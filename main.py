@@ -289,7 +289,6 @@ def select_decoration(stdscr, tracker, decorations, room_name, ai_hint):
 
 def play_minigame(stdscr, tracker):
     """Side-scroller minigame - dodge fail boxes, collect speedups"""
-    import random
 
     # Check if can afford
     if not tracker.can_afford({"copper": 5}):
@@ -312,25 +311,50 @@ def play_minigame(stdscr, tracker):
     PLAYER_X = 5
     WIN_DISTANCE = 100
 
+    # Pre-generated level: (distance, lane, size, is_speedup, style)
+    # Styles: '░' light, '▒' medium, '▓' dark, '#' solid
+    LEVEL = [
+        # Easy start - single obstacles
+        (10, 0, 1, False, '░'),
+        (15, 5, 1, False, '░'),
+        (20, 2, 1, True, '*'),  # speedup
+        (25, 4, 1, False, '▒'),
+        (30, 1, 2, False, '░'),
+        (35, 3, 1, True, '*'),  # speedup
+
+        # Getting harder - bigger obstacles
+        (40, 0, 2, False, '▒'),
+        (45, 4, 2, False, '▒'),
+        (50, 2, 1, True, '*'),  # speedup
+        (55, 1, 3, False, '▓'),
+        (60, 5, 1, False, '░'),
+
+        # Challenge section
+        (65, 0, 1, False, '#'),
+        (65, 3, 2, False, '▓'),
+        (70, 2, 1, True, '*'),  # speedup
+        (75, 1, 2, False, '▒'),
+        (75, 5, 1, False, '▒'),
+        (80, 3, 3, False, '▓'),
+        (85, 0, 2, False, '░'),
+
+        # Final stretch
+        (90, 4, 1, True, '*'),  # speedup
+        (90, 2, 1, False, '#'),
+        (95, 0, 1, False, '▓'),
+        (95, 5, 1, False, '▓'),
+        (98, 2, 2, False, '▒'),
+    ]
+
     # Game state
     player_lane = 3
-    obstacles = []  # List of (x, lane, size, is_speedup)
+    obstacles = []  # List of [x, lane, size, is_speedup, style]
     distance = 0
     speedups_collected = 0
     game_over = False
     won = False
     won_already = False
-
-    # Spawn initial obstacles
-    for i in range(10):
-        x = GAME_WIDTH + i * 10
-        lane = random.randint(0, NUM_LANES - 1)
-        is_speedup = random.random() < 0.3  # 30% chance of speedup
-        if is_speedup:
-            size = 1
-        else:
-            size = random.randint(1, 3)
-        obstacles.append([x, lane, size, is_speedup])
+    level_index = 0
 
     tick = 0
     while not game_over:
@@ -351,17 +375,17 @@ def play_minigame(stdscr, tracker):
 
         # Draw obstacles
         for obs in obstacles:
-            x, lane, size, is_speedup = obs
+            x, lane, size, is_speedup, style = obs
             if 0 <= x < GAME_WIDTH:
                 if is_speedup:
-                    stdscr.addstr(2 + lane, int(x), "*", curses.color_pair(2))
+                    stdscr.addstr(2 + lane, int(x), style, curses.color_pair(2))
                 else:
-                    # Draw fail box
+                    # Draw fail box with style
                     for s in range(size):
                         if lane + s < NUM_LANES:
-                            stdscr.addstr(2 + lane + s, int(x), "#", curses.color_pair(1))
+                            stdscr.addstr(2 + lane + s, int(x), style, curses.color_pair(1))
 
-        stdscr.addstr(2 + NUM_LANES + 1, 0, "Use UP/DOWN arrows to move. Dodge # boxes, collect * speedups!")
+        stdscr.addstr(2 + NUM_LANES + 1, 0, "Use UP/DOWN arrows to move. Dodge ░▒▓# boxes, collect * speedups!")
         stdscr.refresh()
 
         # Handle input
@@ -382,20 +406,15 @@ def play_minigame(stdscr, tracker):
             for obs in obstacles:
                 obs[0] -= 1
 
-            # Spawn new obstacle
-            if random.random() < 0.2:
-                x = GAME_WIDTH
-                lane = random.randint(0, NUM_LANES - 1)
-                is_speedup = random.random() < 0.3
-                if is_speedup:
-                    size = 1
-                else:
-                    size = random.randint(1, 3)
-                obstacles.append([x, lane, size, is_speedup])
+            # Spawn obstacles from level data
+            while level_index < len(LEVEL) and LEVEL[level_index][0] == distance:
+                spawn_dist, lane, size, is_speedup, style = LEVEL[level_index]
+                obstacles.append([GAME_WIDTH, lane, size, is_speedup, style])
+                level_index += 1
 
         # Check collisions
         for obs in obstacles:
-            x, lane, size, is_speedup = obs
+            x, lane, size, is_speedup, style = obs
             if abs(x - PLAYER_X) <= 1:  # At player position
                 if is_speedup:
                     if lane == player_lane:
