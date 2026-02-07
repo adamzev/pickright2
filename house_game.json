@@ -7,16 +7,16 @@
     "iron": 1
   },
   "resource_generators": {
-    "wood": 25,
-    "copper": 30,
-    "iron": 60,
-    "gold": 900,
-    "diamond": 900
+    "wood": 8,
+    "copper": 10,
+    "iron": 20,
+    "gold": 300,
+    "diamond": 300
   },
   "rooms": [
     {
       "name": "Living Room",
-      "ai_hint": "My favorite color is red",
+      "ai_hint": "I like the color of fire",
       "decorations": [
         {
           "name": "Red furniture set",
@@ -73,7 +73,7 @@
     },
     {
       "name": "Security Room",
-      "ai_hint": "Do not waste stuff on security",
+      "ai_hint": "Security costs too much",
       "decorations": [
         {
           "name": "Low security system",
@@ -113,7 +113,7 @@
     },
     {
       "name": "Pet Room",
-      "ai_hint": "Cats are cute",
+      "ai_hint": "I like animals that purr",
       "decorations": [
         {
           "name": "Get a cat",
