@@ -135,7 +135,7 @@
             "        ||| |/  |  \\| |||",
             "             CRASH!!!"
           ],
-          "game_over": false
+          "game_over": true
         },
         {
           "name": "No axe/your fist",
@@ -165,7 +165,7 @@
             "      |||||||      |ouch |",
             "    __|||||||||__   '-----'"
           ],
-          "game_over": false
+          "game_over": true
         }
       ]
     },
