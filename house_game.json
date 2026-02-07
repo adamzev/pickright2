@@ -1,0 +1,152 @@
+{
+  "starting_resources": {
+    "wood": 6,
+    "iron": 2
+  },
+  "starting_generators": {
+    "iron": 1
+  },
+  "resource_generators": {
+    "wood": 25,
+    "copper": 30,
+    "iron": 60,
+    "gold": 900,
+    "diamond": 900
+  },
+  "rooms": [
+    {
+      "name": "Living Room",
+      "ai_hint": "My favorite color is red",
+      "decorations": [
+        {
+          "name": "Red furniture set",
+          "cost": {},
+          "correct": true,
+          "unlocks_generator": "wood",
+          "success_message": "The AI loves the red furniture! You've unlocked a wood generator!",
+          "picture": [
+            "    ___________",
+            "   |  RED SET  |",
+            "   |___________|",
+            "    |   |   |",
+            "   _|___|___|_",
+            "  |           |",
+            "  |  []   []  |",
+            "  |___________|"
+          ]
+        },
+        {
+          "name": "Blue furniture set",
+          "cost": {},
+          "correct": false,
+          "game_over_message": "The AI doesn't like blue. Game over!",
+          "picture": [
+            "    ___________",
+            "   |  BLUE SET |",
+            "   |___________|",
+            "    |   |   |",
+            "   _|___|___|_",
+            "  |           |",
+            "  |  []   []  |",
+            "  |___________|"
+          ]
+        },
+        {
+          "name": "Just a chair",
+          "cost": {
+            "wood": 4,
+            "iron": 1
+          },
+          "correct": false,
+          "game_over_message": "The AI wanted a full set, not just a chair! Game over.",
+          "picture": [
+            "      ___",
+            "     |___|",
+            "       |",
+            "      _|_",
+            "     |   |",
+            "     |   |",
+            "     |___|"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Security Room",
+      "ai_hint": "Do not waste stuff on security",
+      "decorations": [
+        {
+          "name": "Low security system",
+          "cost": {
+            "iron": 1
+          },
+          "correct": true,
+          "unlocks_generator": "copper",
+          "success_message": "The AI appreciates your efficiency! You've unlocked a copper generator!",
+          "picture": [
+            "   ___________",
+            "  |  LOCK     |",
+            "  |   ()      |",
+            "  |___________|",
+            "    BASIC"
+          ]
+        },
+        {
+          "name": "High security system",
+          "cost": {
+            "wood": 3,
+            "iron": 2
+          },
+          "correct": false,
+          "game_over_message": "Too expensive! The AI said not to waste resources. Game over!",
+          "picture": [
+            "   _____________",
+            "  | $$$ DELUXE |",
+            "  |  [CAMERA]  |",
+            "  |  <LASER>   |",
+            "  |  {ALARM}   |",
+            "  |____________|",
+            "    OVERKILL!"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Pet Room",
+      "ai_hint": "Cats are cute",
+      "decorations": [
+        {
+          "name": "Get a cat",
+          "cost": {
+            "wood": 1
+          },
+          "correct": true,
+          "unlocks_generator": "gold",
+          "success_message": "The AI loves cats! You've unlocked a gold generator! House complete!",
+          "picture": [
+            "     /\\_/\\",
+            "    ( o.o )",
+            "     > ^ <",
+            "    /|   |\\",
+            "   (_|   |_)",
+            "      MEOW!"
+          ]
+        },
+        {
+          "name": "Get a dog",
+          "cost": {},
+          "correct": false,
+          "game_over_message": "The AI wanted a cat! Game over.",
+          "picture": [
+            "     /\\_/\\",
+            "    ( ^.^ )",
+            "     > o <",
+            "    /|   |\\",
+            "   / |___| \\",
+            "      WOOF!"
+          ]
+        }
+      ]
+    }
+  ]
+}
