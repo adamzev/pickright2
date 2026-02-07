@@ -51,40 +51,33 @@ def show_win_screen(stdscr):
     curses.init_pair(5, curses.COLOR_MAGENTA, curses.COLOR_BLACK)
 
     stdscr.clear()
+    max_y, max_x = stdscr.getmaxyx()
 
-    # Confetti!
-    confetti = [
-        ("*", 1, 5), (".", 2, 8), ("*", 3, 12), ("o", 4, 18), ("*", 5, 25),
-        (".", 1, 30), ("*", 2, 35), ("o", 3, 40), ("*", 4, 45), (".", 5, 50),
-        ("o", 1, 55), ("*", 2, 60), (".", 3, 3), ("*", 4, 10), ("o", 5, 15),
-        ("*", 1, 20), (".", 2, 28), ("o", 3, 33), ("*", 4, 38), (".", 5, 48),
-    ]
-
-    for char, color, x in confetti:
-        stdscr.addstr(1, x, char, curses.color_pair(color) | curses.A_BOLD)
+    row = 0
 
     # Victory message
-    stdscr.addstr(3, 15, "╔══════════════════════════════╗", curses.A_BOLD)
-    stdscr.addstr(4, 15, "║                              ║", curses.A_BOLD)
-    stdscr.addstr(5, 15, "║       YOU WIN!!! 🎉          ║", curses.color_pair(2) | curses.A_BOLD)
-    stdscr.addstr(6, 15, "║                              ║", curses.A_BOLD)
-    stdscr.addstr(7, 15, "║  You and Sir Rock live       ║", curses.A_BOLD)
-    stdscr.addstr(8, 15, "║  happily ever after!         ║", curses.A_BOLD)
-    stdscr.addstr(9, 15, "║                              ║", curses.A_BOLD)
-    stdscr.addstr(10, 15, "╚══════════════════════════════╝", curses.A_BOLD)
+    if row + 7 < max_y:
+        stdscr.addstr(row, 2, "╔══════════════════════════════╗", curses.A_BOLD)
+        stdscr.addstr(row + 1, 2, "║       YOU WIN!!! 🎉          ║", curses.color_pair(2) | curses.A_BOLD)
+        stdscr.addstr(row + 2, 2, "║                              ║", curses.A_BOLD)
+        stdscr.addstr(row + 3, 2, "║  You and Sir Rock live       ║", curses.A_BOLD)
+        stdscr.addstr(row + 4, 2, "║  happily ever after!         ║", curses.A_BOLD)
+        stdscr.addstr(row + 5, 2, "║                              ║", curses.A_BOLD)
+        stdscr.addstr(row + 6, 2, "╚══════════════════════════════╝", curses.A_BOLD)
+        row += 8
 
     # Sir Rock in celebration
-    stdscr.addstr(12, 22, ".-------.", curses.color_pair(3))
-    stdscr.addstr(13, 22, "/   ^_^  \\", curses.color_pair(3))
-    stdscr.addstr(14, 22, "|  HAPPY  |", curses.color_pair(3))
-    stdscr.addstr(15, 22, "\\_________/", curses.color_pair(3))
-    stdscr.addstr(16, 20, "~ Sir Rock ~", curses.color_pair(3) | curses.A_BOLD)
+    if row + 5 < max_y:
+        stdscr.addstr(row, 10, ".-------.", curses.color_pair(3))
+        stdscr.addstr(row + 1, 10, "/   ^_^  \\", curses.color_pair(3))
+        stdscr.addstr(row + 2, 10, "|  HAPPY  |", curses.color_pair(3))
+        stdscr.addstr(row + 3, 10, "\\_________/", curses.color_pair(3))
+        stdscr.addstr(row + 4, 8, "~ Sir Rock ~", curses.color_pair(3) | curses.A_BOLD)
+        row += 6
 
-    # More confetti at bottom
-    for char, color, x in confetti:
-        stdscr.addstr(18, x, char, curses.color_pair(color) | curses.A_BOLD)
+    if row < max_y:
+        stdscr.addstr(row, 2, "Press any key to continue...", curses.A_BOLD)
 
-    stdscr.addstr(20, 15, "Press any key to continue...", curses.A_BOLD)
     stdscr.refresh()
     stdscr.getch()
 
@@ -319,30 +312,41 @@ def show_house_win_screen(stdscr):
     curses.init_pair(3, curses.COLOR_GREEN, curses.COLOR_BLACK)
 
     stdscr.clear()
+    max_y, max_x = stdscr.getmaxyx()
 
-    stdscr.addstr(2, 15, "╔══════════════════════════════╗", curses.A_BOLD)
-    stdscr.addstr(3, 15, "║                              ║", curses.A_BOLD)
-    stdscr.addstr(4, 15, "║   HOUSE COMPLETE!!! 🏠       ║", curses.color_pair(2) | curses.A_BOLD)
-    stdscr.addstr(5, 15, "║                              ║", curses.A_BOLD)
-    stdscr.addstr(6, 15, "║  The AI loves your house!    ║", curses.A_BOLD)
-    stdscr.addstr(7, 15, "║  Sir Rock has a cozy home!   ║", curses.A_BOLD)
-    stdscr.addstr(8, 15, "║                              ║", curses.A_BOLD)
-    stdscr.addstr(9, 15, "╚══════════════════════════════╝", curses.A_BOLD)
+    row = 0
+
+    # Victory message
+    if row + 7 < max_y:
+        stdscr.addstr(row, 2, "╔══════════════════════════════╗", curses.A_BOLD)
+        stdscr.addstr(row + 1, 2, "║   HOUSE COMPLETE!!! 🏠       ║", curses.color_pair(2) | curses.A_BOLD)
+        stdscr.addstr(row + 2, 2, "║                              ║", curses.A_BOLD)
+        stdscr.addstr(row + 3, 2, "║  The AI loves your house!    ║", curses.A_BOLD)
+        stdscr.addstr(row + 4, 2, "║  Sir Rock has a cozy home!   ║", curses.A_BOLD)
+        stdscr.addstr(row + 5, 2, "║                              ║", curses.A_BOLD)
+        stdscr.addstr(row + 6, 2, "╚══════════════════════════════╝", curses.A_BOLD)
+        row += 8
 
     # House ASCII art
-    stdscr.addstr(11, 22, "        /\\       ", curses.color_pair(3))
-    stdscr.addstr(12, 22, "       /  \\      ", curses.color_pair(3))
-    stdscr.addstr(13, 22, "      /____\\     ", curses.color_pair(3))
-    stdscr.addstr(14, 22, "     |      |    ", curses.color_pair(3))
-    stdscr.addstr(15, 22, "     |  []  |    ", curses.color_pair(3))
-    stdscr.addstr(16, 22, "     |______|    ", curses.color_pair(3))
+    if row + 6 < max_y:
+        stdscr.addstr(row, 10, "        /\\       ", curses.color_pair(3))
+        stdscr.addstr(row + 1, 10, "       /  \\      ", curses.color_pair(3))
+        stdscr.addstr(row + 2, 10, "      /____\\     ", curses.color_pair(3))
+        stdscr.addstr(row + 3, 10, "     |      |    ", curses.color_pair(3))
+        stdscr.addstr(row + 4, 10, "     |  []  |    ", curses.color_pair(3))
+        stdscr.addstr(row + 5, 10, "     |______|    ", curses.color_pair(3))
+        row += 7
 
     # Sir Rock in his house
-    stdscr.addstr(18, 18, ".-------.", curses.color_pair(3))
-    stdscr.addstr(19, 18, "/   ^_^  \\  <- Sir Rock is happy!", curses.color_pair(3))
-    stdscr.addstr(20, 18, "\\________/", curses.color_pair(3))
+    if row + 3 < max_y:
+        stdscr.addstr(row, 6, ".-------.", curses.color_pair(3))
+        stdscr.addstr(row + 1, 6, "/   ^_^  \\  <- Sir Rock!", curses.color_pair(3))
+        stdscr.addstr(row + 2, 6, "\\________/", curses.color_pair(3))
+        row += 4
 
-    stdscr.addstr(22, 15, "Press any key to exit...", curses.A_BOLD)
+    if row < max_y:
+        stdscr.addstr(row, 2, "Press any key to exit...", curses.A_BOLD)
+
     stdscr.refresh()
     stdscr.getch()
 
