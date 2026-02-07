@@ -309,7 +309,7 @@ def play_minigame(stdscr, tracker):
     NUM_LANES = 6
     GAME_WIDTH = 60
     PLAYER_X = 5
-    WIN_DISTANCE = 100
+    WIN_DISTANCE = 150
 
     # Pre-generated level: (distance, lane, size, is_speedup, style)
     # Styles: '░' light, '▒' medium, '▓' dark, '#' solid
@@ -338,12 +338,28 @@ def play_minigame(stdscr, tracker):
         (80, 3, 3, False, '▓'),
         (85, 0, 2, False, '░'),
 
-        # Final stretch
+        # Intense section
         (90, 4, 1, True, '*'),  # speedup
         (90, 2, 1, False, '#'),
         (95, 0, 1, False, '▓'),
         (95, 5, 1, False, '▓'),
-        (98, 2, 2, False, '▒'),
+        (100, 2, 2, False, '▒'),
+        (105, 4, 1, False, '░'),
+        (110, 1, 3, False, '▓'),
+        (115, 3, 1, True, '*'),  # speedup
+        (120, 0, 2, False, '▒'),
+        (120, 5, 1, False, '#'),
+
+        # Final gauntlet
+        (125, 2, 2, False, '▓'),
+        (130, 4, 1, True, '*'),  # speedup
+        (130, 0, 1, False, '░'),
+        (135, 1, 2, False, '#'),
+        (135, 5, 1, False, '▒'),
+        (140, 3, 2, False, '▓'),
+        (145, 0, 1, False, '░'),
+        (145, 4, 1, True, '*'),  # speedup (final!)
+        (148, 2, 1, False, '▒'),
     ]
 
     # Game state
@@ -437,6 +453,19 @@ def play_minigame(stdscr, tracker):
             diamond_reward = 200 + (speedups_collected * 10)
             with tracker.lock:
                 tracker.resources["diamond"] += diamond_reward
+
+            # Show big win notification
+            stdscr.clear()
+            stdscr.addstr(NUM_LANES // 2, 10, "╔════════════════════════════════════╗", curses.A_BOLD)
+            stdscr.addstr(NUM_LANES // 2 + 1, 10, "║                                    ║", curses.A_BOLD)
+            stdscr.addstr(NUM_LANES // 2 + 2, 10, "║         YOU WON! 🎉                ║", curses.color_pair(2) | curses.A_BOLD)
+            stdscr.addstr(NUM_LANES // 2 + 3, 10, f"║    +{diamond_reward} DIAMONDS!                   ║", curses.color_pair(2) | curses.A_BOLD)
+            stdscr.addstr(NUM_LANES // 2 + 4, 10, "║                                    ║", curses.A_BOLD)
+            stdscr.addstr(NUM_LANES // 2 + 5, 10, "║   Keep playing or press Q to quit  ║", curses.A_BOLD)
+            stdscr.addstr(NUM_LANES // 2 + 6, 10, "║                                    ║", curses.A_BOLD)
+            stdscr.addstr(NUM_LANES // 2 + 7, 10, "╚════════════════════════════════════╝", curses.A_BOLD)
+            stdscr.refresh()
+            time.sleep(2)  # Show for 2 seconds
 
     # Game over screen
     stdscr.clear()
