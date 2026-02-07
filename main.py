@@ -287,6 +287,150 @@ def select_decoration(stdscr, tracker, decorations, room_name, ai_hint):
                 stdscr.getch()
 
 
+def play_minigame(stdscr, tracker):
+    """Side-scroller minigame - dodge fail boxes, collect speedups"""
+    import random
+
+    # Check if can afford
+    if not tracker.can_afford({"copper": 5}):
+        stdscr.nodelay(False)
+        stdscr.clear()
+        stdscr.addstr(0, 0, "Not enough copper! Need 5 copper to play.", curses.A_BOLD)
+        stdscr.addstr(2, 0, "Press any key to continue...")
+        stdscr.refresh()
+        stdscr.getch()
+        stdscr.nodelay(True)
+        return
+
+    # Spend copper
+    tracker.spend({"copper": 5})
+    stdscr.nodelay(False)
+
+    # Game constants
+    NUM_LANES = 6
+    GAME_WIDTH = 60
+    PLAYER_X = 5
+    WIN_DISTANCE = 100
+
+    # Game state
+    player_lane = 3
+    obstacles = []  # List of (x, lane, size, is_speedup)
+    distance = 0
+    speedups_collected = 0
+    game_over = False
+    won = False
+
+    # Spawn initial obstacles
+    for i in range(10):
+        x = GAME_WIDTH + i * 10
+        lane = random.randint(0, NUM_LANES - 1)
+        is_speedup = random.random() < 0.3  # 30% chance of speedup
+        if is_speedup:
+            size = 1
+        else:
+            size = random.randint(1, 3)
+        obstacles.append([x, lane, size, is_speedup])
+
+    tick = 0
+    while not game_over:
+        stdscr.clear()
+
+        # Title
+        stdscr.addstr(0, 0, f"=== MINIGAME === Distance: {distance}/{WIN_DISTANCE} | Speedups: {speedups_collected}", curses.A_BOLD)
+
+        # Draw lanes
+        for lane in range(NUM_LANES):
+            stdscr.addstr(2 + lane, 0, "-" * 70)
+
+        # Draw player
+        stdscr.addstr(2 + player_lane, PLAYER_X, ">O>", curses.A_BOLD | curses.color_pair(3))
+
+        # Draw obstacles
+        for obs in obstacles:
+            x, lane, size, is_speedup = obs
+            if 0 <= x < GAME_WIDTH:
+                if is_speedup:
+                    stdscr.addstr(2 + lane, int(x), "*", curses.color_pair(2))
+                else:
+                    # Draw fail box
+                    for s in range(size):
+                        if lane + s < NUM_LANES:
+                            stdscr.addstr(2 + lane + s, int(x), "#", curses.color_pair(1))
+
+        stdscr.addstr(2 + NUM_LANES + 1, 0, "Use UP/DOWN arrows to move. Dodge # boxes, collect * speedups!")
+        stdscr.refresh()
+
+        # Handle input
+        stdscr.timeout(50)  # 50ms timeout
+        key = stdscr.getch()
+
+        if key == curses.KEY_UP and player_lane > 0:
+            player_lane -= 1
+        elif key == curses.KEY_DOWN and player_lane < NUM_LANES - 1:
+            player_lane += 1
+
+        # Move obstacles
+        tick += 1
+        if tick % 2 == 0:  # Move every other tick
+            distance += 1
+            for obs in obstacles:
+                obs[0] -= 1
+
+            # Spawn new obstacle
+            if random.random() < 0.2:
+                x = GAME_WIDTH
+                lane = random.randint(0, NUM_LANES - 1)
+                is_speedup = random.random() < 0.3
+                if is_speedup:
+                    size = 1
+                else:
+                    size = random.randint(1, 3)
+                obstacles.append([x, lane, size, is_speedup])
+
+        # Check collisions
+        for obs in obstacles:
+            x, lane, size, is_speedup = obs
+            if abs(x - PLAYER_X) <= 1:  # At player position
+                if is_speedup:
+                    if lane == player_lane:
+                        speedups_collected += 1
+                        obstacles.remove(obs)
+                else:
+                    # Check if player is in the fail box range
+                    if lane <= player_lane < lane + size:
+                        game_over = True
+                        won = False
+
+        # Remove off-screen obstacles
+        obstacles = [obs for obs in obstacles if obs[0] > -5]
+
+        # Check win condition
+        if distance >= WIN_DISTANCE:
+            game_over = True
+            won = True
+
+    # Game over screen
+    stdscr.clear()
+    if won:
+        diamond_reward = 200 + (speedups_collected * 10)
+        stdscr.addstr(0, 0, "YOU WON!", curses.color_pair(3) | curses.A_BOLD)
+        stdscr.addstr(2, 0, f"Speedups collected: {speedups_collected}")
+        stdscr.addstr(3, 0, f"Diamond reward: {diamond_reward}!", curses.A_BOLD)
+        with tracker.lock:
+            tracker.resources["diamond"] += diamond_reward
+    else:
+        stdscr.addstr(0, 0, "GAME OVER!", curses.color_pair(1) | curses.A_BOLD)
+        stdscr.addstr(2, 0, "You hit a fail box!")
+        stdscr.addstr(3, 0, "Consolation prize: +50 copper", curses.A_BOLD)
+        with tracker.lock:
+            tracker.resources["copper"] += 50
+
+    stdscr.addstr(5, 0, "Press any key to continue...")
+    stdscr.refresh()
+    stdscr.getch()
+    stdscr.nodelay(True)
+
+
 def wait_for_resources_screen(stdscr, tracker):
     """Show a waiting screen where resources generate in real-time"""
     stdscr.nodelay(True)  # Non-blocking input
@@ -298,16 +442,19 @@ def wait_for_resources_screen(stdscr, tracker):
             stdscr.addstr(0, 0, "=== Resource Generation ===", curses.A_BOLD)
             stdscr.addstr(1, 0, "Watch your resources grow!")
             stdscr.addstr(2, 0, "Press SPACE when ready to continue...", curses.A_BOLD)
+            stdscr.addstr(3, 0, "Press M to play minigame (costs 5 copper)", curses.A_BOLD)
 
             # Display resources
-            display_resources(stdscr, tracker, 4)
+            display_resources(stdscr, tracker, 5)
 
             stdscr.refresh()
 
-            # Check for space key
+            # Check for keys
             key = stdscr.getch()
             if key == ord(' '):
                 break
+            elif key == ord('m') or key == ord('M'):
+                play_minigame(stdscr, tracker)
 
             time.sleep(0.1)  # Update display 10 times per second
 
