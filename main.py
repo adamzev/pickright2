@@ -319,6 +319,7 @@ def play_minigame(stdscr, tracker):
     speedups_collected = 0
     game_over = False
     won = False
+    won_already = False
 
     # Spawn initial obstacles
     for i in range(10):
@@ -336,7 +337,10 @@ def play_minigame(stdscr, tracker):
         stdscr.clear()
 
         # Title
-        stdscr.addstr(0, 0, f"=== MINIGAME === Distance: {distance}/{WIN_DISTANCE} | Speedups: {speedups_collected}", curses.A_BOLD)
+        if won_already:
+            stdscr.addstr(0, 0, f"=== YOU WON! === Distance: {distance} | Speedups: {speedups_collected} | Press Q to quit", curses.A_BOLD)
+        else:
+            stdscr.addstr(0, 0, f"=== MINIGAME === Distance: {distance}/{WIN_DISTANCE} | Speedups: {speedups_collected}", curses.A_BOLD)
 
         # Draw lanes
         for lane in range(NUM_LANES):
@@ -368,6 +372,8 @@ def play_minigame(stdscr, tracker):
             player_lane -= 1
         elif key == curses.KEY_DOWN and player_lane < NUM_LANES - 1:
             player_lane += 1
+        elif (key == ord('q') or key == ord('Q')) and won_already:
+            game_over = True
 
         # Move obstacles
         tick += 1
@@ -405,27 +411,32 @@ def play_minigame(stdscr, tracker):
         obstacles = [obs for obs in obstacles if obs[0] > -5]
 
         # Check win condition
-        if distance >= WIN_DISTANCE:
-            game_over = True
+        if distance >= WIN_DISTANCE and not won_already:
+            won_already = True
             won = True
+            # Award diamonds immediately
+            diamond_reward = 200 + (speedups_collected * 10)
+            with tracker.lock:
+                tracker.resources["diamond"] += diamond_reward
 
     # Game over screen
     stdscr.clear()
-    if won:
-        diamond_reward = 200 + (speedups_collected * 10)
-        stdscr.addstr(0, 0, "YOU WON!", curses.color_pair(3) | curses.A_BOLD)
-        stdscr.addstr(2, 0, f"Speedups collected: {speedups_collected}")
-        stdscr.addstr(3, 0, f"Diamond reward: {diamond_reward}!", curses.A_BOLD)
-        with tracker.lock:
-            tracker.resources["diamond"] += diamond_reward
+    if won_already:
+        # Already awarded diamonds, just show stats
+        stdscr.addstr(0, 0, "Thanks for playing!", curses.color_pair(3) | curses.A_BOLD)
+        stdscr.addstr(2, 0, f"Final distance: {distance}")
+        stdscr.addstr(3, 0, f"Speedups collected: {speedups_collected}")
+        if not won:  # Hit a fail box after winning
+            stdscr.addstr(4, 0, "(You hit a fail box, but you already won!)")
     else:
+        # Lost without winning
         stdscr.addstr(0, 0, "GAME OVER!", curses.color_pair(1) | curses.A_BOLD)
         stdscr.addstr(2, 0, "You hit a fail box!")
         stdscr.addstr(3, 0, "Consolation prize: +50 copper", curses.A_BOLD)
         with tracker.lock:
             tracker.resources["copper"] += 50
 
-    stdscr.addstr(5, 0, "Press any key to continue...")
+    stdscr.addstr(6, 0, "Press any key to continue...")
     stdscr.refresh()
     stdscr.getch()
     stdscr.nodelay(True)
