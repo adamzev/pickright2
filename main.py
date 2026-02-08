@@ -137,6 +137,63 @@ def check_terminal_size(stdscr):
             return False
 
 
+def show_new_art_preview(stdscr):
+    """Temporary preview of new ASCII art"""
+    stdscr.clear()
+
+    # Cat
+    stdscr.addstr(0, 0, "=== NEW ASCII ART PREVIEW ===", curses.A_BOLD)
+    stdscr.addstr(2, 0, "1. CAT:", curses.A_BOLD)
+    stdscr.addstr(3, 2, "  /\\_/\\  ")
+    stdscr.addstr(4, 2, "=(  o.o  )=")
+    stdscr.addstr(5, 2, "  >  ^  <")
+
+    # Gold Snake
+    stdscr.addstr(7, 0, "2. GOLD SNAKE:", curses.A_BOLD)
+    snake = [
+        "        /^\\/^\\",
+        "     _|__|  o|",
+        "    (      _/ )",
+        "     \\____/   \\",
+        "      /   .-\"\"\"-.",
+        "     |   /  .-.   \\",
+        "      \\  |  (   )  |",
+        "       '.\\   '-'  /",
+        "          '-.___.-'"
+    ]
+    for i, line in enumerate(snake):
+        stdscr.addstr(8 + i, 2, line)
+
+    stdscr.addstr(18, 0, "Press any key to see more...")
+    stdscr.refresh()
+    stdscr.getch()
+
+    # Page 2
+    stdscr.clear()
+    stdscr.addstr(0, 0, "=== NEW ASCII ART PREVIEW (continued) ===", curses.A_BOLD)
+
+    # Eat Fish
+    stdscr.addstr(2, 0, "3. EAT FISH:", curses.A_BOLD)
+    fish = [
+        "                _",
+        "            .-\"   o \" -.",
+        "           /        \\/\\/\\",
+        "        _ /    >      / ",
+        "       \\ /           /",
+        "        \\          /",
+        "         \"-._____ -\""
+    ]
+    for i, line in enumerate(fish):
+        stdscr.addstr(3 + i, 2, line)
+
+    stdscr.addstr(12, 0, "4. JUMBO GOLD SNAKE:", curses.A_BOLD)
+    stdscr.addstr(13, 2, "(Too big to show here - 18 lines!)")
+
+    stdscr.addstr(16, 0, "Press any key to start the game...")
+    stdscr.refresh()
+    stdscr.getch()
+
+
 def menu(stdscr):
     curses.curs_set(0)
     curses.start_color()
@@ -144,6 +201,9 @@ def menu(stdscr):
     # Check terminal size first
     if not check_terminal_size(stdscr):
         return
+
+    # TEMP: Show new art preview
+    show_new_art_preview(stdscr)
 
     data = load_game_data()
 
