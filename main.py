@@ -492,7 +492,19 @@ def play_minigame(stdscr, tracker):
         (145, 0, 1, False, '░'),
         (145, 4, 1, True, '*'),  # speedup (final!)
         (148, 2, 1, False, '▒'),
+        # Boss monster — spans every lane, drawn as a wide image, inevitable
+        (165, 0, NUM_LANES, False, 'M'),
     ]
+
+    MONSTER_ART = [
+        " ▄▄▄▄▄▄▄▄▄ ",
+        "█ ●     ● █",
+        "█         █",
+        "█ ▼▼▼▼▼▼▼ █",
+        "█ ▲▲▲▲▲▲▲ █",
+        " ▀▀▀▀▀▀▀▀▀ ",
+    ]
+    MONSTER_WIDTH = len(MONSTER_ART[0])
 
     # Game state
     player_lane = 3
@@ -500,6 +512,7 @@ def play_minigame(stdscr, tracker):
     distance = 0
     speedups_collected = 0
     game_over = False
+    hit_monster = False
     won = False
     won_already = False
     level_index = 0
@@ -513,7 +526,7 @@ def play_minigame(stdscr, tracker):
             stdscr.addstr(
                 0,
                 0,
-                f"=== YOU WON! === Distance: {distance} | Speedups: {speedups_collected} | Press Q to quit",
+                f"=== YOU WON! === Speedups: {speedups_collected} | A MONSTER APPROACHES!",
                 curses.A_BOLD,
             )
         else:
@@ -539,6 +552,22 @@ def play_minigame(stdscr, tracker):
         # Draw obstacles
         for obs in obstacles:
             x, lane, size, is_speedup, style = obs
+            if style == 'M':
+                # Draw the monster image, clipped to the game area
+                for row_i, row in enumerate(MONSTER_ART):
+                    for col_i, ch in enumerate(row):
+                        if ch == ' ':
+                            continue
+                        cx = int(x) + col_i
+                        if 0 <= cx < GAME_WIDTH and 2 + row_i < 2 + NUM_LANES:
+                            try:
+                                stdscr.addstr(
+                                    2 + row_i, cx, ch,
+                                    curses.color_pair(5) | curses.A_BOLD,
+                                )
+                            except curses.error:
+                                pass
+                continue
             if 0 <= x < GAME_WIDTH:
                 if is_speedup:
                     stdscr.addstr(
@@ -570,8 +599,6 @@ def play_minigame(stdscr, tracker):
             player_lane -= 1
         elif key == curses.KEY_DOWN and player_lane < NUM_LANES - 1:
             player_lane += 1
-        elif (key == ord('q') or key == ord('Q')) and won_already:
-            game_over = True
 
         # Move obstacles
         tick += 1
@@ -591,7 +618,11 @@ def play_minigame(stdscr, tracker):
         # Check collisions
         for obs in obstacles:
             x, lane, size, is_speedup, style = obs
-            if abs(x - PLAYER_X) <= 1:  # At player position
+            if style == 'M':
+                hits_x = x <= PLAYER_X < x + MONSTER_WIDTH
+            else:
+                hits_x = abs(x - PLAYER_X) <= 1
+            if hits_x:
                 if is_speedup:
                     if lane == player_lane:
                         speedups_collected += 1
@@ -601,9 +632,14 @@ def play_minigame(stdscr, tracker):
                     if lane <= player_lane < lane + size:
                         game_over = True
                         won = False
+                        if style == 'M':
+                            hit_monster = True
 
         # Remove off-screen obstacles
-        obstacles = [obs for obs in obstacles if obs[0] > -5]
+        obstacles = [
+            obs for obs in obstacles
+            if (obs[0] > -MONSTER_WIDTH if obs[4] == 'M' else obs[0] > -5)
+        ]
 
         # Check win condition
         if distance >= WIN_DISTANCE and not won_already:
@@ -649,8 +685,8 @@ def play_minigame(stdscr, tracker):
             stdscr.addstr(
                 NUM_LANES // 2 + 5,
                 10,
-                "║   Keep playing or press Q to quit  ║",
-                curses.A_BOLD,
+                "║   But a monster approaches...      ║",
+                curses.color_pair(1) | curses.A_BOLD,
             )
             stdscr.addstr(
                 NUM_LANES // 2 + 6,
@@ -669,7 +705,13 @@ def play_minigame(stdscr, tracker):
 
     # Game over screen
     stdscr.clear()
-    if won_already:
+    if hit_monster:
+        stdscr.addstr(
+            0, 0, "THE MONSTER CRUSHED YOU!", curses.color_pair(1) | curses.A_BOLD
+        )
+        stdscr.addstr(2, 0, "Nothing could stop it. But you kept your diamonds.")
+        stdscr.addstr(3, 0, f"Speedups collected: {speedups_collected}")
+    elif won_already:
         # Already awarded diamonds, just show stats
         stdscr.addstr(
             0, 0, "Thanks for playing!", curses.color_pair(3) | curses.A_BOLD

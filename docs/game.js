@@ -38,17 +38,12 @@
       `
       <h1>Pick Right 2</h1>
       <p class="dim">A choose-your-fate adventure. Pick wisely.</p>
-      <div class="confetti">* . * o * . o *</div>
-      <pre class="art">       .-------.
-      /         \\
-     /   .   .   \\
-    |             |
-    |     ___     |
-     \\   '   '  /
-      \\_________/
-
-     ~ Sir Rock ~</pre>
-      <p>Help your hero survive and build a home for Sir Rock!</p>
+      <pre class="art">      ✨     ·     ✨
+   ·  ╔═════════╗  ·
+  ✨  ║ ★ START ║  ✨
+   ·  ╚═════════╝  ·
+      ✨     ·     ✨</pre>
+      <p>Help your hero survive whatever comes next!</p>
       <div class="options">
         ${button("Start Game", () => renderRound(0))}
       </div>
@@ -377,7 +372,7 @@
     startMinigame(onExit);
   };
 
-  const startMinigame = (onExit) => {
+  const startMinigame = (onExit, catMode = false) => {
     const NUM_LANES = 6;
     const WIN_DISTANCE = 150;
     const PLAYER_X = 5;
@@ -397,7 +392,10 @@
       [125, 2, 2, false, "▓"], [130, 4, 1, true, "*"], [130, 0, 1, false, "░"],
       [140, 3, 2, false, "▓"], [145, 0, 1, false, "░"], [145, 4, 1, true, "*"],
       [148, 2, 1, false, "▒"],
+      // Boss monster — spans every lane, drawn as a wide image, inevitable
+      [165, 0, NUM_LANES, false, "M"],
     ];
+    const MONSTER_WIDTH = 11;
 
     let playerLane = 3;
     let obstacles = [];
@@ -406,6 +404,7 @@
     let levelI = 0;
     let won = false;
     let dead = false;
+    let killedByMonster = false;
     let raf = null;
     let tickCount = 0;
 
@@ -462,7 +461,55 @@
       if (style === "▒") return "#8a3a3a";
       if (style === "▓") return "#c14a4a";
       if (style === "#") return "#ff5050";
+      if (style === "M") return "#7a0099";
       return "#aa4040";
+    };
+
+    const drawMonster = (px, py, w, h) => {
+      // Body fill
+      ctx.fillStyle = "#2a0040";
+      ctx.fillRect(px, py, w, h);
+      // Body outline
+      ctx.strokeStyle = "#aa00cc";
+      ctx.lineWidth = 3;
+      ctx.strokeRect(px + 1.5, py + 1.5, w - 3, h - 3);
+      // Eyes (whites + glowing red pupils)
+      const eyeR = h * 0.07;
+      const eyeY = py + h * 0.27;
+      const eyeXL = px + w * 0.3;
+      const eyeXR = px + w * 0.7;
+      ctx.fillStyle = "#ffff88";
+      ctx.beginPath(); ctx.arc(eyeXL, eyeY, eyeR, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(eyeXR, eyeY, eyeR, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#ff2222";
+      ctx.beginPath(); ctx.arc(eyeXL, eyeY, eyeR * 0.55, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(eyeXR, eyeY, eyeR * 0.55, 0, Math.PI * 2); ctx.fill();
+      // Fangs — top row pointing down, bottom row pointing up
+      ctx.fillStyle = "#f8f8e0";
+      const fangCount = 7;
+      const fangW = (w * 0.7) / fangCount;
+      const fangLeft = px + w * 0.15;
+      const topFangY = py + h * 0.5;
+      const fangH = h * 0.13;
+      for (let i = 0; i < fangCount; i++) {
+        const fx = fangLeft + i * fangW;
+        ctx.beginPath();
+        ctx.moveTo(fx, topFangY);
+        ctx.lineTo(fx + fangW, topFangY);
+        ctx.lineTo(fx + fangW / 2, topFangY + fangH);
+        ctx.closePath();
+        ctx.fill();
+      }
+      const botFangY = topFangY + fangH + h * 0.08;
+      for (let i = 0; i < fangCount; i++) {
+        const fx = fangLeft + i * fangW;
+        ctx.beginPath();
+        ctx.moveTo(fx, botFangY);
+        ctx.lineTo(fx + fangW, botFangY);
+        ctx.lineTo(fx + fangW / 2, botFangY - fangH);
+        ctx.closePath();
+        ctx.fill();
+      }
     };
 
     const draw = () => {
@@ -487,9 +534,13 @@
 
       // Obstacles
       for (const obs of obstacles) {
-        const [x, lane, size, isSpeedup] = obs;
+        const [x, lane, size, isSpeedup, style] = obs;
         const px = x * cellW;
-        ctx.fillStyle = colorFor(obs[4], isSpeedup);
+        if (style === "M") {
+          drawMonster(px, 0, MONSTER_WIDTH * cellW, H);
+          continue;
+        }
+        ctx.fillStyle = colorFor(style, isSpeedup);
         if (isSpeedup) {
           ctx.beginPath();
           const cx = px + cellW / 2;
@@ -537,8 +588,11 @@
         // Collisions
         for (let i = obstacles.length - 1; i >= 0; i--) {
           const obs = obstacles[i];
-          const [x, lane, size, isSpeedup] = obs;
-          if (Math.abs(x - PLAYER_X) <= 1) {
+          const [x, lane, size, isSpeedup, style] = obs;
+          const hitsX = style === "M"
+            ? x <= PLAYER_X && PLAYER_X < x + MONSTER_WIDTH
+            : Math.abs(x - PLAYER_X) <= 1;
+          if (hitsX) {
             if (isSpeedup) {
               if (lane === playerLane) {
                 speedups++;
@@ -547,11 +601,12 @@
             } else {
               if (lane <= playerLane && playerLane < lane + size) {
                 dead = true;
+                if (style === "M") killedByMonster = true;
               }
             }
           }
         }
-        obstacles = obstacles.filter((o) => o[0] > -5);
+        obstacles = obstacles.filter((o) => o[4] === "M" ? o[0] > -MONSTER_WIDTH : o[0] > -5);
 
         if (distance >= WIN_DISTANCE && !won) {
           won = true;
@@ -563,7 +618,7 @@
       }
       draw();
 
-      if (dead && !won) {
+      if (dead) {
         endMinigame(false);
         return;
       }
@@ -576,7 +631,7 @@
       // Briefly flash a banner over the canvas
       const banner = document.createElement("div");
       banner.className = "win-banner";
-      banner.innerHTML = `<div class="big">YOU WON!</div><div>+${reward} diamonds!</div><div class="dim">Keep playing or quit when ready.</div>`;
+      banner.innerHTML = `<div class="big">YOU WON!</div><div>+${reward} diamonds!</div><div class="dim">But a monster approaches…</div>`;
       canvas.insertAdjacentElement("afterend", banner);
       setTimeout(() => banner.remove(), 2500);
     };
@@ -586,26 +641,65 @@
       raf = null;
       window.removeEventListener("keydown", keyHandler);
 
-      if (!won) {
+      if (!won && !killedByMonster) {
         resources.copper = (resources.copper || 0) + 50;
       }
 
+      let title, summary;
+      if (killedByMonster) {
+        title = "THE MONSTER CRUSHED YOU!";
+        summary = `<p class="bad">Nothing could stop it. But you kept your ${200 + speedups * 10} diamonds.</p>`;
+      } else if (won) {
+        title = "Great run!";
+        summary = `<p class="good">You earned ${200 + speedups * 10} diamonds!</p>`;
+      } else {
+        title = "Game Over";
+        summary = `<p class="accent">Consolation prize: +50 copper</p>`;
+      }
+
+      const actions = catMode
+        ? `${button("Play again", () => startMinigame(null, true))}
+           ${button("Back to cat rooms", () => renderCatRooms(), "option")}`
+        : button("Back to building →", () => renderHouseWait(onExit));
+
       setScreen(`
-        <h2>${won ? "Great run!" : "Game Over"}</h2>
+        <h2>${title}</h2>
         <p>Final distance: <strong>${distance}</strong></p>
         <p>Speedups collected: <strong>${speedups}</strong></p>
-        ${won
-          ? `<p class="good">You earned ${200 + speedups * 10} diamonds!</p>`
-          : `<p class="accent">Consolation prize: +50 copper</p>`}
-        <div class="options">
-          ${button("Back to building →", () => renderHouseWait(onExit))}
-        </div>
+        ${summary}
+        <div class="options">${actions}</div>
       `);
     };
 
     raf = requestAnimationFrame(step);
   };
 
+  // ---------- Cat Rooms (secret testing backdoor) ----------
+
+  const renderCatRooms = () => {
+    stopResourceTicking();
+    resources = { copper: 999, diamond: 0 };
+    generators = {};
+    generatorRates = {};
+    setScreen(`
+      <h1>🐈 Cat Rooms 🐈</h1>
+      <p class="dim">Secret backdoor — straight to the minigame for testing.</p>
+      <p>No resource costs apply here.</p>
+      <div class="options">
+        ${button("Launch minigame →", () => startMinigame(null, true))}
+        ${button("Back to title", () => { window.location.hash = ""; renderTitle(); }, "option")}
+      </div>
+    `);
+  };
+
   // ---------- Boot ----------
-  renderTitle();
+  const bootRoute = () => {
+    if (window.location.hash === "#catrooms") {
+      renderCatRooms();
+    } else {
+      renderTitle();
+    }
+  };
+  window.addEventListener("hashchange", bootRoute);
+  bootRoute();
 })();
