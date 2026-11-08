@@ -141,6 +141,8 @@ button.primary:active {
   transform: scale(0.99);
 }
 
+a.option { color: #8d5ae6; }
+
 button.option .cost,
 a.option .cost {
   display: block;
