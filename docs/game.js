@@ -46,6 +46,9 @@
       <p>Help your hero survive whatever comes next!</p>
       <div class="options">
         ${button("Start Game", () => renderRound(0))}
+        <a class="option" href="blockdash.html" style="text-decoration:none;display:block">
+          ⛏ Block Dash <span class="cost">Blocky platformer + level maker</span>
+        </a>
       </div>
     `,
     );

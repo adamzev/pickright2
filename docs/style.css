@@ -115,6 +115,7 @@ pre.art {
 }
 
 button.option,
+a.option,
 button.primary {
   background: var(--panel-hi);
   color: var(--fg);
@@ -129,6 +130,7 @@ button.primary {
 }
 
 button.option:hover,
+a.option:hover,
 button.primary:hover {
   background: #262633;
   border-color: #3a3a48;
@@ -139,7 +141,10 @@ button.primary:active {
   transform: scale(0.99);
 }
 
-button.option .cost {
+a.option { color: #8d5ae6; }
+
+button.option .cost,
+a.option .cost {
   display: block;
   font-size: 0.85rem;
   color: var(--dim);

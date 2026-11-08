@@ -1,0 +1,141 @@
+// Built-in art for Block Dash — repainted sprites that ship with the game.
+//
+// This file is GENERATED. Paint sprites in the Art Studio, then use
+// "Download art pack" and replace this whole file with the download. Don't
+// hand-edit it. An empty pack means everyone gets the original pixel art.
+//
+// Anything painted in a player's own browser wins over this file.
+window.BDArtPack = {
+  "m": {
+    "w": 16,
+    "h": 16,
+    "px": [
+      "#5aa03a","#5aa03a","#5aa03a","#5aa03a","#5aa03a","#5aa03a","#5aa03a","#5aa03a","#5aa03a","#5aa03a","#5aa03a","#5aa03a","#5aa03a","#5aa03a","#5aa03a","#5aa03a",
+      "#5aa03a","#7bc95a","#7bc95a","#7bc95a","#7bc95a","#7bc95a","#7bc95a","#7bc95a","#7bc95a","#7bc95a","#7bc95a","#7bc95a","#7bc95a","#7bc95a","#7bc95a","#5aa03a",
+      "#5aa03a","#7bc95a","#c6f5a8","#c6f5a8","#c6f5a8","#7bc95a","#7bc95a","#7bc95a","#7bc95a","#7bc95a","#7bc95a","#7bc95a","#7bc95a","#7bc95a","#7bc95a","#5aa03a",
+      "#5aa03a","#7bc95a","#c6f5a8","#96e072","#96e072","#96e072","#96e072","#96e072","#96e072","#96e072","#96e072","#96e072","#96e072","#7bc95a","#7bc95a","#5aa03a",
+      "#5aa03a","#7bc95a","#c6f5a8","#96e072","#7bc95a","#7bc95a","#7bc95a","#7bc95a","#7bc95a","#7bc95a","#7bc95a","#7bc95a","#96e072","#7bc95a","#7bc95a","#5aa03a",
+      "#5aa03a","#7bc95a","#7bc95a","#96e072","#7bc95a","#7bc95a","#7bc95a","#7bc95a","#7bc95a","#7bc95a","#7bc95a","#7bc95a","#96e072","#7bc95a","#7bc95a","#5aa03a",
+      "#5aa03a","#7bc95a","#7bc95a","#96e072","#7bc95a","#7bc95a","#7bc95a","#7bc95a","#7bc95a","#7bc95a","#7bc95a","#7bc95a","#96e072","#7bc95a","#7bc95a","#5aa03a",
+      "#5aa03a","#7bc95a","#7bc95a","#96e072","#7bc95a","#7bc95a","#7bc95a","#7bc95a","#7bc95a","#7bc95a","#7bc95a","#7bc95a","#96e072","#7bc95a","#7bc95a","#5aa03a",
+      "#5aa03a","#7bc95a","#7bc95a","#96e072","#7bc95a","#7bc95a","#7bc95a","#7bc95a","#7bc95a","#7bc95a","#7bc95a","#7bc95a","#96e072","#7bc95a","#7bc95a","#5aa03a",
+      "#5aa03a","#7bc95a","#7bc95a","#96e072","#7bc95a","#7bc95a","#7bc95a","#7bc95a","#7bc95a","#7bc95a","#7bc95a","#7bc95a","#96e072","#7bc95a","#7bc95a","#5aa03a",
+      "#5aa03a","#7bc95a","#7bc95a","#96e072","#7bc95a","#7bc95a","#7bc95a","#7bc95a","#7bc95a","#7bc95a","#7bc95a","#7bc95a","#96e072","#7bc95a","#7bc95a","#5aa03a",
+      "#5aa03a","#7bc95a","#7bc95a","#96e072","#7bc95a","#7bc95a","#7bc95a","#7bc95a","#7bc95a","#7bc95a","#7bc95a","#7bc95a","#96e072","#7bc95a","#7bc95a","#5aa03a",
+      "#5aa03a","#7bc95a","#7bc95a","#96e072","#96e072","#96e072","#96e072","#96e072","#96e072","#96e072","#96e072","#96e072","#96e072","#7bc95a","#7bc95a","#5aa03a",
+      "#5aa03a","#7bc95a","#7bc95a","#7bc95a","#7bc95a","#7bc95a","#7bc95a","#7bc95a","#7bc95a","#7bc95a","#7bc95a","#7bc95a","#7bc95a","#7bc95a","#7bc95a","#5aa03a",
+      "#5aa03a","#7bc95a","#7bc95a","#7bc95a","#7bc95a","#7bc95a","#7bc95a","#7bc95a","#7bc95a","#7bc95a","#7bc95a","#7bc95a","#7bc95a","#7bc95a","#7bc95a","#5aa03a",
+      "#5aa03a","#5aa03a","#5aa03a","#5aa03a","#5aa03a","#5aa03a","#5aa03a","#5aa03a","#5aa03a","#5aa03a","#5aa03a","#5aa03a","#5aa03a","#5aa03a","#5aa03a","#5aa03a"
+    ]
+  },
+  "t": {
+    "w": 16,
+    "h": 16,
+    "px": [
+      "#a8291f","#d1402f","#d1402f","#a8291f","#a8291f","#d1402f","#d1402f","#a8291f","#a8291f","#d1402f","#d1402f","#a8291f","#a8291f","#d1402f","#d1402f","#a8291f",
+      "#a8291f","#d1402f","#d1402f","#a8291f","#a8291f","#d1402f","#d1402f","#a8291f","#a8291f","#d1402f","#d1402f","#a8291f","#a8291f","#d1402f","#d1402f","#a8291f",
+      "#a8291f","#d1402f","#d1402f","#a8291f","#a8291f","#d1402f","#d1402f","#a8291f","#a8291f","#d1402f","#d1402f","#a8291f","#a8291f","#d1402f","#d1402f","#a8291f",
+      "#a8291f","#d1402f","#d1402f","#a8291f","#a8291f","#d1402f","#d1402f","#a8291f","#a8291f","#d1402f","#d1402f","#a8291f","#a8291f","#d1402f","#d1402f","#a8291f",
+      "#a8291f","#d1402f","#d1402f","#a8291f","#a8291f","#d1402f","#d1402f","#a8291f","#a8291f","#d1402f","#d1402f","#a8291f","#a8291f","#d1402f","#d1402f","#a8291f",
+      "#efefef","#efefef","#efefef","#efefef","#efefef","#efefef","#efefef","#efefef","#efefef","#efefef","#efefef","#efefef","#efefef","#efefef","#efefef","#efefef",
+      "#ffffff","#1c1c1c","#1c1c1c","#1c1c1c","#ffffff","#1c1c1c","#1c1c1c","#ffffff","#efefef","#1c1c1c","#ffffff","#1c1c1c","#1c1c1c","#1c1c1c","#ffffff","#ffffff",
+      "#efefef","#efefef","#1c1c1c","#efefef","#efefef","#1c1c1c","#efefef","#1c1c1c","#efefef","#1c1c1c","#efefef","#efefef","#1c1c1c","#efefef","#efefef","#efefef",
+      "#efefef","#efefef","#1c1c1c","#efefef","#efefef","#1c1c1c","#efefef","#efefef","#1c1c1c","#1c1c1c","#efefef","#efefef","#1c1c1c","#efefef","#efefef","#efefef",
+      "#efefef","#efefef","#1c1c1c","#efefef","#efefef","#1c1c1c","#efefef","#efefef","#efefef","#1c1c1c","#efefef","#efefef","#1c1c1c","#efefef","#efefef","#efefef",
+      "#efefef","#efefef","#efefef","#efefef","#efefef","#efefef","#efefef","#efefef","#efefef","#efefef","#efefef","#efefef","#efefef","#efefef","#efefef","#efefef",
+      "#c8c8c8","#c8c8c8","#c8c8c8","#c8c8c8","#c8c8c8","#c8c8c8","#c8c8c8","#c8c8c8","#c8c8c8","#c8c8c8","#c8c8c8","#c8c8c8","#c8c8c8","#c8c8c8","#c8c8c8","#c8c8c8",
+      "#a8291f","#d1402f","#d1402f","#a8291f","#a8291f","#d1402f","#d1402f","#a8291f","#a8291f","#d1402f","#d1402f","#a8291f","#a8291f","#d1402f","#d1402f","#a8291f",
+      "#a8291f","#d1402f","#d1402f","#a8291f","#a8291f","#d1402f","#d1402f","#a8291f","#a8291f","#d1402f","#d1402f","#a8291f","#a8291f","#d1402f","#d1402f","#a8291f",
+      "#a8291f","#d1402f","#d1402f","#a8291f","#a8291f","#d1402f","#d1402f","#a8291f","#a8291f","#d1402f","#d1402f","#a8291f","#a8291f","#d1402f","#d1402f","#a8291f",
+      "#a8291f","#d1402f","#d1402f","#a8291f","#a8291f","#d1402f","#d1402f","#a8291f","#a8291f","#d1402f","#d1402f","#a8291f","#a8291f","#d1402f","#d1402f","#a8291f"
+    ]
+  },
+  "d": {
+    "w": 16,
+    "h": 16,
+    "px": [
+      null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,
+      null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,
+      null,null,"#3ad0c8","#3ad0c8","#3ad0c8","#3ad0c8","#1a8f8a","#3ad0c8","#3ad0c8","#1a8f8a","#3ad0c8","#3ad0c8","#3ad0c8","#3ad0c8",null,null,
+      null,null,"#8ff5ee","#8ff5ee","#8ff5ee","#ffffff","#ffffff","#ffffff","#8ff5ee","#8ff5ee","#3ad0c8","#3ad0c8","#3ad0c8","#3ad0c8",null,null,
+      null,null,null,"#8ff5ee","#8ff5ee","#8ff5ee","#8ff5ee","#8ff5ee","#8ff5ee","#3ad0c8","#1a8f8a","#3ad0c8","#3ad0c8",null,null,null,
+      null,null,null,null,"#8ff5ee","#8ff5ee","#8ff5ee","#8ff5ee","#3ad0c8","#3ad0c8","#3ad0c8","#3ad0c8",null,null,null,null,
+      null,null,null,null,null,"#3ad0c8","#3ad0c8","#3ad0c8","#3ad0c8","#3ad0c8","#3ad0c8",null,null,null,null,null,
+      null,null,null,null,null,null,"#3ad0c8","#3ad0c8","#3ad0c8","#3ad0c8",null,null,null,null,null,null,
+      null,null,null,null,null,null,null,"#3ad0c8","#3ad0c8",null,null,null,null,null,null,null,
+      null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,
+      null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,
+      null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,
+      null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,
+      null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,
+      null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,
+      null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null
+    ]
+  },
+  "C": {
+    "w": 16,
+    "h": 16,
+    "px": [
+      null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,
+      null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,
+      null,null,"#05777f","#05777f","#05777f","#05777f","#05777f","#05777f","#05777f","#05777f","#05777f","#05777f","#05777f","#05777f",null,null,
+      null,null,"#05777f","#04565d","#04565d","#04565d","#04565d","#04565d","#04565d","#04565d","#04565d","#04565d","#04565d","#05777f",null,null,
+      null,null,"#05777f","#04565d","#07aeb4","#07aeb4","#07aeb4","#07aeb4","#07aeb4","#07aeb4","#07aeb4","#07aeb4","#04565d","#05777f",null,null,
+      null,null,"#05777f","#04565d","#07aeb4","#3ad0c8","#3ad0c8","#3ad0c8","#3ad0c8","#3ad0c8","#3ad0c8","#07aeb4","#04565d","#05777f",null,null,
+      null,null,"#05777f","#04565d","#07aeb4","#3ad0c8","#6ec0ff","#6ec0ff","#6ec0ff","#6ec0ff","#3ad0c8","#07aeb4","#04565d","#05777f",null,null,
+      null,null,"#05777f","#04565d","#07aeb4","#3ad0c8","#6ec0ff","#8ff5ee","#8ff5ee","#6ec0ff","#3ad0c8","#07aeb4","#04565d","#05777f",null,null,
+      null,null,"#05777f","#04565d","#07aeb4","#3ad0c8","#6ec0ff","#8ff5ee","#8ff5ee","#6ec0ff","#3ad0c8","#07aeb4","#04565d","#05777f",null,null,
+      null,null,"#05777f","#04565d","#07aeb4","#3ad0c8","#6ec0ff","#8ff5ee","#8ff5ee","#6ec0ff","#3ad0c8","#07aeb4","#04565d","#05777f",null,null,
+      null,null,"#05777f","#04565d","#07aeb4","#3ad0c8","#6ec0ff","#6ec0ff","#6ec0ff","#6ec0ff","#3ad0c8","#07aeb4","#04565d","#05777f",null,null,
+      null,null,"#05777f","#04565d","#07aeb4","#3ad0c8","#3ad0c8","#3ad0c8","#3ad0c8","#3ad0c8","#3ad0c8","#07aeb4","#04565d","#05777f",null,null,
+      null,null,"#05777f","#04565d","#07aeb4","#07aeb4","#07aeb4","#07aeb4","#07aeb4","#07aeb4","#07aeb4","#07aeb4","#04565d","#05777f",null,null,
+      null,null,"#05777f","#04565d","#04565d","#04565d","#04565d","#04565d","#04565d","#04565d","#04565d","#04565d","#04565d","#05777f",null,null,
+      null,null,"#05777f","#05777f","#05777f","#05777f","#05777f","#05777f","#05777f","#05777f","#05777f","#05777f","#05777f","#05777f",null,null,
+      null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null
+    ]
+  },
+  "checkpointOn": {
+    "w": 16,
+    "h": 16,
+    "px": [
+      null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,
+      null,null,"#1d3a12","#1d3a12","#1d3a12","#1d3a12","#1d3a12","#1d3a12","#1d3a12","#1d3a12","#1d3a12","#1d3a12","#1d3a12","#1d3a12",null,null,
+      null,null,"#1d3a12","#3c7023","#3c7023","#3c7023","#3c7023","#3c7023","#3c7023","#3c7023","#3c7023","#3c7023","#3c7023","#1d3a12",null,null,
+      null,null,"#1d3a12","#3c7023","#4a8b2c","#4a8b2c","#4a8b2c","#4a8b2c","#4a8b2c","#4a8b2c","#4a8b2c","#4a8b2c","#3c7023","#1d3a12",null,null,
+      null,null,"#1d3a12","#3c7023","#4a8b2c","#4a8b2c","#4a8b2c","#4a8b2c","#4a8b2c","#4a8b2c","#4a8b2c","#4a8b2c","#3c7023","#1d3a12",null,null,
+      null,null,"#1d3a12","#3c7023","#4a8b2c","#5fa83c","#5fa83c","#5fa83c","#5fa83c","#5fa83c","#5fa83c","#4a8b2c","#3c7023","#1d3a12",null,null,
+      null,null,"#1d3a12","#3c7023","#4a8b2c","#5fa83c","#7cb342","#7cb342","#7cb342","#7cb342","#5fa83c","#4a8b2c","#3c7023","#1d3a12",null,null,
+      null,null,"#1d3a12","#3c7023","#4a8b2c","#5fa83c","#7cb342","#8bc34a","#8bc34a","#7cb342","#5fa83c","#4a8b2c","#3c7023","#1d3a12",null,null,
+      null,null,"#1d3a12","#3c7023","#4a8b2c","#5fa83c","#7cb342","#8bc34a","#8bc34a","#7cb342","#5fa83c","#4a8b2c","#3c7023","#1d3a12",null,null,
+      null,null,"#1d3a12","#3c7023","#4a8b2c","#5fa83c","#7cb342","#8bc34a","#8bc34a","#7cb342","#5fa83c","#4a8b2c","#3c7023","#1d3a12",null,null,
+      null,null,"#1d3a12","#3c7023","#4a8b2c","#5fa83c","#7cb342","#7cb342","#7cb342","#7cb342","#5fa83c","#4a8b2c","#3c7023","#1d3a12",null,null,
+      null,null,"#1d3a12","#3c7023","#4a8b2c","#5fa83c","#5fa83c","#5fa83c","#5fa83c","#5fa83c","#5fa83c","#4a8b2c","#3c7023","#1d3a12",null,null,
+      null,null,"#1d3a12","#3c7023","#4a8b2c","#4a8b2c","#4a8b2c","#4a8b2c","#4a8b2c","#4a8b2c","#4a8b2c","#4a8b2c","#3c7023","#1d3a12",null,null,
+      null,null,"#1d3a12","#3c7023","#3c7023","#3c7023","#3c7023","#3c7023","#3c7023","#3c7023","#3c7023","#3c7023","#3c7023","#1d3a12",null,null,
+      null,null,"#1d3a12","#1d3a12","#1d3a12","#1d3a12","#1d3a12","#1d3a12","#1d3a12","#1d3a12","#1d3a12","#1d3a12","#1d3a12","#1d3a12",null,null,
+      null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null
+    ]
+  },
+  "f": {
+    "w": 16,
+    "h": 16,
+    "px": [
+      null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,
+      null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,
+      null,null,null,null,null,"#9d93c4","#e2dcf2",null,null,"#e2dcf2","#9d93c4",null,null,null,null,null,
+      null,null,null,null,"#9d93c4","#9d93c4","#e2dcf2",null,null,"#e2dcf2","#9d93c4","#9d93c4",null,null,null,null,
+      null,null,null,"#9d93c4","#9d93c4","#9d93c4","#9d93c4",null,null,"#9d93c4","#9d93c4","#9d93c4","#9d93c4",null,null,null,
+      null,null,null,"#9d93c4","#9d93c4","#6c6394","#9d93c4",null,null,"#9d93c4","#6c6394","#9d93c4","#9d93c4",null,null,null,
+      null,null,"#9d93c4","#9d93c4","#9d93c4","#9d93c4","#9d93c4",null,null,"#9d93c4","#9d93c4","#9d93c4","#9d93c4","#9d93c4",null,null,
+      null,null,"#9d93c4","#9d93c4","#6c6394","#9d93c4","#9d93c4",null,null,"#9d93c4","#9d93c4","#6c6394","#9d93c4","#9d93c4",null,null,
+      null,null,"#9d93c4","#9d93c4","#9d93c4","#9d93c4",null,null,null,null,"#9d93c4","#9d93c4","#9d93c4","#9d93c4",null,null,
+      null,"#9d93c4","#9d93c4","#6c6394","#9d93c4","#9d93c4",null,null,null,null,"#9d93c4","#9d93c4","#6c6394","#9d93c4","#9d93c4",null,
+      null,"#9d93c4","#9d93c4","#9d93c4","#9d93c4",null,null,null,null,null,null,"#9d93c4","#9d93c4","#9d93c4","#9d93c4",null,
+      null,"#9d93c4","#6c6394","#9d93c4","#9d93c4",null,null,null,null,null,null,"#9d93c4","#9d93c4","#6c6394","#9d93c4",null,
+      null,"#9d93c4","#9d93c4","#9d93c4",null,null,null,null,null,null,null,null,"#9d93c4","#9d93c4","#9d93c4",null,
+      null,null,"#9d93c4","#9d93c4",null,null,null,null,null,null,null,null,"#9d93c4","#9d93c4",null,null,
+      null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,
+      null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null
+    ]
+  }
+};

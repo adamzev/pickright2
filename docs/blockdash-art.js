@@ -1,0 +1,687 @@
+// Block Dash pixel art.
+//
+// Every sprite is baked once into a small offscreen canvas (16x16 for blocks,
+// 12x16 for the player) and blitted with smoothing off — flat, blocky,
+// blocky-sandbox flavoured. The game never draws art itself; it only calls the
+// functions returned at the bottom of this file.
+//
+// SWAPPING IN REAL IMAGE ASSETS
+// ----------------------------
+// Every drawable is looked up by key in the SPRITES registry, so any of them can
+// be replaced at runtime with a PNG (or any canvas/Image) without touching the
+// game code:
+//
+//   BDArt.loadSprites({ g: "art/grass.png", t: "art/tnt.png" }).then(...)
+//   BDArt.registerSprite("player", someCanvasOrImage);
+//
+// Keys: block letters g s m t h C d b w E B P, plus "checkpointOn", plus "dirt", "cloud", "player",
+// "explosion1", "explosion2". Blocks should be square; the player is drawn at
+// roughly 3:4. Anything not replaced keeps the built-in pixel art.
+//
+// REPAINTING SPRITES (Art Studio)
+// -------------------------------
+// getPixels/setPixels turn a sprite into an editable { w, h, px } object and
+// back again; see the "repainting sprites" section further down.
+window.BDArt = (() => {
+  "use strict";
+
+  const S = 16;
+
+  // deterministic noise so a block type always has the exact same texture
+  const nz = (x, y, seed) => {
+    let h = (x * 374761393 + y * 668265263 + seed * 2654435761) | 0;
+    h = (h ^ (h >> 13)) * 1274126177;
+    return ((h ^ (h >> 16)) >>> 0) / 4294967295;
+  };
+
+  const mk = (w, h, paint) => {
+    const c = document.createElement("canvas");
+    c.width = w;
+    c.height = h;
+    const ctx = c.getContext("2d");
+    paint(ctx);
+    return c;
+  };
+
+  const rect = (ctx, x, y, w, h, col) => {
+    ctx.fillStyle = col;
+    ctx.fillRect(x, y, w, h);
+  };
+
+  // Build a sprite from a text map: one character per pixel, looked up in a
+  // legend of colours. Any character missing from the legend stays transparent.
+  const paintMap = (rows, legend) =>
+    mk(rows[0].length, rows.length, (c) => {
+      rows.forEach((row, y) => {
+        [...row].forEach((ch, x) => {
+          const col = legend[ch];
+          if (!col) return;
+          c.fillStyle = col;
+          c.fillRect(x, y, 1, 1);
+        });
+      });
+    });
+
+  // draw a shape described as [row, xStart, xEnd] spans
+  const spans = (ctx, list, col) => {
+    ctx.fillStyle = col;
+    for (const [y, x0, x1] of list) ctx.fillRect(x0, y, x1 - x0 + 1, 1);
+  };
+
+  const noiseFill = (ctx, seed, colors, w = S, h = S) => {
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const r = nz(x, y, seed);
+        ctx.fillStyle = colors[Math.min(colors.length - 1, (r * colors.length) | 0)];
+        ctx.fillRect(x, y, 1, 1);
+      }
+    }
+  };
+
+  // ---------- blocks ----------
+
+  const DIRT_COLORS = ["#6b4220", "#7a4d26", "#8b5a2b", "#9c6b43", "#8b5a2b", "#7a4d26"];
+
+  const dirt = mk(S, S, (c) => noiseFill(c, 3, DIRT_COLORS));
+
+  const grass = mk(S, S, (c) => {
+    c.drawImage(dirt, 0, 0);
+    for (let x = 0; x < S; x++) {
+      const depth = 3 + Math.floor(nz(x, 0, 11) * 3); // ragged grass/dirt seam
+      for (let y = 0; y < depth; y++) {
+        const r = nz(x, y, 17);
+        c.fillStyle =
+          y === 0
+            ? r < 0.5 ? "#7cb342" : "#8bc34a"
+            : r < 0.35 ? "#4a7c2a" : r < 0.72 ? "#5f9e3f" : "#6fae4a";
+        c.fillRect(x, y, 1, 1);
+      }
+    }
+  });
+
+  const stone = mk(S, S, (c) => {
+    noiseFill(c, 7, ["#5c5c5c", "#6e6e6e", "#8a8a8a", "#9d9d9d", "#8a8a8a", "#7b7b7b"]);
+  });
+
+  const slime = mk(S, S, (c) => {
+    rect(c, 0, 0, S, S, "#5aa03a");
+    rect(c, 1, 1, 14, 14, "#7bc95a");
+    rect(c, 3, 3, 10, 10, "#96e072");
+    rect(c, 4, 4, 8, 8, "#7bc95a");
+    // slime cube "eyes"
+    rect(c, 5, 6, 2, 2, "#2f5e1c");
+    rect(c, 9, 6, 2, 2, "#2f5e1c");
+    rect(c, 6, 10, 4, 1, "#2f5e1c");
+    // highlight
+    rect(c, 2, 2, 3, 1, "#c6f5a8");
+    rect(c, 2, 3, 1, 2, "#c6f5a8");
+  });
+
+  const tnt = mk(S, S, (c) => {
+    // grey top/bottom caps
+    noiseFill(c, 21, ["#7d7d7d", "#8c8c8c", "#9a9a9a"]);
+    // red body with vertical stripes
+    for (let y = 2; y < 14; y++) {
+      for (let x = 0; x < S; x++) {
+        const stripe = x % 4 === 0 || x % 4 === 3;
+        c.fillStyle = stripe ? "#a8291f" : "#d1402f";
+        c.fillRect(x, y, 1, 1);
+      }
+    }
+    // white label band
+    rect(c, 0, 6, S, 5, "#efefef");
+    rect(c, 0, 6, S, 1, "#ffffff");
+    rect(c, 0, 10, S, 1, "#c8c8c8");
+    // "TNT" in 3x5 pixel letters
+    const glyphs = {
+      T: ["111", "010", "010", "010", "010"],
+      N: ["101", "111", "111", "101", "101"],
+    };
+    const put = (g, ox) => {
+      g.forEach((row, ry) => {
+        [...row].forEach((ch, rx) => {
+          if (ch === "1") rect(c, ox + rx, 6 + ry, 1, 1, "#1c1c1c");
+        });
+      });
+    };
+    put(glyphs.T, 1);
+    put(glyphs.N, 6);
+    put(glyphs.T, 11);
+  });
+
+  // Hidden TNT: the editor-only look. In play it isn't drawn at all, so this
+  // just needs to read as "TNT, but sneaky" — a faded TNT in a dashed red box.
+  const ghostOf = (tntSprite) => mk(S, S, (c) => {
+    c.globalAlpha = 0.35;
+    c.drawImage(tntSprite, 0, 0, S, S);
+    c.globalAlpha = 1;
+    for (let i = 0; i < S; i += 4) {
+      rect(c, i, 0, 2, 1, "#ff3b3b");
+      rect(c, i + 2, S - 1, 2, 1, "#ff3b3b");
+      rect(c, 0, i + 2, 1, 2, "#ff3b3b");
+      rect(c, S - 1, i, 1, 2, "#ff3b3b");
+    }
+  });
+  const hiddenTnt = ghostOf(tnt);
+
+  // Saving point, from the drawing: a framed block with tabs on each side and a
+  // spiral in the middle. Grey until you reach it, then the spiral lights up.
+  const savePoint = (frame, frameDark, core, swirl) => mk(S, S, (c) => {
+    rect(c, 2, 1, 12, 14, frameDark);
+    rect(c, 3, 2, 10, 12, frame);
+    rect(c, 0, 4, 2, 8, frameDark); // side tabs
+    rect(c, 14, 4, 2, 8, frameDark);
+    rect(c, 0, 5, 1, 6, frame);
+    rect(c, 15, 5, 1, 6, frame);
+    rect(c, 4, 3, 8, 10, core);
+    const spiral = [[7, 7], [8, 7], [8, 8], [7, 8], [6, 8], [6, 7], [6, 6], [7, 6],
+      [8, 6], [9, 6], [9, 7], [9, 8], [9, 9], [8, 9], [7, 9], [6, 9], [5, 9],
+      [5, 8], [5, 7], [5, 6], [5, 5], [6, 5], [7, 5], [8, 5], [9, 5], [10, 5],
+      [10, 6], [10, 7], [10, 8], [10, 9], [10, 10]];
+    spiral.forEach(([x, y]) => rect(c, x, y, 1, 1, swirl));
+  });
+  const checkpoint = savePoint("#9a9a9a", "#5e5e5e", "#3a3a3a", "#8c8c8c");
+  const checkpointOn = savePoint("#9a9a9a", "#5e5e5e", "#2a1745", "#c58bff");
+
+  // Wings, from the drawing: two long wing shapes. The pickup adds a firework
+  // rocket between them; "wingsWorn" is the bare pair drawn on the player.
+  const paintWings = (c) => {
+    const left = [[2, 5, 6], [3, 4, 6], [4, 3, 6], [5, 3, 6], [6, 2, 6], [7, 2, 6],
+      [8, 2, 5], [9, 1, 5], [10, 1, 4], [11, 1, 4], [12, 1, 3], [13, 2, 3]];
+    left.forEach(([y, x0, x1]) => {
+      rect(c, x0, y, x1 - x0 + 1, 1, "#9d93c4");
+      rect(c, S - 1 - x1, y, x1 - x0 + 1, 1, "#9d93c4");
+    });
+    [[3, 6], [5, 5], [7, 4], [9, 3], [11, 2]].forEach(([y, x]) => {
+      rect(c, x, y, 1, 1, "#6c6394"); // feather lines
+      rect(c, S - 1 - x, y, 1, 1, "#6c6394");
+    });
+    rect(c, 6, 2, 1, 2, "#e2dcf2");
+    rect(c, 9, 2, 1, 2, "#e2dcf2");
+  };
+  const wingsWorn = mk(S, S, paintWings);
+  const wings = mk(S, S, (c) => {
+    paintWings(c);
+    rect(c, 7, 6, 2, 6, "#d1402f"); // firework rocket
+    rect(c, 7, 6, 1, 6, "#ef6b5b");
+    rect(c, 7, 5, 2, 1, "#efefef");
+    rect(c, 7, 12, 2, 1, "#c8c8c8");
+    rect(c, 7, 13, 1, 2, "#ffd54a"); // fuse spark
+    rect(c, 8, 14, 1, 1, "#ff8a3d");
+  });
+
+  const diamond = mk(S, S, (c) => {
+    const gem = [];
+    for (let y = 2; y <= 13; y++) {
+      const dy = Math.abs(y - 7.5);
+      const half = Math.round(6 - dy * 0.78);
+      if (half > 0) gem.push([y, 8 - half, 7 + half]);
+    }
+    spans(c, gem, "#3ad0c8");
+    // dark outline
+    for (const [y, x0, x1] of gem) {
+      rect(c, x0, y, 1, 1, "#1a8f8a");
+      rect(c, x1, y, 1, 1, "#1a8f8a");
+    }
+    spans(c, [[3, 6, 9], [4, 5, 8], [5, 5, 7]], "#8ff5ee");
+    rect(c, 6, 3, 2, 1, "#ffffff");
+    spans(c, [[11, 5, 10], [12, 6, 9]], "#22a8a2");
+  });
+
+  const bolt = mk(S, S, (c) => {
+    const shape = [
+      [1, 9, 13], [2, 8, 12], [3, 7, 11], [4, 6, 10], [5, 5, 9],
+      [6, 4, 12], [7, 3, 11],
+      [8, 7, 11], [9, 6, 10], [10, 5, 9], [11, 4, 8],
+      [12, 3, 7], [13, 3, 6], [14, 2, 5],
+    ];
+    spans(c, shape, "#ffc107");
+    // bright core + shadowed lower edge
+    spans(c, [[2, 9, 11], [3, 8, 10], [4, 7, 9], [5, 6, 8], [6, 6, 10]], "#ffe98a");
+    spans(c, [[7, 3, 5], [12, 3, 5], [13, 3, 5], [14, 2, 4]], "#e08e0b");
+  });
+
+  const rose = mk(S, S, (c) => {
+    rect(c, 7, 7, 2, 9, "#2f3a2a");            // stem
+    rect(c, 4, 10, 3, 1, "#3d5233");           // leaves
+    rect(c, 9, 12, 3, 1, "#3d5233");
+    spans(c, [[2, 6, 9], [3, 5, 10], [4, 4, 11], [5, 4, 11], [6, 5, 10], [7, 6, 9]], "#191919");
+    spans(c, [[3, 6, 7], [4, 5, 6]], "#333333"); // faint petal shading
+    rect(c, 7, 4, 2, 2, "#5b5b5b");              // wilted centre
+    rect(c, 6, 8, 1, 1, "#3a3a3a");
+  });
+
+  const portal = mk(S, S, (c) => {
+    noiseFill(c, 31, ["#3f3a55", "#4a4463", "#332f47", "#565073"]); // obsidian frame
+    rect(c, 2, 1, 12, 14, "#5b1f96");
+    for (let y = 1; y < 15; y++) {
+      for (let x = 2; x < 14; x++) {
+        const r = nz(x, y, 41);
+        c.fillStyle = r < 0.3 ? "#6d28ad" : r < 0.7 ? "#7b2fbe" : "#8b3ed1";
+        c.fillRect(x, y, 1, 1);
+      }
+    }
+    // swirl
+    for (let t = 0; t < 30; t++) {
+      const a = t * 0.5;
+      const r = 0.7 + t * 0.16;
+      const sx = Math.round(8 + Math.cos(a) * r);
+      const sy = Math.round(8 + Math.sin(a) * r);
+      if (sx >= 2 && sx < 14 && sy >= 1 && sy < 15) rect(c, sx, sy, 1, 1, "#c58bff");
+    }
+  });
+
+  const bush = mk(S, S, (c) => {
+    const shape = [
+      [4, 6, 9], [5, 4, 11], [6, 3, 12], [7, 2, 13],
+      [8, 2, 13], [9, 1, 14], [10, 1, 14], [11, 2, 13],
+      [12, 3, 12], [13, 4, 11], [14, 5, 10],
+    ];
+    spans(c, shape, "#4a8b2c");
+    for (const [y, x0, x1] of shape) {
+      for (let x = x0; x <= x1; x++) {
+        const r = nz(x, y, 53);
+        if (r < 0.3) rect(c, x, y, 1, 1, "#3c7023");
+        else if (r > 0.78) rect(c, x, y, 1, 1, "#63ab3c");
+      }
+    }
+  });
+
+  const cloud = mk(S, S, (c) => {
+    spans(c, [[4, 5, 10], [5, 3, 12], [6, 2, 13], [7, 1, 14], [8, 1, 14], [9, 2, 13]], "#dbe9f7");
+    spans(c, [[5, 5, 9], [6, 3, 11], [7, 2, 12]], "#ffffff");
+    spans(c, [[9, 3, 12], [8, 10, 14]], "#c3d6ea");
+  });
+
+  const explosion1 = mk(S, S, (c) => {
+    spans(c, [[5, 6, 9], [6, 5, 10], [7, 4, 11], [8, 4, 11], [9, 5, 10], [10, 6, 9]], "#ffffff");
+    for (const [y, x0, x1] of [[3, 6, 9], [4, 4, 11], [5, 3, 12], [6, 2, 13],
+      [7, 2, 13], [8, 2, 13], [9, 3, 12], [10, 4, 11], [11, 5, 10], [12, 6, 9]]) {
+      for (let x = x0; x <= x1; x++) {
+        const d = Math.hypot(x - 7.5, y - 7.5);
+        if (d < 2.6) continue;
+        c.fillStyle = d < 4 ? "#ff9800" : "#e5401f";
+        c.fillRect(x, y, 1, 1);
+      }
+    }
+    for (const [x, y] of [[1, 4], [2, 12], [13, 3], [14, 10], [5, 1], [10, 14], [0, 8], [15, 6]]) {
+      rect(c, x, y, 1, 1, nz(x, y, 61) < 0.5 ? "#4a4a4a" : "#8a8a8a");
+    }
+  });
+
+  const explosion2 = mk(S, S, (c) => {
+    for (const [y, x0, x1] of [[4, 5, 10], [5, 3, 12], [6, 2, 13], [7, 2, 13],
+      [8, 3, 12], [9, 4, 11], [10, 5, 10]]) {
+      for (let x = x0; x <= x1; x++) {
+        const r = nz(x, y, 71);
+        if (r < 0.28) continue;
+        c.fillStyle = r < 0.5 ? "#6f6f6f" : r < 0.8 ? "#9a9a9a" : "#c4c4c4";
+        c.fillRect(x, y, 1, 1);
+      }
+    }
+    for (const [x, y] of [[7, 11], [8, 11], [6, 12], [9, 12]]) rect(c, x, y, 1, 1, "#ff9800");
+    for (const [x, y] of [[1, 3], [14, 5], [3, 14], [12, 14], [0, 9], [15, 2]]) {
+      rect(c, x, y, 1, 1, "#ff9d2e");
+    }
+  });
+
+  const spawnMark = mk(S, S, (c) => {
+    c.fillStyle = "rgba(124, 199, 255, 0.16)";
+    c.fillRect(0, 0, S, S);
+    spans(c, [[4, 6, 6], [5, 6, 7], [6, 6, 8], [7, 6, 9], [8, 6, 9],
+      [9, 6, 8], [10, 6, 7], [11, 6, 6]], "#7cc7ff");
+  });
+
+  // ---------- player ----------
+
+  // The armoured knight, from the drawing this game is based on: lavender plate,
+  // big blue eyes behind the helmet, orange straps crossed over the chest, gold
+  // trim on the gauntlets and greaves. 16 wide x 21 tall, pauldrons out past the
+  // shoulders.
+  const PLAYER_LEGEND = {
+    O: "#453f5a", // dark seam / outline
+    A: "#e2dcf2", // plate, lit
+    a: "#b9b0d8", // plate
+    s: "#7d74a0", // plate, shaded — doubles as the outline against the sky
+    E: "#2f9dc0", // eye
+    e: "#6fd3ea", // eye glint
+    X: "#ef8c3c", // strap
+    x: "#c4661f", // strap, shaded
+    G: "#ddbe46", // gold trim
+    g: "#ab8a20", // gold trim, shaded
+    B: "#4a4360", // boot
+  };
+
+  const PLAYER_MAP = [
+    "...sAAAAAAAAs...",
+    "...sAAAAAAAAs...",
+    "...saAAAAAAas...",
+    "...saEEaaEEas...",
+    "...saEeaaeEas...",
+    "...saaaaaaaas...",
+    "...saasssaaas...",
+    "...ssaaaaaass...",
+    "...OOsaaaasOO...",
+    "sAAsaaGGGGaasAAs",
+    "sAAsXXaaaaXXsAAs",
+    "sAAsaXXaaXXasAAs",
+    "xXXsaaXXXXaasXXx",
+    "xXXsaXXaaXXasXXx",
+    "gGGsXXaaaaXXsGGg",
+    "gGGsXXXXXXXXsGGg",
+    "...saaaaaaaas...",
+    "...saGaOOaGas...",
+    "...saGaOOaGas...",
+    "...sXXXOOXXXs...",
+    "...sBBBOOBBBs...",
+  ];
+
+  const player = paintMap(PLAYER_MAP, PLAYER_LEGEND);
+
+  // ---------- sprite registry ----------
+  // Every drawable is looked up here, so any of it can be swapped for a PNG.
+
+  const SPRITES = {
+    g: grass,
+    dirt: dirt,
+    s: stone,
+    m: slime,
+    t: tnt,
+    h: hiddenTnt,
+    C: checkpoint,
+    checkpointOn: checkpointOn,
+    f: wings,
+    wingsWorn: wingsWorn,
+    d: diamond,
+    b: bolt,
+    w: rose,
+    E: portal,
+    B: bush,
+    P: spawnMark,
+    cloud: cloud,
+    player: player,
+    explosion1: explosion1,
+    explosion2: explosion2,
+  };
+
+  // Editor-facing list: which sprites can be repainted, and what to call them.
+  const SPRITE_INFO = [
+    { key: "player", label: "Player" },
+    { key: "g", label: "Grass" },
+    { key: "dirt", label: "Dirt" },
+    { key: "s", label: "Stone" },
+    { key: "m", label: "Slime" },
+    { key: "t", label: "TNT" },
+    { key: "h", label: "Hidden TNT" },
+    { key: "C", label: "Checkpoint" },
+    { key: "checkpointOn", label: "Checkpoint ✓" },
+    { key: "d", label: "Diamond" },
+    { key: "b", label: "Lightning" },
+    { key: "w", label: "Rose" },
+    { key: "f", label: "Wings" },
+    { key: "wingsWorn", label: "Wings (worn)" },
+    { key: "E", label: "Portal" },
+    { key: "B", label: "Bush" },
+    { key: "P", label: "Start" },
+    { key: "cloud", label: "Cloud" },
+    { key: "explosion1", label: "Boom 1" },
+    { key: "explosion2", label: "Boom 2" },
+  ];
+
+  // The built-in look, kept aside so "reset" can always get back to it.
+  const ORIGINALS = Object.assign({}, SPRITES);
+
+  const registerSprite = (key, source) => {
+    if (source) SPRITES[key] = source;
+  };
+
+  // Load replacement art: BDArt.loadSprites({ g: "art/grass.png", ... })
+  // Any image that fails to load simply leaves the built-in sprite in place.
+  const loadSprites = (map) =>
+    Promise.all(
+      Object.entries(map).map(([key, url]) =>
+        new Promise((resolve) => {
+          const img = new Image();
+          img.onload = () => { registerSprite(key, img); resolve(key); };
+          img.onerror = () => resolve(null);
+          img.src = url;
+        }),
+      ),
+    );
+
+  // ---------- repainting sprites (the Art Studio) ----------
+  //
+  // A sprite's pixels round-trip through a plain object so they can be edited,
+  // saved and shared:  { w, h, px: ["#rrggbb" | null, ...] }  row by row, with
+  // null meaning "see-through". Custom art lives in localStorage, so anything
+  // painted here shows up everywhere the game draws.
+
+  const ART_KEY = "blockdash_art_v1";
+  const HEX = /^#[0-9a-fA-F]{6}$/;
+
+  const sizeOf = (sp) => ({
+    w: sp.width || sp.naturalWidth,
+    h: sp.height || sp.naturalHeight,
+  });
+
+  const asCanvas = (sp) => {
+    if (sp instanceof HTMLCanvasElement) return sp;
+    const { w, h } = sizeOf(sp);
+    return mk(w, h, (c) => {
+      c.imageSmoothingEnabled = false;
+      c.drawImage(sp, 0, 0);
+    });
+  };
+
+  // Read a sprite back out as editable pixels. Nearly-transparent pixels come
+  // back as null, so faint overlays (the Start marker) read as see-through.
+  const getPixels = (key) => {
+    const sp = SPRITES[key];
+    if (!sp) return null;
+    const cv = asCanvas(sp);
+    const { w, h } = sizeOf(cv);
+    const d = cv.getContext("2d").getImageData(0, 0, w, h).data;
+    const px = [];
+    for (let i = 0; i < w * h; i++) {
+      px.push(d[i * 4 + 3] < 128
+        ? null
+        : "#" + [0, 1, 2].map((k) => d[i * 4 + k].toString(16).padStart(2, "0")).join(""));
+    }
+    return { w, h, px };
+  };
+
+  const cleanPixels = (o) => {
+    if (!o || typeof o !== "object") return null;
+    const w = o.w | 0;
+    const h = o.h | 0;
+    if (w < 1 || h < 1 || w > 64 || h > 64) return null;
+    if (!Array.isArray(o.px)) return null;
+    // px is flat, but older art files nested it one array per row
+    let px = o.px;
+    if (px.length === h && Array.isArray(px[0])) px = [].concat.apply([], px);
+    if (px.length !== w * h) return null;
+    return {
+      w,
+      h,
+      px: px.map((p) => (typeof p === "string" && HEX.test(p) ? p.toLowerCase() : null)),
+    };
+  };
+
+  const bake = ({ w, h, px }) =>
+    mk(w, h, (c) => {
+      for (let i = 0; i < px.length; i++) {
+        if (!px[i]) continue;
+        c.fillStyle = px[i];
+        c.fillRect(i % w, (i / w) | 0, 1, 1);
+      }
+    });
+
+  const readStore = () => {
+    try {
+      const o = JSON.parse(localStorage.getItem(ART_KEY) || "{}");
+      return o && typeof o === "object" ? o : {};
+    } catch (e) {
+      return {};
+    }
+  };
+
+  const writeStore = (obj) => {
+    try {
+      if (Object.keys(obj).length) localStorage.setItem(ART_KEY, JSON.stringify(obj));
+      else localStorage.removeItem(ART_KEY);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  };
+
+  // Apply a whole set of repainted sprites at once. Unknown keys and malformed
+  // entries are skipped, so a hand-edited art file can never break the game.
+  const applyPack = (pack, persist) => {
+    const good = {};
+    for (const [key, data] of Object.entries(pack || {})) {
+      if (!(key in ORIGINALS)) continue;
+      const clean = cleanPixels(data);
+      if (!clean) continue;
+      SPRITES[key] = bake(clean);
+      good[key] = clean;
+    }
+    const keys = Object.keys(good);
+    if (persist && keys.length) writeStore(Object.assign(readStore(), good));
+    syncHidden();
+    return keys;
+  };
+
+  // Hidden TNT is a faded copy of whatever TNT looks like right now, so a
+  // repainted TNT carries over — unless Hidden TNT was repainted on its own.
+  const syncHidden = () => {
+    if ("h" in (window.BDArtPack || {}) || "h" in readStore()) return;
+    SPRITES.h = ghostOf(SPRITES.t);
+  };
+
+  const setPixels = (key, data) => applyPack({ [key]: data }, true).length > 0;
+
+  const resetSprite = (key) => {
+    if (!(key in ORIGINALS)) return;
+    SPRITES[key] = ORIGINALS[key];
+    const store = readStore();
+    delete store[key];
+    writeStore(store);
+    syncHidden();
+  };
+
+  const resetAllSprites = () => {
+    Object.assign(SPRITES, ORIGINALS);
+    writeStore({});
+    syncHidden();
+  };
+
+  const customArt = () => readStore();
+  const isCustom = (key) => key in readStore();
+
+  // Art shipped with the game (docs/blockdash-artpack.js) loads first; anything
+  // painted in this browser wins over it. Once the pack has been applied it
+  // becomes the baseline, so "reset" goes back to the art the game ships with
+  // rather than to whatever the code drew before the pack existed.
+  applyPack(window.BDArtPack || {}, false);
+  Object.assign(ORIGINALS, SPRITES);
+  applyPack(readStore(), false);
+
+  const blit = (ctx, sprite, x, y, w, h) => {
+    if (!sprite) return;
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(sprite, Math.round(x), Math.round(y), Math.ceil(w), Math.ceil(h));
+  };
+
+  // covered = something solid sits directly above, so grass shows as plain dirt
+  const drawTile = (ctx, ch, x, y, size, time, covered) => {
+    if (ch === "g" && covered) return blit(ctx, SPRITES.dirt, x, y, size, size);
+    const sp = SPRITES[ch];
+    if (!sp) return;
+    if (ch === "m") {
+      // slime squishes gently
+      const wob = (Math.sin(time * 4 + x * 0.03) * 0.04 + 0.04) * size;
+      return blit(ctx, sp, x, y + wob, size, size - wob);
+    }
+    if (ch === "d") {
+      const bob = Math.sin(time * 3 + x * 0.05) * size * 0.08;
+      return blit(ctx, sp, x, y + bob, size, size);
+    }
+    if (ch === "b") {
+      const pulse = 0.55 + 0.45 * Math.sin(time * 8);
+      ctx.save();
+      ctx.globalAlpha = 0.25 * pulse;
+      ctx.fillStyle = "#ffe98a";
+      ctx.fillRect(x, y, size, size);
+      ctx.restore();
+      return blit(ctx, sp, x, y, size, size);
+    }
+    if (ch === "E") {
+      blit(ctx, sp, x, y, size, size);
+      // a few sparkles drifting out of the portal
+      ctx.fillStyle = "#dcb6ff";
+      for (let i = 0; i < 4; i++) {
+        const t = time * 1.2 + i * 1.7;
+        const sx = x + size * (0.25 + 0.5 * ((Math.sin(t * 1.3 + i) + 1) / 2));
+        const sy = y + size * (1 - ((t * 0.35 + i * 0.25) % 1));
+        ctx.fillRect(sx, sy, size * 0.07, size * 0.07);
+      }
+      return;
+    }
+    blit(ctx, sp, x, y, size, size);
+  };
+
+  const drawPlayer = (ctx, x, y, w, h, rot) => {
+    ctx.save();
+    ctx.translate(x + w / 2, y + h / 2);
+    ctx.rotate(rot);
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(SPRITES.player, -w / 2, -h / 2, w, h);
+    ctx.restore();
+  };
+
+  const drawExplosion = (ctx, cx, cy, size, t) => {
+    const frame = t < 0.18 || (t >= 0.36 && t < 0.54)
+      ? SPRITES.explosion1
+      : SPRITES.explosion2;
+    const s = size * (1 + t * 1.2);
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, 1 - t / 0.85);
+    blit(ctx, frame, cx - s / 2, cy - s / 2, s, s);
+    ctx.restore();
+  };
+
+  const drawCloud = (ctx, x, y, size) => blit(ctx, SPRITES.cloud, x, y, size, size);
+
+  const drawEraser = (ctx, x, y, s) => {
+    ctx.fillStyle = "#15151c";
+    ctx.fillRect(x, y, s, s);
+    ctx.strokeStyle = "#ef6b6b";
+    ctx.lineWidth = Math.max(2, s * 0.08);
+    ctx.beginPath();
+    ctx.moveTo(x + s * 0.25, y + s * 0.25);
+    ctx.lineTo(x + s * 0.75, y + s * 0.75);
+    ctx.moveTo(x + s * 0.75, y + s * 0.25);
+    ctx.lineTo(x + s * 0.25, y + s * 0.75);
+    ctx.stroke();
+  };
+
+  return {
+    drawTile,
+    drawPlayer,
+    drawExplosion,
+    drawCloud,
+    drawEraser,
+    registerSprite,
+    loadSprites,
+    SPRITES,
+    SPRITE_INFO,
+    getPixels,
+    setPixels,
+    applyPack,
+    resetSprite,
+    resetAllSprites,
+    customArt,
+    isCustom,
+  };
+})();
