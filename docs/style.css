@@ -284,3 +284,12 @@ button.primary:hover { background: #ffdf6e; }
 @media (max-width: 320px) {
   pre.art { font-size: 0.62rem; }
 }
+
+.chores {
+  font-size: 3.2rem;
+  font-weight: 800;
+  line-height: 1.1;
+  text-align: center;
+  color: var(--accent);
+  padding: 20vh 0;
+}

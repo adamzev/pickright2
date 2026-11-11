@@ -32,6 +32,12 @@
 
   let roundIdx = 0;
 
+  const renderChores = () =>
+    setScreen(
+      `<div class="chores">Go do chores</div>`,
+      button("← Back", () => renderTitle(), "option"),
+    );
+
   const renderTitle = () => {
     roundIdx = 0;
     setScreen(
@@ -52,6 +58,7 @@
         <a class="option" href="blockdash.html?edit" style="text-decoration:none;display:block">
           ✏ Block Dash Level Maker <span class="cost">Build your own levels and art</span>
         </a>
+        ${button("🧹 Go do chores", renderChores, "option")}
       </div>
     `,
     );
