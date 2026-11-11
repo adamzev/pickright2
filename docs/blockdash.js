@@ -22,21 +22,32 @@
     3: { name: "Hidden TNT", over: "w" },
     4: { name: "Hidden TNT", over: "B" },
     5: { name: "Hidden TNT", over: "f" },
+    6: { name: "Hidden TNT", over: "r" },
     d: { name: "Diamond" },
     b: { name: "Bolt" },
     w: { name: "Rose" },
     f: { name: "Wings" },
+    n: { name: "Netherrack", solid: true },
+    k: { name: "Nether bricks", solid: true },
+    L: { name: "Lava" },
+    U: { name: "Rising lava" },
+    D: { name: "Falling lava" },
+    F: { name: "Fire" },
+    S: { name: "Shooter", solid: true },
+    Z: { name: "Spawner", solid: true },
+    r: { name: "Blaze rod" },
     E: { name: "End" },
     B: { name: "Bush" },
     P: { name: "Start" },
   };
 
-  const PALETTE = ["g", "s", "m", "t", "h", "C", "d", "b", "w", "f", "E", "B", "P", ERASER];
+  const PALETTE = ["g", "s", "n", "k", "m", "t", "h", "L", "U", "D", "F", "S", "Z",
+    "C", "d", "r", "b", "w", "f", "E", "B", "P", ERASER];
 
   const isSolid = (ch) => !!(TILES[ch] && TILES[ch].solid);
   const overOf = (ch) => TILES[ch] && TILES[ch].over;
   const isHiddenTnt = (ch) => ch === "h" || !!overOf(ch);
-  const TRAP_OVER = { d: "1", b: "2", w: "3", B: "4", f: "5" };
+  const TRAP_OVER = { d: "1", b: "2", w: "3", B: "4", f: "5", r: "6" };
 
   // physics, in blocks and seconds
   const GRAVITY = 62;
@@ -53,6 +64,19 @@
   const PLAYER_H = 0.9;
   const COYOTE = 0.1;
   const JUMP_BUFFER = 0.14;
+  const LAVA_RISE = 1.2; // new blocks per second from a rising-lava source
+  const LAVA_FALL = 0.7; // falling lava "slowly falls"
+  const FLOWED = "l"; // lava grown from a source during play; never in saved levels
+  const SHOOT_EVERY = 2; // seconds between stars
+  const BULLET_SPEED = 5.5; // slower than you run, so they hit from ahead
+  const BULLET_TURN = 2.2; // how hard a star can steer toward you, per second
+  const BULLET_LIFE = 4;
+  const SPAWN_EVERY = 3.5; // seconds between blazes from one spawner
+  const BLAZE_MAX = 2; // blazes alive at once per spawner
+  const BLAZE_REACH = 3; // how far (blocks) a blaze drifts from its spawner
+  const BLAZE_DRIFT = 1.6; // blocks per second
+  const BLAZE_SHOOT = 2.6; // seconds between fireballs
+  const FIREBALL_SPEED = 6.5; // flies straight, unlike the stars
 
   const STORE_KEY = "blockdash_levels_v1";
   const BEST_KEY = "blockdash_best_v1";
@@ -79,9 +103,6 @@
       return false;
     }
   })();
-
-  // set by the editor; used to warn before losing unsaved work
-  let editorDirty = false;
 
   // ---------- tiny helpers ----------
 
@@ -195,6 +216,12 @@
 
   // Normalise anything that claims to be a level into { name, rows } with
   // exactly H rows of equal length, or throw.
+  const bgOf = (o) =>
+    (window.BDArt.BACKGROUNDS.some((b) => b.key === o.bg) ? o.bg : "overworld");
+  // what goes in a saved or downloaded level; overworld levels stay { name, rows }
+  const levelData = (l) =>
+    (bgOf(l) === "overworld" ? { name: l.name, rows: l.rows } : { name: l.name, bg: l.bg, rows: l.rows });
+
   const normalizeLevel = (o, fallbackName) => {
     if (!o || typeof o !== "object" || !Array.isArray(o.rows) || !o.rows.length) {
       throw new Error("not a level");
@@ -204,6 +231,7 @@
     return {
       name: String(o.name || fallbackName || "Untitled"),
       rows: gridToRows(rowsToGrid(rows)),
+      bg: bgOf(o),
     };
   };
 
@@ -237,26 +265,7 @@
     s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "level";
 
   const levelJson = (lvl) =>
-    JSON.stringify({ name: lvl.name, rows: lvl.rows }, null, 2) + "\n";
-
-  // The whole My Levels list as a drop-in replacement for blockdash-levels.js
-  const packJs = (levels) =>
-    "// Built-in levels for Block Dash — the ones that ship with the game.\n" +
-    "//\n" +
-    "// This file is GENERATED. Build levels in the level maker, then use\n" +
-    '// "Download pack" in the Level pack tools section and replace this whole\n' +
-    "// file with the download. Don't hand-edit it.\n" +
-    "window.BLOCKDASH_LEVELS = [\n" +
-    levels
-      .map((l) =>
-        JSON.stringify({ name: l.name, rows: l.rows }, null, 2)
-          .split("\n")
-          .map((line) => "  " + line)
-          .join("\n"),
-      )
-      .join(",\n") +
-    (levels.length ? "\n" : "") +
-    "];\n";
+    JSON.stringify(levelData(lvl), null, 2) + "\n";
 
   // Accepts a .json level, a .json array of levels, or a blockdash-levels.js file
   const parseLevelFile = (text, filename) => {
@@ -278,7 +287,7 @@
   // ---------- share codes ----------
 
   const encodeLevel = (lvl) => {
-    const json = JSON.stringify({ n: lvl.name, r: lvl.rows });
+    const json = JSON.stringify({ n: lvl.name, r: lvl.rows, b: bgOf(lvl) });
     const bytes = new TextEncoder().encode(json);
     let s = "";
     for (const b of bytes) s += String.fromCharCode(b);
@@ -290,15 +299,18 @@
     const bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0));
     const o = JSON.parse(new TextDecoder().decode(bytes));
     if (!o || !Array.isArray(o.r) || !o.r.length) throw new Error("bad code");
-    return { name: String(o.n || "Imported level"), rows: o.r.map(String) };
+    return { name: String(o.n || "Imported level"), rows: o.r.map(String), bg: o.b };
   };
 
   // ---------- block art (see blockdash-art.js) ----------
 
-  const { drawTile, drawPlayer, drawExplosion, drawCloud, drawEraser } = window.BDArt;
+  const { drawTile, drawPlayer, drawExplosion, drawEraser } = window.BDArt;
   const Art = window.BDArt;
 
   // ---------- screen: main menu ----------
+
+  // blockdash.html plays the official levels; blockdash.html?edit is the level maker.
+  const editMode = new URLSearchParams(location.search).has("edit");
 
   const levelCard = (lvl, actions, num) => {
     const g = rowsToGrid(lvl.rows);
@@ -337,9 +349,12 @@
     const builtin = builtinLevels();
 
     const head = el("div", "row");
-    head.appendChild(el("h1", null, "Block Dash"));
+    head.appendChild(el("h1", null, editMode ? "Block Dash Level Maker" : "Block Dash"));
     head.appendChild(el("div", "spacer"));
-    if (devMode) {
+    const other = el("a", "btn small", editMode ? "▶ Play the game" : "✏ Level Maker");
+    other.href = editMode ? "blockdash.html" : "blockdash.html?edit";
+    head.appendChild(other);
+    if (devMode && editMode) {
       const artBtn = el("button", "small", "🎨 Art");
       artBtn.onclick = () => showArtStudio();
       head.appendChild(artBtn);
@@ -348,7 +363,13 @@
     home.href = "index.html";
     head.appendChild(home);
     root.appendChild(head);
-    root.appendChild(el("p", "sub", "Build a level. Then survive it."));
+    root.appendChild(el("p", "sub",
+      editMode ? "Build a level. Then survive it." : "Run, jump, grab diamonds. Don't explode."));
+
+    if (!editMode && !builtin.length) {
+      root.appendChild(el("div", "panel empty-note", "No levels yet — check back soon!"));
+      return;
+    }
 
     // ---- levels that ship with the game ----
     if (builtin.length) {
@@ -359,8 +380,8 @@
         const play = el("button", "green small", i ? "▶ Play" : "▶ Start");
         play.onclick = () => playSeries(builtin, i, 0, () => showMenu());
         const copy = el("button", "small", "✏ Copy & edit");
-        copy.onclick = () => showEditor({ name: lvl.name + " copy", rows: lvl.rows }, -1);
-        list.appendChild(levelCard(lvl, [play, copy], i + 1));
+        copy.onclick = () => showEditor({ name: lvl.name + " copy", rows: lvl.rows, bg: lvl.bg }, -1);
+        list.appendChild(levelCard(lvl, editMode ? [play, copy] : [play], i + 1));
       });
       bp.appendChild(list);
       if (builtin.length > 1) {
@@ -370,6 +391,7 @@
       }
       root.appendChild(bp);
     }
+    if (!editMode) return;
 
     // ---- levels saved in this browser ----
     const panel = el("div", "panel");
@@ -469,28 +491,18 @@
     sum.style.textTransform = "uppercase";
     pack.appendChild(sum);
     pack.appendChild(el("p", "hint",
-      "For building the levels that ship with the game. <b>Download pack</b> " +
-      "saves all of My Levels as <code>blockdash-levels.js</code>, in the order " +
-      "they're listed above — drop that file into <code>docs/</code>, replacing " +
-      "the old one, and those levels show up at the top of this page for " +
-      "everyone, played in that same order. <b>Load file</b> reads a " +
-      "<code>.json</code> level or a <code>blockdash-levels.js</code> pack back " +
-      "into My Levels so you can keep editing them."));
+      "<b>Download all</b> saves every level in My levels as one " +
+      "<code>blockdash-levels.json</code> file, in the order listed above. Use it " +
+      "as a backup, or to pick which levels become the game's official ones. " +
+      "<b>Load file</b> reads a <code>.json</code> file back into My levels."));
 
     const packRow = el("div", "row");
     packRow.style.marginTop = "8px";
 
-    const dlPack = el("button", "small", "⬇ Download pack (.js)");
-    dlPack.disabled = !levels.length;
-    dlPack.onclick = () => {
-      download("blockdash-levels.js", packJs(levels), "text/javascript");
-      toast(`Saved ${levels.length} level${levels.length === 1 ? "" : "s"}`);
-    };
-
     const dlJson = el("button", "small", "⬇ Download all (.json)");
     dlJson.disabled = !levels.length;
     dlJson.onclick = () => {
-      const data = levels.map((l) => ({ name: l.name, rows: l.rows }));
+      const data = levels.map(levelData);
       download("blockdash-levels.json", JSON.stringify(data, null, 2) + "\n");
       toast("Saved blockdash-levels.json");
     };
@@ -523,7 +535,7 @@
     const loadBtn = el("button", "small", "⬆ Load file");
     loadBtn.onclick = () => fileInput.click();
 
-    packRow.append(dlPack, dlJson, loadBtn, fileInput);
+    packRow.append(dlJson, loadBtn, fileInput);
     pack.appendChild(packRow);
     if (builtin.length) {
       pack.appendChild(el("p", "hint",
@@ -547,6 +559,15 @@
       ["d", "Diamond — worth 10 points"],
       ["b", "Lightning — go super fast for 3 seconds"],
       ["w", "Wither rose — slows you down for 3 seconds"],
+      ["n", "Netherrack — solid, like stone but for the Nether"],
+      ["k", "Nether bricks — solid bricks for Nether builds"],
+      ["L", "Lava — burns you if you touch it"],
+      ["U", "Rising lava — stays put and grows new lava upward once it's on screen"],
+      ["D", "Falling lava — stays put and slowly grows new lava downward"],
+      ["F", "Fire — burns you if you touch it"],
+      ["S", "Shooter — solid block that fires stars that chase you"],
+      ["Z", "Spawner — solid cage that lets out blazes. Blazes shoot fireballs; jump on one to get its blaze rod"],
+      ["r", "Blaze rod — collect them! Blazes drop one when you jump on them"],
       ["f", "Wings + firework — hold jump to fly up, let go to glide. They come off at the next save point"],
       ["E", "End portal — finish the level here"],
       ["B", "Bush — just decoration, safe to touch"],
@@ -648,16 +669,6 @@
     if (start < 0 || end < start) throw new Error("no art data found");
     return JSON.parse(trimmed.slice(start, end + 1));
   };
-
-  const artPackJs = (art) =>
-    "// Built-in art for Block Dash — repainted sprites that ship with the game.\n" +
-    "//\n" +
-    "// This file is GENERATED. Paint sprites in the Art Studio, then use\n" +
-    "// \"Download art pack\" and replace this whole file with the download. Don't\n" +
-    "// hand-edit it. An empty pack means everyone gets the original pixel art.\n" +
-    "//\n" +
-    "// Anything painted in a player's own browser wins over this file.\n" +
-    `window.BDArtPack = ${artJson(art)};\n`;
 
   // Draw a sprite into a canvas at its own aspect ratio, bottom-aligned.
   const spriteThumb = (key, boxW, boxH) => {
@@ -851,10 +862,9 @@
     sum.style.textTransform = "uppercase";
     filePanel.appendChild(sum);
     filePanel.appendChild(el("p", "hint",
-      "Your art is already saved in this browser. <b>Download art</b> saves a " +
-      "backup you can load on another device. <b>Download art pack</b> saves " +
-      "<code>blockdash-artpack.js</code> — drop that into <code>docs/</code>, " +
-      "replacing the old one, and everyone who plays gets your art."));
+      "Your art is already saved in this browser. <b>Download art</b> saves it " +
+      "as <code>blockdash-art.json</code>: a backup you can load on another " +
+      "device, or the file to send in to make your art the game's official art."));
 
     const fileRow = el("div", "row");
     fileRow.style.marginTop = "8px";
@@ -865,12 +875,6 @@
       if (!Object.keys(art).length) { toast("Nothing painted yet"); return; }
       download("blockdash-art.json", artJson(art) + "\n");
       toast("Saved blockdash-art.json");
-    };
-
-    const dlPack = el("button", "small", "⬇ Download art pack (.js)");
-    dlPack.onclick = () => {
-      download("blockdash-artpack.js", artPackJs(Art.customArt()), "text/javascript");
-      toast("Saved blockdash-artpack.js");
     };
 
     const fileInput = el("input");
@@ -909,7 +913,7 @@
       toast("All art reset");
     };
 
-    fileRow.append(dlJson, dlPack, loadBtn, resetAllBtn, fileInput);
+    fileRow.append(dlJson, loadBtn, resetAllBtn, fileInput);
     filePanel.appendChild(fileRow);
     root.appendChild(filePanel);
 
@@ -1093,10 +1097,10 @@
 
     let grid = existing ? rowsToGrid(existing.rows) : newGrid(48);
     let name = existing ? existing.name : "My Level " + (loadLevels().length + 1);
+    let bg = existing ? bgOf(existing) : "overworld";
     let slot = index;
     let sel = "g";
     let mode = "draw"; // draw | pan
-    editorDirty = false;
     const undoStack = [];
 
     const TS = 36; // editor block size in px
@@ -1105,10 +1109,7 @@
     header.appendChild(el("h1", null, "Level Maker"));
     header.appendChild(el("div", "spacer"));
     const backBtn = el("button", "small", "← Levels");
-    backBtn.onclick = () => {
-      if (editorDirty && !confirm("Leave without saving? Your changes will be lost.")) return;
-      showMenu();
-    };
+    backBtn.onclick = () => showMenu();
     header.appendChild(backBtn);
     root.appendChild(header);
 
@@ -1119,22 +1120,40 @@
     nameInput.type = "text";
     nameInput.value = name;
     nameInput.placeholder = "Level name";
-    nameInput.oninput = () => { name = nameInput.value; editorDirty = true; };
-    const saveBtn = el("button", "green", "💾 Save");
-    saveBtn.onclick = () => {
+    // Saves on every change, so a kid never loses work to a forgotten button.
+    // A new level (or a copy) only gets a slot in My levels once it's changed.
+    const savedLabel = el("span", "hint", slot >= 0 ? "✓ Saved" : "");
+    const autosave = () => {
       const all = loadLevels();
-      const lvl = { name: (nameInput.value || "Untitled").trim(), rows: gridToRows(grid) };
+      const lvl = levelData({ name: (name || "").trim() || "Untitled", rows: gridToRows(grid), bg });
       if (slot >= 0 && slot < all.length) all[slot] = lvl;
       else { all.push(lvl); slot = all.length - 1; }
-      if (saveLevels(all)) { editorDirty = false; toast("Saved!"); }
+      savedLabel.textContent = saveLevels(all) ? "✓ Saved" : "⚠ Not saved";
     };
+    nameInput.oninput = () => { name = nameInput.value; autosave(); };
     const testBtn = el("button", "", "▶ Test");
     testBtn.onclick = () => {
-      const lvl = { name: (nameInput.value || "Untitled").trim(), rows: gridToRows(grid) };
+      const lvl = { name: (nameInput.value || "Untitled").trim(), rows: gridToRows(grid), bg };
       showPlay(lvl, () => showEditor(lvl, slot), true);
     };
-    nameRow.append(nameInput, saveBtn, testBtn);
+    nameRow.append(nameInput, testBtn, savedLabel);
     namePanel.appendChild(nameRow);
+    const bgRow = el("div", "row");
+    bgRow.style.marginTop = "8px";
+    bgRow.appendChild(el("span", "hint", "Background:"));
+    const bgBtns = Art.BACKGROUNDS.map((b) => {
+      const btn = el("button", "small", b.label);
+      btn.onclick = () => {
+        bg = b.key;
+        bgBtns.forEach((x, i) => x.classList.toggle("green", Art.BACKGROUNDS[i].key === bg));
+        autosave();
+        render();
+      };
+      btn.classList.toggle("green", b.key === bg);
+      return btn;
+    });
+    bgRow.append(...bgBtns);
+    namePanel.appendChild(bgRow);
     root.appendChild(namePanel);
 
     // palette
@@ -1188,7 +1207,7 @@
       const prev = undoStack.pop();
       if (!prev) { toast("Nothing to undo"); return; }
       grid = prev;
-      editorDirty = true;
+      autosave();
       render();
     };
 
@@ -1201,7 +1220,7 @@
     floorBtn.onclick = () => {
       pushUndo();
       for (let x = 0; x < grid[0].length; x++) grid[H - 1][x] = "g";
-      editorDirty = true;
+      autosave();
       render();
     };
 
@@ -1217,7 +1236,7 @@
       const w = grid[0].length;
       grid = Array.from({ length: H }, () => Array(w).fill(AIR));
       grid[H - 2][2] = "P";
-      editorDirty = true;
+      autosave();
       render();
     };
 
@@ -1244,7 +1263,7 @@
       if (w === grid[0].length) return;
       pushUndo();
       grid = resizeGrid(grid, w);
-      editorDirty = true;
+      autosave();
       render();
     };
 
@@ -1264,7 +1283,7 @@
         }
       }
       grid[cy][cx] = ch;
-      editorDirty = true;
+      autosave();
       return true;
     };
 
@@ -1278,9 +1297,11 @@
 
     const cellFrom = (e) => {
       const rect = canvas.getBoundingClientRect();
+      // Measure against the drawn size, not TS: the page may be scaled up on
+      // big screens, so one block can cover more than TS screen pixels.
       return {
-        x: Math.floor((e.clientX - rect.left) / TS),
-        y: Math.floor((e.clientY - rect.top) / TS),
+        x: Math.floor(((e.clientX - rect.left) / rect.width) * canvas.width / TS),
+        y: Math.floor(((e.clientY - rect.top) / rect.height) * canvas.height / TS),
       };
     };
 
@@ -1330,12 +1351,17 @@
       }
       lenLabel.textContent = `${w} blocks · ${countDiamonds(grid)} 💎`;
 
-      // sky
-      const sky = ctx.createLinearGradient(0, 0, 0, canvas.height);
-      sky.addColorStop(0, "#5aa9e6");
-      sky.addColorStop(1, "#bfe7ff");
-      ctx.fillStyle = sky;
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      // the editor canvas is the whole level, so draw the backdrop once per screen-width
+      const view = Math.min(canvas.width, 24 * TS);
+      for (let x0 = 0; x0 < canvas.width; x0 += view) {
+        ctx.save();
+        ctx.translate(x0, 0);
+        ctx.beginPath();
+        ctx.rect(0, 0, view, canvas.height);
+        ctx.clip();
+        Art.drawBackground(ctx, bg, view, canvas.height, 0, TS, 0, null);
+        ctx.restore();
+      }
 
       for (let y = 0; y < H; y++) {
         for (let x = 0; x < w; x++) {
@@ -1391,11 +1417,6 @@
 
   };
 
-  // warn once, globally, if the editor has unsaved work when the tab closes
-  window.addEventListener("beforeunload", (e) => {
-    if (editorDirty) { e.preventDefault(); e.returnValue = ""; }
-  });
-
   // ---------- screen: play ----------
 
   // `chain` links a level to the ones after it: { i, count, carried, playNext }.
@@ -1418,9 +1439,12 @@
     const panel = el("div", "panel");
     const hud = el("div", "play-hud");
     const scoreEl = el("span", "score", "💎 0");
+    const rodsEl = el("span", "score", "🪄 0");
     const attEl = el("span", "att", "Attempt 1");
     const pctEl = el("span", "att", "0%");
-    hud.append(scoreEl, pctEl, attEl);
+    // only levels that have rods or spawners show a rod counter
+    const hasRods = level.rows.some((r) => /[Zr6]/.test(r));
+    hud.append(scoreEl, ...(hasRods ? [rodsEl] : []), pctEl, attEl);
     panel.appendChild(hud);
 
     if (chain && chain.count > 1) {
@@ -1459,7 +1483,9 @@
 
     let grid, player, score, attempts = 0, state, camX, effect, effectT,
       rot, coyote, buffer, particles, deadT, time = 0, holding = false,
-      checkpoint = null, flying = false;
+      checkpoint = null, flying = false, deathKind = "boom",
+      movers = [], shooters = [], bullets = [], spawners = [], blazes = [], fireballs = [],
+      rods = 0;
 
     // fromStart: R / Play again. Otherwise (after dying) respawn at the last
     // checkpoint with the level as it was when you got there, so diamonds
@@ -1468,6 +1494,27 @@
       if (fromStart) checkpoint = null;
       const at = checkpoint || spawn;
       grid = (checkpoint ? checkpoint.grid : template).map((r) => r.slice());
+      // Lava sources and shooters always restart, even after a save point:
+      // grown lava is cleared and the sources start growing again.
+      movers = [];
+      shooters = [];
+      bullets = [];
+      spawners = [];
+      blazes = [];
+      fireballs = [];
+      for (let y = 0; y < H; y++) {
+        for (let x = 0; x < width; x++) {
+          if (grid[y][x] === FLOWED) grid[y][x] = AIR;
+          const ch = template[y][x];
+          if (ch === "U" || ch === "D") {
+            movers.push({ x, tip: y, dir: ch === "U" ? -1 : 1, t: 0, active: false, done: false });
+          } else if (ch === "S") {
+            shooters.push({ x, y, t: 1 });
+          } else if (ch === "Z") {
+            spawners.push({ x, y, t: 0.6, alive: 0 });
+          }
+        }
+      }
       player = {
         x: at.x + 0.15,
         y: at.y + (1 - PLAYER_H),
@@ -1476,6 +1523,8 @@
       };
       score = checkpoint ? checkpoint.score : 0;
       scoreEl.textContent = "💎 " + score;
+      rods = checkpoint ? checkpoint.rods : 0;
+      rodsEl.textContent = "🪄 " + rods;
       state = "run";
       camX = clamp(player.x - VIEW_COLS * 0.32, 0, Math.max(0, width - VIEW_COLS));
       effect = null;
@@ -1521,12 +1570,15 @@
       }
     };
 
-    const die = () => {
+    const die = (kind = "boom") => {
       if (state !== "run") return;
       state = "dead";
+      deathKind = kind;
       deadT = 0;
       explode(player.x + PLAYER_W / 2, player.y + PLAYER_H / 2,
-        ["#ffd54a", "#ff8a3d", "#e04a2f", "#8c8c8c"]);
+        kind === "burn"
+          ? ["#ffd54a", "#ff8a3d", "#e04a2f", "#ff5a1f"]
+          : ["#ffd54a", "#ff8a3d", "#e04a2f", "#8c8c8c"]);
       jumpBtn.disabled = true;
     };
 
@@ -1545,6 +1597,7 @@
       box.innerHTML =
         `<div class="big">${more || !chain ? "Level Complete!" : "You Finished!"}</div>` +
         `<div>Score: ${score} · Best: ${getBest(bestKey(level))}</div>` +
+        (hasRods ? `<div>Blaze rods: ${rods} 🪄</div>` : "") +
         (chain && chain.count > 1
           ? `<div class="run-total">Run total: ${runTotal} 💎` +
             (more ? ` · ${chain.count - chain.i - 1} to go` : ` · all ${chain.count} levels!`) +
@@ -1567,6 +1620,128 @@
       msgSlot.innerHTML = "";
       msgSlot.appendChild(box);
       msgSlot.style.marginTop = "8px";
+    };
+
+    const gotRod = (x, y) => {
+      rods++;
+      rodsEl.textContent = "🪄 " + rods;
+      for (let i = 0; i < 10; i++) {
+        particles.push({ x, y, vx: (Math.random() - 0.5) * 6, vy: -2 - Math.random() * 4,
+          life: 0.4 + Math.random() * 0.3, c: Math.random() < 0.5 ? "#ffe98a" : "#f0a020" });
+      }
+    };
+
+    // Player's hit box for things that move, a little forgiving like items.
+    const touches = (x0, y0, x1, y1) => {
+      const inset = 0.14;
+      return x1 > player.x + inset && x0 < player.x + PLAYER_W - inset &&
+        y1 > player.y + inset && y0 < player.y + PLAYER_H - inset;
+    };
+    const onScreen = (x) => x >= camX - 1 && x < camX + VIEW_COLS + 0.5;
+
+    // Moving lava, shooters and their stars. Returns true if you died.
+    const updateHazards = (dt) => {
+      for (const m of movers) {
+        if (!m.active && onScreen(m.x)) m.active = true;
+        if (!m.active || m.done) continue;
+        m.t += dt * (m.dir < 0 ? LAVA_RISE : LAVA_FALL);
+        if (m.t < 1) continue;
+        m.t = 0;
+        // Grow one block into empty air; anything else (ground, an item,
+        // the edge of the level) stops the flow for good.
+        const next = m.tip + m.dir;
+        if (next < 0 || next >= H || grid[next][m.x] !== AIR) { m.done = true; continue; }
+        grid[next][m.x] = FLOWED;
+        m.tip = next;
+      }
+
+      for (const sh of shooters) {
+        if (!onScreen(sh.x)) continue;
+        sh.t -= dt;
+        if (sh.t > 0) continue;
+        sh.t = SHOOT_EVERY;
+        const bx = sh.x + 0.5, by = sh.y + 0.5;
+        const a = Math.atan2(player.y + PLAYER_H / 2 - by, player.x + PLAYER_W / 2 - bx);
+        bullets.push({ x: bx, y: by, a, life: BULLET_LIFE, fromX: sh.x, fromY: sh.y });
+      }
+
+      for (const b of bullets) {
+        // steer toward the player, but only so fast — you can outrun a turn
+        const want = Math.atan2(player.y + PLAYER_H / 2 - b.y, player.x + PLAYER_W / 2 - b.x);
+        let diff = want - b.a;
+        while (diff > Math.PI) diff -= Math.PI * 2;
+        while (diff < -Math.PI) diff += Math.PI * 2;
+        b.a += clamp(diff, -BULLET_TURN * dt, BULLET_TURN * dt);
+        b.x += Math.cos(b.a) * BULLET_SPEED * dt;
+        b.y += Math.sin(b.a) * BULLET_SPEED * dt;
+        b.life -= dt;
+        const cx = Math.floor(b.x), cy = Math.floor(b.y);
+        if ((cx !== b.fromX || cy !== b.fromY) && solidAt(cx, cy)) b.life = 0;
+        if (b.life > 0 && touches(b.x - 0.2, b.y - 0.2, b.x + 0.2, b.y + 0.2)) {
+          die();
+          return true;
+        }
+      }
+      bullets = bullets.filter((b) => b.life > 0);
+
+      for (const sp of spawners) {
+        if (!onScreen(sp.x) || sp.alive >= BLAZE_MAX) continue;
+        sp.t -= dt;
+        if (sp.t > 0) continue;
+        sp.t = SPAWN_EVERY;
+        // come out of whichever side of the cage is open, top first
+        const exits = [[0, -1], [-1, 0], [1, 0], [0, 1]];
+        const ex = exits.find(([dx, dy]) => {
+          const cx = sp.x + dx, cy = sp.y + dy;
+          return cx >= 0 && cx < width && cy >= 0 && cy < H && !isSolid(grid[cy][cx]);
+        });
+        if (!ex) continue;
+        const bx = sp.x + ex[0] + 0.5, by = sp.y + ex[1] + 0.5;
+        sp.alive++;
+        blazes.push({ x: bx, y: by, homeX: bx, homeY: by, t: BLAZE_SHOOT * 0.6, sp, ph: Math.random() * 6 });
+      }
+
+      for (const bz of blazes) {
+        // drift toward you, but stay near the spawner, bobbing up and down
+        const want = clamp(player.x + PLAYER_W / 2, bz.homeX - BLAZE_REACH, bz.homeX + BLAZE_REACH);
+        bz.x += clamp(want - bz.x, -BLAZE_DRIFT * dt, BLAZE_DRIFT * dt);
+        bz.y = bz.homeY + Math.sin(time * 2 + bz.ph) * 0.35;
+        const r = 0.4;
+        if (touches(bz.x - r, bz.y - r, bz.x + r, bz.y + r)) {
+          // landing on top pops it and bounces you; any other touch burns
+          if (player.vy > 0 && player.y + PLAYER_H < bz.y + 0.1) {
+            bz.dead = true;
+            bz.sp.alive--;
+            player.vy = -JUMP_V * 0.85;
+            explode(bz.x, bz.y, ["#ffd54a", "#ff8a3d", "#ffe98a"]);
+            gotRod(bz.x, bz.y);
+            continue;
+          }
+          die("burn");
+          return true;
+        }
+        if (!onScreen(bz.x)) continue;
+        bz.t -= dt;
+        if (bz.t > 0) continue;
+        bz.t = BLAZE_SHOOT;
+        const a = Math.atan2(player.y + PLAYER_H / 2 - bz.y, player.x + PLAYER_W / 2 - bz.x);
+        fireballs.push({ x: bz.x, y: bz.y, vx: Math.cos(a) * FIREBALL_SPEED,
+          vy: Math.sin(a) * FIREBALL_SPEED, life: BULLET_LIFE });
+      }
+      blazes = blazes.filter((bz) => !bz.dead);
+
+      for (const fb of fireballs) {
+        fb.x += fb.vx * dt;
+        fb.y += fb.vy * dt;
+        fb.life -= dt;
+        if (solidAt(Math.floor(fb.x), Math.floor(fb.y))) fb.life = 0;
+        if (fb.life > 0 && touches(fb.x - 0.2, fb.y - 0.2, fb.x + 0.2, fb.y + 0.2)) {
+          die("burn");
+          return true;
+        }
+      }
+      fireballs = fireballs.filter((fb) => fb.life > 0);
+      return false;
     };
 
     // --- physics ---
@@ -1698,12 +1873,16 @@
           const ch = grid[y][x];
           if (ch === "t") { die(); return; }
           if (isHiddenTnt(ch)) { die(); return; }
+          if (ch === "L" || ch === "F" || ch === "U" || ch === "D" || ch === FLOWED) {
+            die("burn");
+            return;
+          }
           if (ch === "C") {
             // Wings come off here, so each stretch between save points
             // has to earn its own pair.
             flying = false;
             grid[y][x] = "checkpointOn";
-            checkpoint = { x, y, score, grid: grid.map((r) => r.slice()) };
+            checkpoint = { x, y, score, rods, grid: grid.map((r) => r.slice()) };
             toast("Checkpoint!");
           }
           if (ch === "d") {
@@ -1716,6 +1895,9 @@
           } else if (ch === "w") {
             effect = "slow";
             effectT = EFFECT_TIME;
+          } else if (ch === "r") {
+            grid[y][x] = AIR;
+            gotRod(x + 0.5, y + 0.5);
           } else if (ch === "f") {
             grid[y][x] = AIR;
             flying = true;
@@ -1725,6 +1907,8 @@
           }
         }
       }
+
+      if (updateHazards(dt)) return;
 
       if (player.y > H + 1) { die(); return; }
       if (player.x > width) { win(); return; }
@@ -1737,35 +1921,8 @@
     };
 
     // --- rendering ---
-    const drawBackground = () => {
-      const sky = ctx.createLinearGradient(0, 0, 0, canvas.height);
-      if (effect === "fast") { sky.addColorStop(0, "#e8a93a"); sky.addColorStop(1, "#ffe6a8"); }
-      else if (effect === "slow") { sky.addColorStop(0, "#3a3a4a"); sky.addColorStop(1, "#8f8fa5"); }
-      else { sky.addColorStop(0, "#4c9fe0"); sky.addColorStop(1, "#bfe7ff"); }
-      ctx.fillStyle = sky;
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-      // clouds (slow parallax)
-      const span = canvas.width + 400;
-      for (let i = 0; i < 7; i++) {
-        const size = 110 + (i % 3) * 55;
-        let x = ((i * 337 - camX * TS * 0.22) % span + span) % span - 200;
-        const y = 20 + ((i * 71) % 110);
-        drawCloud(ctx, x, y, size);
-      }
-
-      // blocky hills on the horizon (faster parallax, always behind the floor)
-      const groundY = canvas.height - TS;
-      const hspan = canvas.width + 520;
-      for (let i = 0; i < 10; i++) {
-        const x = ((i * 260 - camX * TS * 0.5) % hspan + hspan) % hspan - 260;
-        const hgt = 40 + ((i * 53) % 70);
-        ctx.fillStyle = "rgba(72, 116, 58, 0.45)";
-        ctx.fillRect(x, groundY - hgt, 200, hgt + TS);
-        ctx.fillStyle = "rgba(110, 170, 80, 0.45)";
-        ctx.fillRect(x, groundY - hgt, 200, 10);
-      }
-    };
+    const drawBackground = () =>
+      Art.drawBackground(ctx, bgOf(level), canvas.width, canvas.height, camX * TS, TS, time, effect);
 
     const render = () => {
       drawBackground();
@@ -1776,10 +1933,55 @@
         for (let y = 0; y < H; y++) {
           const ch = grid[y][x];
           if (ch !== AIR && ch !== "P" && ch !== "h") {
-            drawTile(ctx, overOf(ch) || ch, (x - camX) * TS, y * TS, TS, time,
+            drawTile(ctx, ch === FLOWED ? "L" : overOf(ch) || ch, (x - camX) * TS, y * TS, TS, time,
               y > 0 && isSolid(grid[y - 1][x]));
           }
         }
+      }
+
+      // the next block of lava oozing out of each active source
+      for (const m of movers) {
+        if (!m.active || m.done) continue;
+        const next = m.tip + m.dir;
+        if (next < 0 || next >= H || grid[next][m.x] !== AIR) continue;
+        const h = TS * m.t;
+        const y = m.dir < 0 ? (next + 1) * TS - h : next * TS;
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect((m.x - camX) * TS, y, TS, h);
+        ctx.clip();
+        drawTile(ctx, "L", (m.x - camX) * TS, next * TS, TS, time, false);
+        ctx.restore();
+      }
+      for (const b of bullets) {
+        const bs = TS * 0.55;
+        ctx.save();
+        ctx.translate((b.x - camX) * TS, b.y * TS);
+        ctx.rotate(time * 6);
+        drawTile(ctx, "bullet", -bs / 2, -bs / 2, bs, time, false);
+        ctx.restore();
+      }
+
+      for (const bz of blazes) {
+        const bs = TS * 0.8;
+        const px = (bz.x - camX) * TS, py = bz.y * TS;
+        // rods spinning around the head, in two rings like the real thing
+        for (let i = 0; i < 6; i++) {
+          const a = time * (i < 3 ? 2.5 : -2) + (i % 3) * (Math.PI * 2 / 3);
+          const rr = TS * (i < 3 ? 0.55 : 0.4);
+          ctx.fillStyle = i % 2 ? "#f0a020" : "#ffd54a";
+          ctx.fillRect(px + Math.cos(a) * rr - TS * 0.06, py + TS * (i < 3 ? 0.05 : 0.35) +
+            Math.sin(a) * rr * 0.3 - TS * 0.14, TS * 0.12, TS * 0.28);
+        }
+        drawTile(ctx, "blaze", px - bs / 2, py - bs / 2, bs, time, false);
+      }
+      for (const fb of fireballs) {
+        const fs = TS * 0.5;
+        ctx.save();
+        ctx.translate((fb.x - camX) * TS, fb.y * TS);
+        ctx.rotate(time * 8);
+        drawTile(ctx, "fireball", -fs / 2, -fs / 2, fs, time, false);
+        ctx.restore();
       }
 
       if (state !== "dead" && flying) {
@@ -1828,7 +2030,7 @@
         ctx.font = "bold 46px ui-monospace, monospace";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        ctx.fillText("BOOM!", canvas.width / 2, canvas.height / 2);
+        ctx.fillText(deathKind === "burn" ? "BURNED!" : "BOOM!", canvas.width / 2, canvas.height / 2);
       }
     };
 

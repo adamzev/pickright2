@@ -14,7 +14,8 @@
 //   BDArt.loadSprites({ g: "art/grass.png", t: "art/tnt.png" }).then(...)
 //   BDArt.registerSprite("player", someCanvasOrImage);
 //
-// Keys: block letters g s m t h C d b w E B P, plus "checkpointOn", plus "dirt", "cloud", "player",
+// Keys: block letters g s m t h C d b w f n k L U D F S Z r E B P, plus "bullet", "blaze", "fireball",
+// "checkpointOn", "wingsWorn", plus "dirt", "cloud", "player",
 // "explosion1", "explosion2". Blocks should be square; the player is drawn at
 // roughly 3:4. Anything not replaced keeps the built-in pixel art.
 //
@@ -101,6 +102,133 @@ window.BDArt = (() => {
 
   const stone = mk(S, S, (c) => {
     noiseFill(c, 7, ["#5c5c5c", "#6e6e6e", "#8a8a8a", "#9d9d9d", "#8a8a8a", "#7b7b7b"]);
+  });
+
+  // ---------- nether blocks (from the drawing) ----------
+
+  const netherrack = mk(S, S, (c) => {
+    noiseFill(c, 51, ["#5a1d1d", "#6b2323", "#7d2b2b", "#8f3434", "#7d2b2b", "#6b2323"]);
+    // a few dark cracks, like the scribbles in the drawing
+    [[2, 3], [3, 4], [4, 4], [5, 5], [10, 2], [11, 3], [11, 4], [9, 9], [10, 10],
+      [11, 10], [12, 11], [3, 11], [4, 12], [5, 12], [6, 13]].forEach(([x, y]) =>
+      rect(c, x, y, 1, 1, "#3e1212"));
+  });
+
+  const netherBricks = mk(S, S, (c) => {
+    rect(c, 0, 0, S, S, "#1e0d10"); // mortar
+    for (let row = 0; row < 4; row++) {
+      const off = row % 2 ? 4 : 0;
+      for (let bx = -1; bx < 3; bx++) {
+        const x = bx * 8 + off;
+        const y = row * 4;
+        const x0 = Math.max(0, x), x1 = Math.min(S, x + 7);
+        if (x1 <= x0) continue;
+        rect(c, x0, y, x1 - x0, 3, "#4a1f24");
+        rect(c, x0, y, x1 - x0, 1, "#5e2a30");
+        rect(c, x0, y + 2, x1 - x0, 1, "#3b181c");
+      }
+    }
+  });
+
+  const lavaBase = (c, seed) => {
+    noiseFill(c, seed, ["#d1481a", "#e8661f", "#f08a24", "#e8661f", "#ffb43a"]);
+    [[3, 4], [4, 4], [10, 7], [11, 7], [11, 8], [6, 12], [7, 12], [13, 2]].forEach(([x, y]) =>
+      rect(c, x, y, 1, 1, "#fff0a0"));
+  };
+  const lava = mk(S, S, (c) => lavaBase(c, 61));
+  // Moving lava keeps the lava look plus arrows, so you can tell which way
+  // it'll go before it starts moving.
+  const arrow = (c, up) => {
+    const rows = up ? [[3, 7, 8], [4, 6, 9], [5, 5, 10]] : [[10, 5, 10], [11, 6, 9], [12, 7, 8]];
+    rows.forEach(([y, x0, x1]) => rect(c, x0, y, x1 - x0 + 1, 1, "#7a1a0a"));
+    rect(c, 7, up ? 6 : 5, 2, 5, "#7a1a0a");
+  };
+  const lavaUp = mk(S, S, (c) => { lavaBase(c, 62); arrow(c, true); });
+  const lavaDown = mk(S, S, (c) => { lavaBase(c, 63); arrow(c, false); });
+
+  const fire = mk(S, S, (c) => {
+    const flame = (cx, h, w) => {
+      for (let y = 0; y < h; y++) {
+        const half = Math.max(0, Math.round((w / 2) * Math.sin((Math.PI * (y + 1)) / (h + 1))));
+        const yy = S - 1 - y;
+        rect(c, cx - half, yy, half * 2 + 1, 1, y > h * 0.7 ? "#ffd54a" : "#ff8a3d");
+        if (half > 1 && y < h * 0.6) rect(c, cx - half + 1, yy, half * 2 - 1, 1, "#ffd54a");
+        if (half > 2 && y < h * 0.35) rect(c, cx - 1, yy, 3, 1, "#fff6c0");
+      }
+    };
+    flame(4, 11, 6);
+    flame(11, 13, 7);
+    flame(8, 8, 5);
+    rect(c, 0, S - 1, S, 1, "#e04a2f");
+  });
+
+  // Shooter: a stone box with a glowing eye that fires tracking stars.
+  const shooter = mk(S, S, (c) => {
+    noiseFill(c, 71, ["#4a4a52", "#5c5c66", "#6e6e78"]);
+    rect(c, 0, 0, S, 1, "#2a2a30");
+    rect(c, 0, S - 1, S, 1, "#2a2a30");
+    rect(c, 0, 0, 1, S, "#2a2a30");
+    rect(c, S - 1, 0, 1, S, "#2a2a30");
+    rect(c, 4, 4, 8, 8, "#1a1a20");
+    rect(c, 5, 5, 6, 6, "#5b1f96");
+    rect(c, 6, 6, 4, 4, "#c58bff");
+    rect(c, 7, 7, 2, 2, "#ffffff");
+  });
+
+  // Spawner: a dark iron cage with a little flame flickering inside.
+  const spawner = mk(S, S, (c) => {
+    rect(c, 0, 0, S, S, "#14161c");
+    rect(c, 5, 6, 6, 7, "#5a1e0a");
+    rect(c, 6, 8, 4, 5, "#e5701f");
+    rect(c, 7, 9, 2, 3, "#ffd54a");
+    for (let i = 0; i < S; i += 5) {
+      rect(c, i, 0, 1, S, "#4a5260");
+      rect(c, 0, i, S, 1, "#4a5260");
+    }
+    rect(c, 0, S - 1, S, 1, "#4a5260");
+    rect(c, S - 1, 0, 1, S, "#4a5260");
+    rect(c, 0, 0, S, 1, "#6e7888");
+    rect(c, 0, 0, 1, S, "#6e7888");
+  });
+
+  // Blaze: a fiery head. Its spinning rods are drawn by the game around it.
+  const blaze = mk(S, S, (c) => {
+    rect(c, 3, 2, 10, 10, "#e5a21f");
+    rect(c, 4, 3, 8, 8, "#ffc93a");
+    rect(c, 4, 3, 8, 2, "#ffe98a");
+    rect(c, 5, 6, 2, 2, "#3a1a08");
+    rect(c, 9, 6, 2, 2, "#3a1a08");
+    rect(c, 6, 9, 4, 1, "#a8501a");
+    rect(c, 6, 12, 4, 3, "#ff8a3d");
+    rect(c, 7, 13, 2, 3, "#ffd54a");
+  });
+
+  // Blaze rod: the thing you collect — a glowing yellow stick on a diagonal.
+  const blazeRod = mk(S, S, (c) => {
+    for (let i = 0; i < 11; i++) {
+      rect(c, 3 + i, 13 - i, 2, 2, i % 3 === 0 ? "#ffe98a" : "#f0a020");
+    }
+    rect(c, 2, 13, 2, 2, "#c86a10");
+    rect(c, 13, 2, 2, 2, "#c86a10");
+    rect(c, 12, 1, 1, 1, "#ffffff");
+  });
+
+  const fireball = mk(S, S, (c) => {
+    rect(c, 4, 4, 8, 8, "#e5401f");
+    rect(c, 3, 6, 10, 4, "#e5401f");
+    rect(c, 6, 3, 4, 10, "#e5401f");
+    rect(c, 5, 5, 6, 6, "#ff8a3d");
+    rect(c, 6, 6, 4, 4, "#ffd54a");
+    rect(c, 7, 7, 2, 2, "#ffffff");
+  });
+
+  // The tracking bullet: a four-pointed star, like the one in the drawing.
+  const bullet = mk(S, S, (c) => {
+    const pts = [[7, 0, 2, 16], [0, 7, 16, 2], [5, 4, 6, 8], [4, 5, 8, 6]];
+    pts.forEach(([x, y, w, h]) => rect(c, x, y, w, h, "#ffd54a"));
+    rect(c, 6, 3, 4, 10, "#ffe98a");
+    rect(c, 3, 6, 10, 4, "#ffe98a");
+    rect(c, 6, 6, 4, 4, "#ffffff");
   });
 
   const slime = mk(S, S, (c) => {
@@ -391,6 +519,18 @@ window.BDArt = (() => {
     C: checkpoint,
     checkpointOn: checkpointOn,
     f: wings,
+    n: netherrack,
+    k: netherBricks,
+    L: lava,
+    U: lavaUp,
+    D: lavaDown,
+    F: fire,
+    S: shooter,
+    bullet: bullet,
+    Z: spawner,
+    blaze: blaze,
+    r: blazeRod,
+    fireball: fireball,
     wingsWorn: wingsWorn,
     d: diamond,
     b: bolt,
@@ -419,6 +559,18 @@ window.BDArt = (() => {
     { key: "b", label: "Lightning" },
     { key: "w", label: "Rose" },
     { key: "f", label: "Wings" },
+    { key: "n", label: "Netherrack" },
+    { key: "k", label: "Nether bricks" },
+    { key: "L", label: "Lava" },
+    { key: "U", label: "Rising lava" },
+    { key: "D", label: "Falling lava" },
+    { key: "F", label: "Fire" },
+    { key: "S", label: "Shooter" },
+    { key: "bullet", label: "Star bullet" },
+    { key: "Z", label: "Spawner" },
+    { key: "blaze", label: "Blaze" },
+    { key: "r", label: "Blaze rod" },
+    { key: "fireball", label: "Fireball" },
     { key: "wingsWorn", label: "Wings (worn)" },
     { key: "E", label: "Portal" },
     { key: "B", label: "Bush" },
@@ -603,7 +755,7 @@ window.BDArt = (() => {
       const wob = (Math.sin(time * 4 + x * 0.03) * 0.04 + 0.04) * size;
       return blit(ctx, sp, x, y + wob, size, size - wob);
     }
-    if (ch === "d") {
+    if (ch === "d" || ch === "r") {
       const bob = Math.sin(time * 3 + x * 0.05) * size * 0.08;
       return blit(ctx, sp, x, y + bob, size, size);
     }
@@ -615,6 +767,20 @@ window.BDArt = (() => {
       ctx.fillRect(x, y, size, size);
       ctx.restore();
       return blit(ctx, sp, x, y, size, size);
+    }
+    if (ch === "L" || ch === "U" || ch === "D") {
+      blit(ctx, sp, x, y, size, size);
+      ctx.save();
+      ctx.globalAlpha = 0.12 + 0.1 * Math.sin(time * 3 + x * 0.05);
+      ctx.fillStyle = "#fff0a0";
+      ctx.fillRect(x, y, size, size);
+      ctx.restore();
+      return;
+    }
+    if (ch === "F") {
+      // flicker: the flames stretch and shrink a little
+      const h = size * (0.88 + 0.12 * Math.sin(time * 14 + x * 0.3));
+      return blit(ctx, sp, x, y + size - h, size, h);
     }
     if (ch === "E") {
       blit(ctx, sp, x, y, size, size);
@@ -653,6 +819,163 @@ window.BDArt = (() => {
 
   const drawCloud = (ctx, x, y, size) => blit(ctx, SPRITES.cloud, x, y, size, size);
 
+  // ---- level backgrounds ----
+  // Everything is drawn with plain rectangles so it keeps the blocky look.
+  // `scroll` is how far the camera has moved in px; far layers move slower.
+  const BACKGROUNDS = [
+    { key: "overworld", label: "🌳 Overworld" },
+    { key: "nether", label: "🔥 Nether" },
+    { key: "mooshroom", label: "🍄 Mooshroom realm" },
+  ];
+
+  const wrapX = (base, scroll, rate, span, pad) =>
+    ((base - scroll * rate) % span + span) % span - pad;
+
+  const skyGrad = (ctx, H, top, bottom) => {
+    const g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, top);
+    g.addColorStop(1, bottom);
+    return g;
+  };
+
+  // a jagged band of blocks hanging from the top (dir 1) or rising from y0 (dir -1)
+  const jagged = (ctx, W, y0, dir, scroll, rate, step, minH, varH, seed, color) => {
+    ctx.fillStyle = color;
+    const off = ((scroll * rate) % step + step) % step;
+    const first = Math.floor((scroll * rate) / step);
+    for (let i = -1; i * step < W + step; i++) {
+      const n = first + i;
+      const h = minH + (((n * 7919 + seed) % 97 + 97) % 97) / 97 * varH;
+      const x = i * step - off;
+      if (dir > 0) ctx.fillRect(x, y0, step + 1, h);
+      else ctx.fillRect(x, y0 - h, step + 1, h + 400);
+    }
+  };
+
+  const drawGhast = (ctx, x, y, s, t) => {
+    const p = s / 8;
+    ctx.fillStyle = "#f1eeee";
+    ctx.fillRect(x, y, s, s);
+    ctx.fillStyle = "#d9d4d4";
+    ctx.fillRect(x, y + s - p, s, p);
+    ctx.fillStyle = "#3a3a3a";
+    ctx.fillRect(x + p * 1.5, y + p * 3, p * 1.5, p);
+    ctx.fillRect(x + p * 5, y + p * 3, p * 1.5, p);
+    ctx.fillRect(x + p * 3, y + p * 5.5, p * 2, p);
+    ctx.fillStyle = "#e4dfdf";
+    for (let k = 0; k < 4; k++) {
+      const len = s * (0.45 + 0.25 * Math.sin(t * 2 + k * 1.7 + x * 0.01));
+      ctx.fillRect(x + p * (0.8 + k * 1.9), y + s, p * 0.8, len);
+    }
+  };
+
+  const drawMushroom = (ctx, x, groundY, h, capW, red) => {
+    const stemW = capW * 0.22;
+    ctx.fillStyle = red ? "#d9cdb8" : "#c9b89b";
+    ctx.fillRect(x + (capW - stemW) / 2, groundY - h, stemW, h);
+    const capH = red ? capW * 0.38 : capW * 0.16;
+    ctx.fillStyle = red ? "#c22a22" : "#8b6a4a";
+    ctx.fillRect(x, groundY - h - capH, capW, capH);
+    if (red) {
+      ctx.fillRect(x + capW * 0.12, groundY - h - capH * 1.4, capW * 0.76, capH * 0.5);
+      ctx.fillStyle = "#f3eadf";
+      const d = capW * 0.1;
+      ctx.fillRect(x + capW * 0.18, groundY - h - capH * 0.75, d, d);
+      ctx.fillRect(x + capW * 0.55, groundY - h - capH * 1.25, d, d);
+      ctx.fillRect(x + capW * 0.75, groundY - h - capH * 0.6, d, d);
+    }
+  };
+
+  // effect: null | "fast" | "slow" (lightning / wither rose tints)
+  const drawBackground = (ctx, kind, W, H, scroll, ts, t, effect) => {
+    const groundY = H - ts;
+    if (kind === "nether") {
+      ctx.fillStyle = skyGrad(ctx, H, "#1e0303", "#6a1a0e");
+      ctx.fillRect(0, 0, W, H);
+      // lava glow far below
+      const glow = ctx.createLinearGradient(0, H * 0.45, 0, H);
+      glow.addColorStop(0, "rgba(255, 110, 30, 0)");
+      glow.addColorStop(1, "rgba(255, 110, 30, 0.3)");
+      ctx.fillStyle = glow;
+      ctx.fillRect(0, H * 0.45, W, H);
+      // distant netherrack ceiling and floor
+      jagged(ctx, W, 0, 1, scroll, 0.15, 48, 18, 46, 3, "#3a0c0a");
+      jagged(ctx, W, 0, 1, scroll, 0.3, 36, 6, 26, 11, "#561410");
+      jagged(ctx, W, groundY + ts * 0.3, -1, scroll, 0.25, 44, 30, 80, 5, "#3e0e0b");
+      jagged(ctx, W, groundY + ts * 0.3, -1, scroll, 0.5, 32, 10, 46, 17, "#5c1812");
+      // ghasts drifting in the distance
+      const span = W + 500;
+      for (let i = 0; i < 4; i++) {
+        const s = 26 + (i % 3) * 12;
+        const x = wrapX(i * 410 + t * 9 * (i % 2 ? 1 : -1), scroll, 0.12, span, 120);
+        const y = 70 + ((i * 97) % 120) + Math.sin(t * 0.8 + i) * 10;
+        ctx.globalAlpha = 0.55 + (i % 3) * 0.12;
+        drawGhast(ctx, x, y, s, t);
+        ctx.globalAlpha = 1;
+      }
+      // floating embers
+      ctx.fillStyle = "rgba(255, 170, 60, 0.7)";
+      for (let i = 0; i < 18; i++) {
+        const x = wrapX(i * 173, scroll, 0.4, W + 40, 20);
+        const y = H - (((t * 18 + i * 61) % (H + 20)));
+        ctx.fillRect(x, y, 3, 3);
+      }
+    } else if (kind === "mooshroom") {
+      ctx.fillStyle = skyGrad(ctx, H, "#8f7bc4", "#f2cfe0");
+      ctx.fillRect(0, 0, W, H);
+      // a few pink clouds
+      const span = W + 400;
+      ctx.globalAlpha = 0.6;
+      for (let i = 0; i < 5; i++) {
+        const size = 100 + (i % 3) * 50;
+        drawCloud(ctx, wrapX(i * 377, scroll, 0.2, span, 200), 20 + ((i * 71) % 90), size);
+      }
+      ctx.globalAlpha = 1;
+      // giant mushrooms on far mycelium hills
+      const mspan = W + 600;
+      for (let i = 0; i < 6; i++) {
+        const x = wrapX(i * 230, scroll, 0.35, mspan, 200);
+        const h = 70 + ((i * 41) % 60);
+        ctx.globalAlpha = 0.75;
+        drawMushroom(ctx, x, groundY, h, 70 + (i % 3) * 20, i % 2 === 0);
+        ctx.globalAlpha = 1;
+      }
+      jagged(ctx, W, groundY + ts * 0.3, -1, scroll, 0.5, 60, 14, 36, 9, "#7a6a80");
+      // floating spores
+      ctx.fillStyle = "rgba(255, 255, 255, 0.55)";
+      for (let i = 0; i < 16; i++) {
+        const x = wrapX(i * 149 + Math.sin(t + i) * 8, scroll, 0.45, W + 40, 20);
+        const y = (((i * 83) - t * 6) % H + H) % H;
+        ctx.fillRect(x, y, 2, 2);
+      }
+    } else {
+      let top = "#4c9fe0", bottom = "#bfe7ff";
+      if (effect === "fast") { top = "#e8a93a"; bottom = "#ffe6a8"; }
+      else if (effect === "slow") { top = "#3a3a4a"; bottom = "#8f8fa5"; }
+      ctx.fillStyle = skyGrad(ctx, H, top, bottom);
+      ctx.fillRect(0, 0, W, H);
+      const span = W + 400;
+      for (let i = 0; i < 7; i++) {
+        const size = 110 + (i % 3) * 55;
+        drawCloud(ctx, wrapX(i * 337, scroll, 0.22, span, 200), 20 + ((i * 71) % 110), size);
+      }
+      const hspan = W + 520;
+      for (let i = 0; i < 10; i++) {
+        const x = wrapX(i * 260, scroll, 0.5, hspan, 260);
+        const hgt = 40 + ((i * 53) % 70);
+        ctx.fillStyle = "rgba(72, 116, 58, 0.45)";
+        ctx.fillRect(x, groundY - hgt, 200, hgt + ts);
+        ctx.fillStyle = "rgba(110, 170, 80, 0.45)";
+        ctx.fillRect(x, groundY - hgt, 200, 10);
+      }
+      return;
+    }
+    if (effect) {
+      ctx.fillStyle = effect === "fast" ? "rgba(255, 190, 60, 0.25)" : "rgba(40, 40, 60, 0.4)";
+      ctx.fillRect(0, 0, W, H);
+    }
+  };
+
   const drawEraser = (ctx, x, y, s) => {
     ctx.fillStyle = "#15151c";
     ctx.fillRect(x, y, s, s);
@@ -672,6 +995,8 @@ window.BDArt = (() => {
     drawExplosion,
     drawCloud,
     drawEraser,
+    drawBackground,
+    BACKGROUNDS,
     registerSprite,
     loadSprites,
     SPRITES,

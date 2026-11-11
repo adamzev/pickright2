@@ -10,11 +10,14 @@ A choose-wisely adventure where most picks end badly. Find a safe house, an axe 
 
 ## Block Dash
 
-A second game on the site (`docs/blockdash.html`, linked from the title screen):
-a blocky-sandbox-flavoured auto-runner in the spirit of rhythm platformers,
-**plus a level maker** — you build the levels yourself. It ships with whatever
-levels are in `docs/blockdash-levels.js`; everything else you make is saved in
-your own browser.
+A second game on the site, a blocky-sandbox-flavoured auto-runner in the spirit
+of rhythm platformers, **plus a level maker**. The title screen links to two
+modes:
+
+| Link | Opens |
+|---|---|
+| `blockdash.html` | Play mode: just the official levels (in `docs/blockdash-levels.js`), back to back |
+| `blockdash.html?edit` | Level Maker: your own levels, saved in your browser, plus "Copy & edit" on the official ones |
 
 An unofficial fan project with original art. Not affiliated with, endorsed by,
 or connected to Mojang, Microsoft, or any other game.
@@ -24,6 +27,12 @@ Block rules:
 | Block | What it does |
 | --- | --- |
 | Grass / Stone | Solid ground and walls |
+| Netherrack / Nether bricks | Solid, like Stone, for Nether-themed levels |
+| Lava / Fire | Burns you on touch |
+| Rising / Falling lava | A lava source that stays put and grows new lava upward (or slowly downward) once it's on screen, until it reaches something |
+| Shooter | Solid block that fires a star every 2 seconds; stars steer toward you and explode on touch |
+| Spawner | Solid cage that lets out a blaze every few seconds (up to 2 at a time). Blazes float near it, drift toward you and shoot straight fireballs. Jump on one to pop it and get its blaze rod; touching it any other way burns |
+| Blaze rod | Collectible, counted separately from diamonds (🪄 in the score bar) |
 | Slime | Bounces you high — from the top or the side |
 | TNT | Instant game over |
 | Diamond | +10 points |
@@ -38,21 +47,26 @@ Block rules:
 
 ### Two ways levels get made
 
-**In the browser (anyone).** Build in the level maker, hit Save — it lives in
-localStorage. The **Code** button turns a level into a text code that someone
+**In the browser (anyone).** Build in the level maker. Every change saves
+itself to localStorage as you go; there's no Save button. Each level also has a
+background, picked under its name: Overworld (sky and hills), Nether (netherrack
+above and below, ghasts drifting in the distance) or Mooshroom realm (giant
+mushrooms on a purple-pink sky). It's saved as `"bg"` in the level; levels
+without it use Overworld. The **Code** button turns a level into a text code that someone
 else can paste into Import.
 
 **Shipped with the game (us).** Build the levels you want everyone to get, then
 open **Level pack tools** on the Block Dash menu:
 
-- **Download pack (.js)** writes every level in My Levels to
-  `blockdash-levels.js`. Drop it into `docs/`, replacing the existing file, and
-  commit — those levels now appear at the top of the page for all players.
-- **Download all (.json)** / the per-level **File** button save plain JSON, if
-  you'd rather keep levels as separate source files.
-- **Load file** reads a `.json` level, a `.json` array of levels, or a
-  `blockdash-levels.js` pack back into My Levels, so a shipped level can be
-  edited again later.
+- **Download all (.json)** saves every level in My Levels to
+  `blockdash-levels.json`; the per-level **File** button saves one. Downloads
+  are JSON only, because browsers warn about downloaded `.js` files.
+- To ship levels, convert the ones you want from that JSON into
+  `docs/blockdash-levels.js` (the same objects inside
+  `window.BLOCKDASH_LEVELS = [...]`) and commit. It stays a `.js` file so the
+  page can load it without a fetch.
+- **Load file** reads a `.json` level, a `.json` array of levels, or an old
+  `blockdash-levels.js` pack back into My Levels.
 
 Built-in levels are read-only in the UI; **Copy & edit** drops a copy into My
 Levels.
@@ -76,12 +90,11 @@ puts everything back.
 
 Sharing art works like sharing levels, under **Art pack tools**:
 
-- **Download art (.json)** is a backup you can load on another device.
-- **Download art pack (.js)** writes `blockdash-artpack.js`. Drop it into
-  `docs/`, replacing the existing file, and commit — everyone who plays gets
-  that art. Whatever a player has painted in their own browser still wins over
-  it, and the Art Studio opens on the shipped art, so a pack can be edited
-  further and re-downloaded.
+- **Download art (.json)** saves the painted sprites as `blockdash-art.json`:
+  a backup for another device, and the file to ship. To ship it, convert it to
+  `docs/blockdash-artpack.js` (`window.BDArtPack = {...};`) and commit;
+  everyone who plays gets that art. Whatever a player has painted in their own
+  browser still wins over it, and the Art Studio opens on the shipped art.
 - **Load art file** reads either format back in.
 
 Once a pack ships, it *is* the original: **↺ Original** and **Reset ALL art**
@@ -94,8 +107,8 @@ go back to the pack, not to the art the code draws.
 - `blockdash-art.js` — all the pixel art, isolated so sprites can be swapped for
   PNGs via `BDArt.loadSprites({ g: "art/grass.png", ... })` or repainted via
   `BDArt.getPixels` / `setPixels`
-- `blockdash-levels.js` — **generated**; the levels that ship with the game
-- `blockdash-artpack.js` — **generated**; the art that ships with the game
+- `blockdash-levels.js` — the official levels, converted from a levels `.json` download
+- `blockdash-artpack.js` — the official art, converted from an art `.json` download
 
 ## Versions
 

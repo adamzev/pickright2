@@ -47,7 +47,10 @@
       <div class="options">
         ${button("Start Game", () => renderRound(0))}
         <a class="option" href="blockdash.html" style="text-decoration:none;display:block">
-          ⛏ Block Dash <span class="cost">Blocky platformer + level maker</span>
+          ⛏ Block Dash <span class="cost">Blocky platformer: overworld into the nether</span>
+        </a>
+        <a class="option" href="blockdash.html?edit" style="text-decoration:none;display:block">
+          ✏ Block Dash Level Maker <span class="cost">Build your own levels and art</span>
         </a>
       </div>
     `,

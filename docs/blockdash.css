@@ -368,3 +368,11 @@ button.tool-btn.sel {
   h1 { font-size: 1.25rem; }
   .palette { grid-template-columns: repeat(auto-fill, minmax(62px, 1fr)); }
 }
+
+/* Big screens: scale the whole page up rather than leave a narrow strip in the
+   middle. Browser zoom shrinks the viewport these test, so someone who has
+   already zoomed in won't get scaled twice. */
+@media (min-width: 1300px) { html { zoom: 1.25; } }
+@media (min-width: 1600px) { html { zoom: 1.5; } }
+@media (min-width: 1850px) { html { zoom: 1.75; } }
+@media (min-width: 2300px) { html { zoom: 2.1; } }

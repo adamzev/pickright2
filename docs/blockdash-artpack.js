@@ -1,8 +1,7 @@
 // Built-in art for Block Dash — repainted sprites that ship with the game.
 //
-// This file is GENERATED. Paint sprites in the Art Studio, then use
-// "Download art pack" and replace this whole file with the download. Don't
-// hand-edit it. An empty pack means everyone gets the original pixel art.
+// Converted from a blockdash-art.json download (Art Studio → Download art).
+// An empty pack means everyone gets the original pixel art.
 //
 // Anything painted in a player's own browser wins over this file.
 window.BDArtPack = {
