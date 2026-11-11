@@ -23,6 +23,7 @@
     4: { name: "Hidden TNT", over: "B" },
     5: { name: "Hidden TNT", over: "f" },
     6: { name: "Hidden TNT", over: "r" },
+    7: { name: "Hidden TNT", over: "o" },
     d: { name: "Diamond" },
     b: { name: "Bolt" },
     w: { name: "Rose" },
@@ -36,18 +37,27 @@
     S: { name: "Shooter", solid: true },
     Z: { name: "Spawner", solid: true },
     r: { name: "Blaze rod" },
+    e: { name: "End stone", solid: true },
+    I: { name: "Blink" },
+    W: { name: "Watcher", solid: true },
+    T: { name: "End TNT" },
+    o: { name: "Eye of ender" },
+    V: { name: "End watcher", mob: true },
+    Q: { name: "Corrupted end watcher", mob: true },
+    N: { name: "Short-legged enderman", mob: true },
     E: { name: "End" },
     B: { name: "Bush" },
     P: { name: "Start" },
   };
 
-  const PALETTE = ["g", "s", "n", "k", "m", "t", "h", "L", "U", "D", "F", "S", "Z",
-    "C", "d", "r", "b", "w", "f", "E", "B", "P", ERASER];
+  const PALETTE = ["g", "s", "n", "k", "e", "m", "t", "T", "h", "L", "U", "D", "F", "S", "Z",
+    "W", "V", "Q", "N", "I", "C", "d", "r", "o", "b", "w", "f", "E", "B", "P", ERASER];
 
   const isSolid = (ch) => !!(TILES[ch] && TILES[ch].solid);
   const overOf = (ch) => TILES[ch] && TILES[ch].over;
   const isHiddenTnt = (ch) => ch === "h" || !!overOf(ch);
-  const TRAP_OVER = { d: "1", b: "2", w: "3", B: "4", f: "5", r: "6" };
+  const TRAP_OVER = { d: "1", b: "2", w: "3", B: "4", f: "5", r: "6", o: "7" };
+  const isMob = (ch) => !!(TILES[ch] && TILES[ch].mob);
 
   // physics, in blocks and seconds
   const GRAVITY = 62;
@@ -77,6 +87,17 @@
   const BLAZE_DRIFT = 1.6; // blocks per second
   const BLAZE_SHOOT = 2.6; // seconds between fireballs
   const FIREBALL_SPEED = 6.5; // flies straight, unlike the stars
+  const WATCH_DEPTH = 6; // how far down a Watcher's cone of vision reaches
+  const WATCH_SPREAD = 0.5; // the cone widens this much each side per block down
+  const WATCH_CYCLE = 3; // seconds for its eye to open and shut once…
+  const WATCH_OPEN = 1.2; // …of which it's open this long
+  const CHASE_SPEED = 6.6; // a woken end watcher; a bit slower than you run
+  const GLITCH_EVERY = 2.2; // a corrupted one also jumps ahead this often…
+  const GLITCH_HOP = 2; // …by this many blocks, so it keeps up with you
+  const ENDER_NOTICE = 7; // enderman teleports when you get this close…
+  const ENDER_AHEAD = 3.5; // …to this far in front of you
+  const MOB_W = 0.8;
+  const MOB_H = 1.8;
 
   const STORE_KEY = "blockdash_levels_v1";
   const BEST_KEY = "blockdash_best_v1";
@@ -204,6 +225,43 @@
       }
     }
     return { x: 1, y: H - 2 };
+  };
+
+  // ---------- the Watcher's cone of vision ----------
+  // The cone points straight down from the eye. Each column of it is cut off at
+  // the first solid block, so what you see shaded is exactly where it can see.
+
+  const coneStop = (g, wy, cx) => {
+    for (let y = wy + 1; y < H; y++) if (isSolid(g[y][cx])) return y;
+    return H;
+  };
+
+  const inCone = (g, wx, wy, px, py) => {
+    const dy = py - (wy + 0.5);
+    if (dy <= 0.5 || dy > WATCH_DEPTH) return false;
+    if (Math.abs(px - (wx + 0.5)) > dy * WATCH_SPREAD) return false;
+    const cx = Math.floor(px);
+    return cx >= 0 && cx < g[0].length && py < coneStop(g, wy, cx);
+  };
+
+  // ox shifts the drawing sideways (the play screen scrolls; the editor doesn't)
+  const drawCone = (ctx, g, wx, wy, ts, ox, open) => {
+    const ax = wx + 0.5, ay = wy + 0.5, half = WATCH_DEPTH * WATCH_SPREAD;
+    ctx.save();
+    ctx.beginPath();
+    for (let cx = Math.floor(ax - half); cx <= Math.floor(ax + half); cx++) {
+      if (cx < 0 || cx >= g[0].length) continue;
+      ctx.rect(cx * ts + ox, (wy + 1) * ts, ts, (coneStop(g, wy, cx) - wy - 1) * ts);
+    }
+    ctx.clip();
+    ctx.beginPath();
+    ctx.moveTo(ax * ts + ox, ay * ts);
+    ctx.lineTo((ax - half) * ts + ox, (ay + WATCH_DEPTH) * ts);
+    ctx.lineTo((ax + half) * ts + ox, (ay + WATCH_DEPTH) * ts);
+    ctx.closePath();
+    ctx.fillStyle = open ? "rgba(255, 50, 80, 0.32)" : "rgba(255, 255, 255, 0.1)";
+    ctx.fill();
+    ctx.restore();
   };
 
   const countDiamonds = (g) => {
@@ -568,6 +626,14 @@
       ["S", "Shooter — solid block that fires stars that chase you"],
       ["Z", "Spawner — solid cage that lets out blazes. Blazes shoot fireballs; jump on one to get its blaze rod"],
       ["r", "Blaze rod — collect them! Blazes drop one when you jump on them"],
+      ["e", "End stone — solid block for End levels"],
+      ["T", "End TNT — TNT in End colours. Touch it and you explode"],
+      ["I", "Blink — teleports you to the nearest other Blink"],
+      ["W", "Watcher — an eye block that looks down. If you're in its shaded cone while the eye is open, you get DELETED"],
+      ["V", "End watcher — ignores you until you jump on it. Then it chases you!"],
+      ["Q", "Corrupted end watcher — touching it deletes you, even asleep. Jump on it and it chases you, glitching forward to keep up"],
+      ["N", "Short-legged enderman — teleports in front of you when you get close. Jump on it to beat it"],
+      ["o", "Eye of ender — collect them!"],
       ["f", "Wings + firework — hold jump to fly up, let go to glide. They come off at the next save point"],
       ["E", "End portal — finish the level here"],
       ["B", "Bush — just decoration, safe to touch"],
@@ -1370,11 +1436,16 @@
             if (overOf(ch)) {
               drawTile(ctx, overOf(ch), x * TS, y * TS, TS, animT, false);
               drawTile(ctx, "h", x * TS, y * TS, TS, animT, false);
+            } else if (isMob(ch)) {
+              Art.drawSprite(ctx, ch, x * TS + TS * 0.05, (y - 1) * TS, TS * 0.9, TS * 2);
             } else {
               drawTile(ctx, ch, x * TS, y * TS, TS, animT, y > 0 && isSolid(grid[y - 1][x]));
             }
           }
         }
+      }
+      for (let y = 0; y < H; y++) {
+        for (let x = 0; x < w; x++) if (grid[y][x] === "W") drawCone(ctx, grid, x, y, TS, 0, true);
       }
 
       // grid lines + a marker every 5 columns
@@ -1444,7 +1515,9 @@
     const pctEl = el("span", "att", "0%");
     // only levels that have rods or spawners show a rod counter
     const hasRods = level.rows.some((r) => /[Zr6]/.test(r));
-    hud.append(scoreEl, ...(hasRods ? [rodsEl] : []), pctEl, attEl);
+    const eyesEl = el("span", "score", "👁 0");
+    const hasEyes = level.rows.some((r) => /[o7]/.test(r));
+    hud.append(scoreEl, ...(hasRods ? [rodsEl] : []), ...(hasEyes ? [eyesEl] : []), pctEl, attEl);
     panel.appendChild(hud);
 
     if (chain && chain.count > 1) {
@@ -1485,7 +1558,7 @@
       rot, coyote, buffer, particles, deadT, time = 0, holding = false,
       checkpoint = null, flying = false, deathKind = "boom",
       movers = [], shooters = [], bullets = [], spawners = [], blazes = [], fireballs = [],
-      rods = 0;
+      rods = 0, eyes = 0, watchers = [], mobs = [], blinkLock = null, runT = 0;
 
     // fromStart: R / Play again. Otherwise (after dying) respawn at the last
     // checkpoint with the level as it was when you got there, so diamonds
@@ -1502,6 +1575,10 @@
       spawners = [];
       blazes = [];
       fireballs = [];
+      watchers = [];
+      mobs = [];
+      blinkLock = null;
+      runT = 0;
       for (let y = 0; y < H; y++) {
         for (let x = 0; x < width; x++) {
           if (grid[y][x] === FLOWED) grid[y][x] = AIR;
@@ -1512,6 +1589,14 @@
             shooters.push({ x, y, t: 1 });
           } else if (ch === "Z") {
             spawners.push({ x, y, t: 0.6, alive: 0 });
+          } else if (ch === "W") {
+            watchers.push({ x, y, ph: (x * 0.37) % WATCH_CYCLE });
+          }
+          // creatures live outside the grid while you play; they restart on every respawn
+          if (isMob(ch)) {
+            grid[y][x] = AIR;
+            mobs.push({ kind: ch, x: x + (1 - MOB_W) / 2, y: y + 1 - MOB_H, vy: 0,
+              awake: false, glitchT: GLITCH_EVERY, onGround: false });
           }
         }
       }
@@ -1525,6 +1610,8 @@
       scoreEl.textContent = "💎 " + score;
       rods = checkpoint ? checkpoint.rods : 0;
       rodsEl.textContent = "🪄 " + rods;
+      eyes = checkpoint ? checkpoint.eyes : 0;
+      eyesEl.textContent = "👁 " + eyes;
       state = "run";
       camX = clamp(player.x - VIEW_COLS * 0.32, 0, Math.max(0, width - VIEW_COLS));
       effect = null;
@@ -1576,9 +1663,9 @@
       deathKind = kind;
       deadT = 0;
       explode(player.x + PLAYER_W / 2, player.y + PLAYER_H / 2,
-        kind === "burn"
-          ? ["#ffd54a", "#ff8a3d", "#e04a2f", "#ff5a1f"]
-          : ["#ffd54a", "#ff8a3d", "#e04a2f", "#8c8c8c"]);
+        kind === "burn" ? ["#ffd54a", "#ff8a3d", "#e04a2f", "#ff5a1f"]
+          : kind === "delete" ? ["#b46bff", "#2a1240", "#f4f0ff", "#7a2fd0"]
+            : ["#ffd54a", "#ff8a3d", "#e04a2f", "#8c8c8c"]);
       jumpBtn.disabled = true;
     };
 
@@ -1598,6 +1685,7 @@
         `<div class="big">${more || !chain ? "Level Complete!" : "You Finished!"}</div>` +
         `<div>Score: ${score} · Best: ${getBest(bestKey(level))}</div>` +
         (hasRods ? `<div>Blaze rods: ${rods} 🪄</div>` : "") +
+        (hasEyes ? `<div>Eyes of ender: ${eyes} 👁</div>` : "") +
         (chain && chain.count > 1
           ? `<div class="run-total">Run total: ${runTotal} 💎` +
             (more ? ` · ${chain.count - chain.i - 1} to go` : ` · all ${chain.count} levels!`) +
@@ -1622,14 +1710,57 @@
       msgSlot.style.marginTop = "8px";
     };
 
+    const sparkle = (x, y, colors) => {
+      for (let i = 0; i < 10; i++) {
+        particles.push({ x, y, vx: (Math.random() - 0.5) * 6, vy: -2 - Math.random() * 4,
+          life: 0.4 + Math.random() * 0.3, c: colors[(Math.random() * colors.length) | 0] });
+      }
+    };
+
     const gotRod = (x, y) => {
       rods++;
       rodsEl.textContent = "🪄 " + rods;
-      for (let i = 0; i < 10; i++) {
-        particles.push({ x, y, vx: (Math.random() - 0.5) * 6, vy: -2 - Math.random() * 4,
-          life: 0.4 + Math.random() * 0.3, c: Math.random() < 0.5 ? "#ffe98a" : "#f0a020" });
-      }
+      sparkle(x, y, ["#ffe98a", "#f0a020"]);
     };
+
+    // Jump to the nearest other Blink. Returns true if you moved.
+    const blink = (fromX, fromY) => {
+      let best = null, bestD = Infinity;
+      for (let y = 0; y < H; y++) {
+        for (let x = 0; x < width; x++) {
+          if (grid[y][x] !== "I" || (x === fromX && y === fromY)) continue;
+          const d = (x - fromX) ** 2 + (y - fromY) ** 2;
+          if (d < bestD) { bestD = d; best = { x, y }; }
+        }
+      }
+      if (!best) return false;
+      sparkle(player.x + PLAYER_W / 2, player.y + PLAYER_H / 2, ["#b46bff", "#f4f0ff"]);
+      player.x = best.x + (1 - PLAYER_W) / 2;
+      player.y = best.y + (1 - PLAYER_H);
+      player.vy = 0;
+      blinkLock = best;
+      sparkle(player.x + PLAYER_W / 2, player.y + PLAYER_H / 2, ["#b46bff", "#f4f0ff"]);
+      return true;
+    };
+
+    const mobSolid = (x0, y0, x1, y1) => {
+      for (let y = Math.floor(y0); y <= Math.floor(y1 - 0.001); y++) {
+        for (let x = Math.floor(x0); x <= Math.floor(x1 - 0.001); x++) {
+          if (solidAt(x, y)) return true;
+        }
+      }
+      return false;
+    };
+
+    // Is any part of you inside this Watcher's cone?
+    const canSee = (w) => {
+      const i = 0.14;
+      const xs = [player.x + i, player.x + PLAYER_W / 2, player.x + PLAYER_W - i];
+      const ys = [player.y + i, player.y + PLAYER_H / 2, player.y + PLAYER_H - i];
+      return xs.some((px) => ys.some((py) => inCone(grid, w.x, w.y, px, py)));
+    };
+    // timed from the (re)start, so each attempt sees the same rhythm, like a rhythm game
+    const eyeOpen = (w) => (runT + w.ph) % WATCH_CYCLE < WATCH_OPEN;
 
     // Player's hit box for things that move, a little forgiving like items.
     const touches = (x0, y0, x1, y1) => {
@@ -1741,12 +1872,89 @@
         }
       }
       fireballs = fireballs.filter((fb) => fb.life > 0);
+
+      for (const w of watchers) {
+        if (onScreen(w.x) && eyeOpen(w) && canSee(w)) {
+          die("delete");
+          return true;
+        }
+      }
+
+      for (const m of mobs) {
+        if (m.gone) continue;
+        if (m.kind === "N" && !m.awake &&
+            m.x - player.x < ENDER_NOTICE && m.x > player.x + PLAYER_W) {
+          // teleport to stand on the ground a few blocks in front of you
+          m.awake = true;
+          const cx = Math.floor(player.x + ENDER_AHEAD);
+          for (let y = Math.max(1, Math.floor(player.y)); y < H - 1; y++) {
+            if (!solidAt(cx, y) && !solidAt(cx, y - 1) && solidAt(cx, y + 1)) {
+              sparkle(m.x + MOB_W / 2, m.y + MOB_H / 2, ["#e08cff", "#1c1c22"]);
+              m.x = cx + (1 - MOB_W) / 2;
+              m.y = y + 1 - MOB_H;
+              m.vy = 0;
+              sparkle(m.x + MOB_W / 2, m.y + MOB_H / 2, ["#e08cff", "#1c1c22"]);
+              break;
+            }
+          }
+        }
+        // woken watchers run after you, hopping up steps in the way
+        if ((m.kind === "V" || m.kind === "Q") && m.awake) {
+          const dir = Math.sign(player.x - m.x) || 1;
+          const nx = m.x + dir * CHASE_SPEED * dt;
+          if (!mobSolid(nx, m.y, nx + MOB_W, m.y + MOB_H)) m.x = nx;
+          else if (m.onGround) m.vy = -JUMP_V;
+          if (m.kind === "Q") {
+            m.glitchT -= dt;
+            if (m.glitchT <= 0) {
+              m.glitchT = GLITCH_EVERY;
+              const gx = m.x + dir * GLITCH_HOP;
+              if (!mobSolid(gx, m.y, gx + MOB_W, m.y + MOB_H)) {
+                sparkle(m.x + MOB_W / 2, m.y + MOB_H / 2, ["#ff4fd8", "#4fffb0"]);
+                m.x = gx;
+              }
+            }
+          }
+        }
+        m.vy += GRAVITY * dt;
+        const ny = m.y + m.vy * dt;
+        m.onGround = false;
+        if (m.vy > 0 && mobSolid(m.x, ny, m.x + MOB_W, ny + MOB_H)) {
+          m.y = Math.floor(ny + MOB_H) - MOB_H;
+          m.vy = 0;
+          m.onGround = true;
+        } else if (m.vy < 0 && mobSolid(m.x, ny, m.x + MOB_W, ny + MOB_H)) {
+          m.vy = 0;
+        } else {
+          m.y = ny;
+        }
+        if (m.y > H + 2) { m.gone = true; continue; }
+
+        if (!touches(m.x, m.y, m.x + MOB_W, m.y + MOB_H)) continue;
+        const stomp = player.vy > 0 && player.y + PLAYER_H < m.y + 0.45;
+        if (stomp) {
+          player.vy = -JUMP_V * 0.85;
+          if (m.kind === "N") {
+            m.gone = true;
+            sparkle(m.x + MOB_W / 2, m.y + MOB_H / 2, ["#e08cff", "#1c1c22", "#ffffff"]);
+          } else if (!m.awake) {
+            m.awake = true; // now it's noticed you
+          }
+          continue;
+        }
+        // a sleeping end watcher doesn't notice you brushing past; a corrupted one does
+        if (m.kind === "V" && !m.awake) continue;
+        die("delete");
+        return true;
+      }
+      mobs = mobs.filter((m) => !m.gone);
       return false;
     };
 
     // --- physics ---
     const update = (dt) => {
       time += dt;
+      runT += dt;
 
       for (const p of particles) {
         p.vy += 26 * dt;
@@ -1871,7 +2079,10 @@
         for (let x = ix0; x <= ix1; x++) {
           if (x < 0 || x >= width || y < 0 || y >= H) continue;
           const ch = grid[y][x];
-          if (ch === "t") { die(); return; }
+          if (ch === "t" || ch === "T") { die(); return; }
+          if (ch === "I" && !(blinkLock && blinkLock.x === x && blinkLock.y === y)) {
+            if (blink(x, y)) return;
+          }
           if (isHiddenTnt(ch)) { die(); return; }
           if (ch === "L" || ch === "F" || ch === "U" || ch === "D" || ch === FLOWED) {
             die("burn");
@@ -1882,7 +2093,7 @@
             // has to earn its own pair.
             flying = false;
             grid[y][x] = "checkpointOn";
-            checkpoint = { x, y, score, rods, grid: grid.map((r) => r.slice()) };
+            checkpoint = { x, y, score, rods, eyes, grid: grid.map((r) => r.slice()) };
             toast("Checkpoint!");
           }
           if (ch === "d") {
@@ -1898,6 +2109,11 @@
           } else if (ch === "r") {
             grid[y][x] = AIR;
             gotRod(x + 0.5, y + 0.5);
+          } else if (ch === "o") {
+            grid[y][x] = AIR;
+            eyes++;
+            eyesEl.textContent = "👁 " + eyes;
+            sparkle(x + 0.5, y + 0.5, ["#7be0c2", "#c8fff0"]);
           } else if (ch === "f") {
             grid[y][x] = AIR;
             flying = true;
@@ -1906,6 +2122,11 @@
             return;
           }
         }
+      }
+
+      // the Blink you arrived on only works again once you've stepped off it
+      if (blinkLock && !touches(blinkLock.x, blinkLock.y, blinkLock.x + 1, blinkLock.y + 1)) {
+        blinkLock = null;
       }
 
       if (updateHazards(dt)) return;
@@ -1933,10 +2154,16 @@
         for (let y = 0; y < H; y++) {
           const ch = grid[y][x];
           if (ch !== AIR && ch !== "P" && ch !== "h") {
-            drawTile(ctx, ch === FLOWED ? "L" : overOf(ch) || ch, (x - camX) * TS, y * TS, TS, time,
+            let key = ch === FLOWED ? "L" : overOf(ch) || ch;
+            if (ch === "W" && !eyeOpen({ x, ph: (x * 0.37) % WATCH_CYCLE })) key = "watcherClosed";
+            drawTile(ctx, key, (x - camX) * TS, y * TS, TS, time,
               y > 0 && isSolid(grid[y - 1][x]));
           }
         }
+      }
+
+      for (const w of watchers) {
+        if (w.x >= startX - 4 && w.x <= endX + 4) drawCone(ctx, grid, w.x, w.y, TS, -camX * TS, eyeOpen(w));
       }
 
       // the next block of lava oozing out of each active source
@@ -1960,6 +2187,20 @@
         ctx.rotate(time * 6);
         drawTile(ctx, "bullet", -bs / 2, -bs / 2, bs, time, false);
         ctx.restore();
+      }
+
+      for (const m of mobs) {
+        // a corrupted watcher flickers sideways now and then
+        const jit = m.kind === "Q" && Math.sin(time * 37 + m.x) > 0.8 ? TS * 0.12 : 0;
+        Art.drawSprite(ctx, m.kind, (m.x - camX) * TS - TS * 0.05 + jit, (m.y + MOB_H - 2) * TS,
+          TS * 0.9, TS * 2);
+        if (m.awake && m.kind !== "N") {
+          ctx.fillStyle = "#ff4f6b";
+          ctx.font = "bold 20px ui-monospace, monospace";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "bottom";
+          ctx.fillText("!", (m.x + MOB_W / 2 - camX) * TS, m.y * TS - 2);
+        }
       }
 
       for (const bz of blazes) {
@@ -2022,15 +2263,18 @@
       if (state === "dead") {
         ctx.fillStyle = "rgba(0,0,0,0.35)";
         ctx.fillRect(0, 0, canvas.width, canvas.height);
-        drawExplosion(ctx,
-          (player.x + PLAYER_W / 2 - camX) * TS,
-          (player.y + PLAYER_H / 2) * TS,
-          TS * 3.2, deadT);
+        if (deathKind !== "delete") {
+          drawExplosion(ctx,
+            (player.x + PLAYER_W / 2 - camX) * TS,
+            (player.y + PLAYER_H / 2) * TS,
+            TS * 3.2, deadT);
+        }
         ctx.fillStyle = "#ff6b6b";
         ctx.font = "bold 46px ui-monospace, monospace";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        ctx.fillText(deathKind === "burn" ? "BURNED!" : "BOOM!", canvas.width / 2, canvas.height / 2);
+        ctx.fillText(deathKind === "burn" ? "BURNED!" : deathKind === "delete" ? "DELETED!" : "BOOM!",
+          canvas.width / 2, canvas.height / 2);
       }
     };
 

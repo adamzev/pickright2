@@ -33,6 +33,14 @@ Block rules:
 | Shooter | Solid block that fires a star every 2 seconds; stars steer toward you and explode on touch |
 | Spawner | Solid cage that lets out a blaze every few seconds (up to 2 at a time). Blazes float near it, drift toward you and shoot straight fireballs. Jump on one to pop it and get its blaze rod; touching it any other way burns |
 | Blaze rod | Collectible, counted separately from diamonds (🪄 in the score bar) |
+| End stone | Solid, for End levels |
+| End TNT | TNT in End colours; same explosion |
+| Blink | Touch it and you teleport to the nearest other Blink |
+| Watcher | An eye block that looks straight down. Its cone of vision shows as a see-through triangle (red while the eye is open), cut off by solid blocks. The eye opens for 1.2 of every 3 seconds, restarting each attempt; be in the cone while it's open and you're DELETED |
+| End watcher | Ignores you, even if you run through it, until you jump on it. Then it chases you, a little slower than you run; touching it deletes you |
+| Corrupted end watcher | Touching it deletes you even while it's asleep, so you have to jump over or onto it. Jump on it and it chases you, glitching 2 blocks forward every couple of seconds to keep pace |
+| Short-legged enderman | When you get within 7 blocks, it teleports to stand 3½ blocks in front of you. Jump on it to beat it; touching it deletes you |
+| Eye of ender | Collectible with its own 👁 counter |
 | Slime | Bounces you high — from the top or the side |
 | TNT | Instant game over |
 | Diamond | +10 points |
@@ -50,9 +58,9 @@ Block rules:
 **In the browser (anyone).** Build in the level maker. Every change saves
 itself to localStorage as you go; there's no Save button. Each level also has a
 background, picked under its name: Overworld (sky and hills), Nether (netherrack
-above and below, ghasts drifting in the distance) or Mooshroom realm (giant
-mushrooms on a purple-pink sky). It's saved as `"bg"` in the level; levels
-without it use Overworld. The **Code** button turns a level into a text code that someone
+above and below, ghasts drifting in the distance), Mooshroom realm (giant
+mushrooms on a purple-pink sky) or The End (stars, floating islands, dark
+pillars). It's saved as `"bg"` in the level; levels without it use Overworld. The **Code** button turns a level into a text code that someone
 else can paste into Import.
 
 **Shipped with the game (us).** Build the levels you want everyone to get, then

@@ -14,7 +14,8 @@
 //   BDArt.loadSprites({ g: "art/grass.png", t: "art/tnt.png" }).then(...)
 //   BDArt.registerSprite("player", someCanvasOrImage);
 //
-// Keys: block letters g s m t h C d b w f n k L U D F S Z r E B P, plus "bullet", "blaze", "fireball",
+// Keys: block letters g s m t h C d b w f n k L U D F S Z r e I W T o V Q N E B P,
+// plus "bullet", "blaze", "fireball", "watcherClosed",
 // "checkpointOn", "wingsWorn", plus "dirt", "cloud", "player",
 // "explosion1", "explosion2". Blocks should be square; the player is drawn at
 // roughly 3:4. Anything not replaced keeps the built-in pixel art.
@@ -221,6 +222,188 @@ window.BDArt = (() => {
     rect(c, 6, 6, 4, 4, "#ffd54a");
     rect(c, 7, 7, 2, 2, "#ffffff");
   });
+
+  // ---- the End ----
+
+  const endStone = mk(S, S, (c) => {
+    noiseFill(c, 83, ["#dfe0a4", "#e8e9b5", "#d2d394", "#eef0c2"]);
+    [[3, 4], [10, 2], [6, 11], [12, 12], [1, 13]].forEach(([x, y]) =>
+      rect(c, x, y, 2, 1, "#c4c585"));
+  });
+
+  // the eye used by Blink and End TNT
+  const eye = (c, x, y, w, h, open) => {
+    if (!open) {
+      rect(c, x, y + Math.floor(h / 2), w, 1, "#1a0f24");
+      return;
+    }
+    rect(c, x + 1, y, w - 2, h, "#f4f0ff");
+    rect(c, x, y + 1, w, h - 2, "#f4f0ff");
+    rect(c, x + Math.floor(w / 2) - 1, y + 1, 2, h - 2, "#7a2fd0");
+    rect(c, x + Math.floor(w / 2) - 1, y + 2, 1, h - 4, "#14081f");
+  };
+
+  // Blink: touch it and you're teleported to the nearest other Blink.
+  const blink = mk(S, S, (c) => {
+    rect(c, 2, 2, 12, 12, "#2a1240");
+    rect(c, 1, 4, 14, 8, "#2a1240");
+    rect(c, 4, 1, 8, 14, "#2a1240");
+    rect(c, 3, 3, 10, 10, "#4a1f72");
+    eye(c, 4, 5, 8, 6, true);
+  });
+
+  // Watcher: a block that's just a big eye. Shut, it shows its eyelid.
+  const watcherPx = (open) => mk(S, S, (c) => {
+    noiseFill(c, 91, ["#1e1a26", "#262130", "#1a1620"]);
+    if (!open) {
+      rect(c, 2, 5, 12, 6, "#4a3f5c");
+      rect(c, 1, 7, 14, 2, "#4a3f5c");
+      rect(c, 2, 9, 12, 1, "#120e18");
+      [3, 6, 9, 12].forEach((x) => rect(c, x, 10, 1, 2, "#120e18"));
+      return;
+    }
+    rect(c, 2, 4, 12, 8, "#f4eef2");
+    rect(c, 1, 6, 14, 4, "#f4eef2");
+    rect(c, 5, 4, 6, 8, "#c4203a");
+    rect(c, 4, 5, 8, 6, "#c4203a");
+    rect(c, 6, 5, 4, 6, "#ff5a6e");
+    rect(c, 7, 5, 2, 6, "#14080c");
+    rect(c, 5, 5, 1, 1, "#ffffff");
+  });
+  const watcher = watcherPx(true);
+  const watcherClosed = watcherPx(false);
+
+  // End TNT: TNT retextured in End colours, with an eye where the N goes.
+  const endTnt = mk(S, S, (c) => {
+    noiseFill(c, 87, ["#2a2238", "#352c47", "#231c30"]);
+    for (let y = 2; y < 14; y++) {
+      for (let x = 0; x < S; x++) {
+        rect(c, x, y, 1, 1, x % 4 === 0 || x % 4 === 3 ? "#4a1f72" : "#6b2fa8");
+      }
+    }
+    rect(c, 0, 6, S, 5, "#efe8ff");
+    const T = ["111", "010", "010", "010", "010"];
+    [1, 12].forEach((ox) => T.forEach((row, ry) => [...row].forEach((ch, rx) => {
+      if (ch === "1") rect(c, ox + rx, 6 + ry, 1, 1, "#1c1c1c");
+    })));
+    rect(c, 6, 6, 4, 5, "#1c1c1c");
+    rect(c, 7, 7, 2, 3, "#b46bff");
+  });
+
+  const eyeOfEnder = mk(S, S, (c) => {
+    rect(c, 4, 3, 8, 10, "#1f6b5a");
+    rect(c, 3, 4, 10, 8, "#1f6b5a");
+    rect(c, 4, 4, 8, 8, "#2fa88a");
+    rect(c, 5, 5, 6, 6, "#7be0c2");
+    rect(c, 7, 5, 2, 6, "#0e2a24");
+    rect(c, 5, 4, 2, 1, "#c8fff0");
+  });
+
+  // Two blocks tall. Characters: K body, k body shade, P eye, p pupil, R arm.
+  const endWatcher = paintMap([
+    "....KKKKKKKK....",
+    "....KkkkkkkK....",
+    "....KPPkkPPK....",
+    "....KPpkkpPK....",
+    "....KkkkkkkK....",
+    "....KKKKKKKK....",
+    "......KKKK......",
+    "...KKKKKKKKKK...",
+    "..RKkkkkkkkkKR..",
+    ".RRKkkkkkkkkKRR.",
+    ".R.KkkkkkkkkKR..",
+    "RR.KkkkkkkkkK.R.",
+    "R..KkkkkkkkkK.RR",
+    "R..KkkkkkkkkK..R",
+    "RR.KkkkkkkkkK..R",
+    ".RRKKKKKKKKKK.RR",
+    "...KKKKKKKKKK.R.",
+    "....KKk..kKK..R.",
+    "....KKk..kKK.RR.",
+    "....KKk..kKK.R..",
+    "....KKk..kKK.R..",
+    "....KKk..kKK....",
+    "....KKk..kKK....",
+    "....KKk..kKK....",
+    "....KKk..kKK....",
+    "....KKk..kKK....",
+    "....KKk..kKK....",
+    "....KKk..kKK....",
+    "....KKk..kKK....",
+    "....KKk..kKK....",
+    "...KKKk..kKKK...",
+    "...KKKK..KKKK...",
+  ], { K: "#1c1426", k: "#2c2140", P: "#d9a8ff", p: "#7a2fd0", R: "#251a33" });
+
+  const corruptedWatcher = paintMap([
+    "...KKKKKKKKKK...",
+    "...KkkkkkkkkK...",
+    "...KPPkGkkkkK...",
+    "...KPpkGkkkkKK..",
+    "...KkkkkkkPPkK..",
+    "...KKKKKKkPpkK..",
+    "......KKKKKKKK..",
+    "..KKKKKKKKKKK...",
+    ".RKkkGkkkkkkKR..",
+    "RRKkkGkkkkkkKRR.",
+    "R.KkkkkkkGGkK.R.",
+    "R.KkkkkkkkkkK.RR",
+    "RR.KkkkkkkkkK..R",
+    ".R.KkkkkkkkkK..R",
+    ".R.KkkGkkkkkK.RR",
+    ".RRKKKKKKKKKK.R.",
+    "...KKKKKKKKKK...",
+    "...KKkk..KkkK...",
+    "...KKkk...KkK...",
+    "...KKk....KkK...",
+    "...KKk....KkK...",
+    "...KKk....KkK...",
+    "...KKk....KkKK..",
+    "...KKk.....KkK..",
+    "...KKk.....KkK..",
+    "...KKk.....KkK..",
+    "...KKk.....KkK..",
+    "...KKk.....KkK..",
+    "...KKk.....KkK..",
+    "...KKk.....KkK..",
+    "..KKKk.....KkKK.",
+    "..KKKK.....KKKK.",
+  ], { K: "#1a0f1f", k: "#3a1a3a", P: "#ff4fd8", p: "#2a0026", R: "#2a1430", G: "#4fffb0" });
+
+  const shortEnderman = paintMap([
+    "................",
+    "................",
+    "....KKKKKKKK....",
+    "....KkkkkkkK....",
+    "....KkkkkkkK....",
+    "....KPPkkPPK....",
+    "....KpPkkPpK....",
+    "....KkkkkkkK....",
+    "....KkkkkkkK....",
+    "....KKKKKKKK....",
+    "...KKKKKKKKKK...",
+    "..KKkkkkkkkkKK..",
+    ".KK.KkkkkkkkK.KK",
+    ".KK.KkkkkkkkK.KK",
+    ".KK.KkkkkkkkK.KK",
+    ".KK.KkkkkkkkK.KK",
+    ".KK.KkkkkkkkK.KK",
+    ".KK.KkkkkkkkK.KK",
+    ".KK.KkkkkkkkK.KK",
+    ".KK.KkkkkkkkK.KK",
+    "..K.KkkkkkkkK.K.",
+    "..K.KkkkkkkkK.K.",
+    "....KkkkkkkkK...",
+    "....KkkkkkkkK...",
+    "....KkkkkkkkK...",
+    "....KKKKKKKKK...",
+    "....KKk..kKK....",
+    "....KKk..kKK....",
+    "....KKk..kKK....",
+    "....KKk..kKK....",
+    "...KKKk..kKKK...",
+    "...KKKK..KKKK...",
+  ], { K: "#0f0f12", k: "#1c1c22", P: "#e08cff", p: "#ffffff" });
 
   // The tracking bullet: a four-pointed star, like the one in the drawing.
   const bullet = mk(S, S, (c) => {
@@ -528,6 +711,15 @@ window.BDArt = (() => {
     S: shooter,
     bullet: bullet,
     Z: spawner,
+    e: endStone,
+    I: blink,
+    W: watcher,
+    watcherClosed: watcherClosed,
+    T: endTnt,
+    o: eyeOfEnder,
+    V: endWatcher,
+    Q: corruptedWatcher,
+    N: shortEnderman,
     blaze: blaze,
     r: blazeRod,
     fireball: fireball,
@@ -568,6 +760,15 @@ window.BDArt = (() => {
     { key: "S", label: "Shooter" },
     { key: "bullet", label: "Star bullet" },
     { key: "Z", label: "Spawner" },
+    { key: "e", label: "End stone" },
+    { key: "I", label: "Blink" },
+    { key: "W", label: "Watcher" },
+    { key: "watcherClosed", label: "Watcher (eye shut)" },
+    { key: "T", label: "End TNT" },
+    { key: "o", label: "Eye of ender" },
+    { key: "V", label: "End watcher" },
+    { key: "Q", label: "Corrupted end watcher" },
+    { key: "N", label: "Short-legged enderman" },
     { key: "blaze", label: "Blaze" },
     { key: "r", label: "Blaze rod" },
     { key: "fireball", label: "Fireball" },
@@ -750,12 +951,17 @@ window.BDArt = (() => {
     if (ch === "g" && covered) return blit(ctx, SPRITES.dirt, x, y, size, size);
     const sp = SPRITES[ch];
     if (!sp) return;
+    const sw = sp.width || sp.naturalWidth, sh = sp.height || sp.naturalHeight;
+    if (sh > sw) {
+      const w = size * sw / sh;
+      return blit(ctx, sp, x + (size - w) / 2, y, w, size);
+    }
     if (ch === "m") {
       // slime squishes gently
       const wob = (Math.sin(time * 4 + x * 0.03) * 0.04 + 0.04) * size;
       return blit(ctx, sp, x, y + wob, size, size - wob);
     }
-    if (ch === "d" || ch === "r") {
+    if (ch === "d" || ch === "r" || ch === "o") {
       const bob = Math.sin(time * 3 + x * 0.05) * size * 0.08;
       return blit(ctx, sp, x, y + bob, size, size);
     }
@@ -817,6 +1023,9 @@ window.BDArt = (() => {
     ctx.restore();
   };
 
+  // draw any sprite at an exact size (the two-block-tall creatures)
+  const drawSprite = (ctx, key, x, y, w, h) => blit(ctx, SPRITES[key], x, y, w, h);
+
   const drawCloud = (ctx, x, y, size) => blit(ctx, SPRITES.cloud, x, y, size, size);
 
   // ---- level backgrounds ----
@@ -826,6 +1035,7 @@ window.BDArt = (() => {
     { key: "overworld", label: "🌳 Overworld" },
     { key: "nether", label: "🔥 Nether" },
     { key: "mooshroom", label: "🍄 Mooshroom realm" },
+    { key: "end", label: "🌌 The End" },
   ];
 
   const wrapX = (base, scroll, rate, span, pad) =>
@@ -920,6 +1130,36 @@ window.BDArt = (() => {
         const y = H - (((t * 18 + i * 61) % (H + 20)));
         ctx.fillRect(x, y, 3, 3);
       }
+    } else if (kind === "end") {
+      ctx.fillStyle = skyGrad(ctx, H, "#07040d", "#2a1640");
+      ctx.fillRect(0, 0, W, H);
+      // stars that twinkle
+      for (let i = 0; i < 40; i++) {
+        const x = wrapX(i * 97, scroll, 0.05, W + 20, 10);
+        const y = (i * 53) % (H * 0.7);
+        ctx.fillStyle = `rgba(230, 210, 255, ${0.3 + 0.3 * Math.sin(t * 2 + i)})`;
+        ctx.fillRect(x, y, 2, 2);
+      }
+      // floating end-stone islands far away, and dark pillars nearer
+      const ispan = W + 600;
+      for (let i = 0; i < 4; i++) {
+        const x = wrapX(i * 330, scroll, 0.15, ispan, 200);
+        const y = 90 + ((i * 67) % 140) + Math.sin(t * 0.6 + i) * 5;
+        const w = 90 + (i % 3) * 40;
+        ctx.fillStyle = "rgba(200, 200, 140, 0.55)";
+        ctx.fillRect(x, y, w, 12);
+        ctx.fillRect(x + w * 0.15, y + 12, w * 0.7, 10);
+        ctx.fillRect(x + w * 0.35, y + 22, w * 0.3, 10);
+      }
+      const pspan = W + 500;
+      for (let i = 0; i < 5; i++) {
+        const x = wrapX(i * 290, scroll, 0.4, pspan, 100);
+        const h = 120 + ((i * 59) % 120);
+        ctx.fillStyle = "rgba(20, 10, 30, 0.85)";
+        ctx.fillRect(x, groundY - h, 46, h + ts);
+        ctx.fillStyle = "rgba(180, 100, 255, 0.5)";
+        ctx.fillRect(x + 17, groundY - h - 10, 12, 10);
+      }
     } else if (kind === "mooshroom") {
       ctx.fillStyle = skyGrad(ctx, H, "#8f7bc4", "#f2cfe0");
       ctx.fillRect(0, 0, W, H);
@@ -997,6 +1237,7 @@ window.BDArt = (() => {
     drawEraser,
     drawBackground,
     BACKGROUNDS,
+    drawSprite,
     registerSprite,
     loadSprites,
     SPRITES,
