@@ -35,8 +35,9 @@ Block rules:
 | Blaze rod | Collectible, counted separately from diamonds (🪄 in the score bar) |
 | End stone | Solid, for End levels |
 | End TNT | TNT in End colours; same explosion |
-| Blink | Touch it and you teleport to the nearest other Blink |
+| Blink | Press jump (space) while touching it to teleport to the nearest Blink ahead. Never goes backwards. The camera glides there with a short purple fade |
 | Watcher | An eye block that looks straight down. Its cone of vision shows as a see-through triangle (red while the eye is open), cut off by solid blocks. The eye opens for 1.2 of every 3 seconds, restarting each attempt; be in the cone while it's open and you're DELETED |
+| Staring watcher | Like the Watcher, but its eye never shuts: its cone is always deadly |
 | End watcher | Ignores you, even if you run through it, until you jump on it. Then it chases you, a little slower than you run; touching it deletes you |
 | Corrupted end watcher | Touching it deletes you even while it's asleep, so you have to jump over or onto it. Jump on it and it chases you, glitching 2 blocks forward every couple of seconds to keep pace |
 | Short-legged enderman | When you get within 7 blocks, it teleports to stand 3½ blocks in front of you. Jump on it to beat it; touching it deletes you |
@@ -59,8 +60,9 @@ Block rules:
 itself to localStorage as you go; there's no Save button. Each level also has a
 background, picked under its name: Overworld (sky and hills), Nether (netherrack
 above and below, ghasts drifting in the distance), Mooshroom realm (giant
-mushrooms on a purple-pink sky) or The End (stars, floating islands, dark
-pillars). It's saved as `"bg"` in the level; levels without it use Overworld. The **Code** button turns a level into a text code that someone
+mushrooms on a purple-pink sky), The End (stars, floating islands, dark
+pillars) or End storage rooms (like the Nether, but end stone above and below,
+a darker end-stone wall behind, no ghasts). It's saved as `"bg"` in the level; levels without it use Overworld. The **Code** button turns a level into a text code that someone
 else can paste into Import.
 
 **Shipped with the game (us).** Build the levels you want everyone to get, then
@@ -79,14 +81,16 @@ open **Level pack tools** on the Block Dash menu:
 Built-in levels are read-only in the UI; **Copy & edit** drops a copy into My
 Levels.
 
-### Art Studio (dev only)
+### Art Studio
 
-The **🎨 Art** button on the Block Dash menu opens a pixel art editor. It's a
-dev tool, so it's hidden by default: it shows up automatically when you serve
-the site locally, and anywhere else you turn it on once with
-`blockdash.html?dev=1` (that sticks in the browser; `?dev=0` turns it back off).
-Regular players never see it — they just get whatever art ships in
-`blockdash-artpack.js`.
+The **🎨 Art** button in the Level Maker (`blockdash.html?edit`) opens a pixel
+art editor. Play mode never shows it; players who don't paint just get whatever
+art ships in `blockdash-artpack.js`.
+
+**Art code** shares a texture pack as text, like a level code: **Make code**
+turns everything painted in this browser into a code (about 2,000 characters
+for the whole pack) and copies it; paste one in and press **Use code** to load
+someone else's art.
 
 Every
 sprite in the game — the player, all ten blocks, the clouds, both explosion

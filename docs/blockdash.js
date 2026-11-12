@@ -40,6 +40,7 @@
     e: { name: "End stone", solid: true },
     I: { name: "Blink" },
     W: { name: "Watcher", solid: true },
+    Y: { name: "Staring watcher", solid: true },
     T: { name: "End TNT" },
     o: { name: "Eye of ender" },
     V: { name: "End watcher", mob: true },
@@ -51,7 +52,7 @@
   };
 
   const PALETTE = ["g", "s", "n", "k", "e", "m", "t", "T", "h", "L", "U", "D", "F", "S", "Z",
-    "W", "V", "Q", "N", "I", "C", "d", "r", "o", "b", "w", "f", "E", "B", "P", ERASER];
+    "W", "Y", "V", "Q", "N", "I", "C", "d", "r", "o", "b", "w", "f", "E", "B", "P", ERASER];
 
   const isSolid = (ch) => !!(TILES[ch] && TILES[ch].solid);
   const overOf = (ch) => TILES[ch] && TILES[ch].over;
@@ -91,6 +92,7 @@
   const WATCH_SPREAD = 0.5; // the cone widens this much each side per block down
   const WATCH_CYCLE = 3; // seconds for its eye to open and shut once…
   const WATCH_OPEN = 1.2; // …of which it's open this long
+  const WARP_TIME = 0.45; // seconds the camera takes to glide to the next Blink
   const CHASE_SPEED = 6.6; // a woken end watcher; a bit slower than you run
   const GLITCH_EVERY = 2.2; // a corrupted one also jumps ahead this often…
   const GLITCH_HOP = 2; // …by this many blocks, so it keeps up with you
@@ -101,29 +103,8 @@
 
   const STORE_KEY = "blockdash_levels_v1";
   const BEST_KEY = "blockdash_best_v1";
-  const DEV_KEY = "blockdash_dev_v1";
 
   const root = document.getElementById("bd-root");
-
-  // Dev mode gates the Art Studio: it's for building the art that ships in
-  // blockdash-artpack.js, not something a random visitor should stumble into.
-  // On automatically when serving locally; elsewhere add ?dev=1 to the URL once
-  // (it sticks in this browser) and ?dev=0 to turn it back off.
-  const devMode = (() => {
-    const flag = new URLSearchParams(location.search).get("dev");
-    try {
-      if (flag === "1" || flag === "on") localStorage.setItem(DEV_KEY, "1");
-      if (flag === "0" || flag === "off") localStorage.removeItem(DEV_KEY);
-    } catch (e) { /* private browsing — fall through to the URL flag */ }
-    if (flag === "1" || flag === "on") return true;
-    if (flag === "0" || flag === "off") return false;
-    if (["localhost", "127.0.0.1", "[::1]", ""].includes(location.hostname)) return true;
-    try {
-      return localStorage.getItem(DEV_KEY) === "1";
-    } catch (e) {
-      return false;
-    }
-  })();
 
   // ---------- tiny helpers ----------
 
@@ -360,6 +341,45 @@
     return { name: String(o.n || "Imported level"), rows: o.r.map(String), bg: o.b };
   };
 
+  // Art codes are much bigger than level codes, so each drawing is stored as
+  // a small colour list plus one letter per pixel, then gzipped where the
+  // browser can. "A1:" = gzipped, "A0:" = plain.
+  const PIX = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789+/";
+  const toB64 = (bytes) => {
+    let s = "";
+    for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+    return btoa(s);
+  };
+  const fromB64 = (b64) => Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+  const pipe = async (bytes, stream) =>
+    new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(stream)).arrayBuffer());
+
+  const encodeArt = async (art) => {
+    const o = {};
+    for (const [key, { w, h, px }] of Object.entries(art)) {
+      const pal = [...new Set(px.filter(Boolean))];
+      if (pal.length >= PIX.length) continue; // more colours than letters; skip rather than break
+      o[key] = [w, h, pal.map((c) => c.slice(1)).join(","), px.map((c) => (c ? PIX[pal.indexOf(c)] : ".")).join("")];
+    }
+    const bytes = new TextEncoder().encode(JSON.stringify(o));
+    if (typeof CompressionStream === "undefined") return "A0:" + toB64(bytes);
+    return "A1:" + toB64(await pipe(bytes, new CompressionStream("gzip")));
+  };
+
+  const decodeArt = async (code) => {
+    const m = /^A([01]):(.*)$/s.exec(code.replace(/\s+/g, ""));
+    if (!m) throw new Error("bad code");
+    let bytes = fromB64(m[2]);
+    if (m[1] === "1") bytes = await pipe(bytes, new DecompressionStream("gzip"));
+    const o = JSON.parse(new TextDecoder().decode(bytes));
+    const art = {};
+    for (const [key, [w, h, pal, idx]] of Object.entries(o)) {
+      const colors = String(pal).split(",").map((c) => "#" + c);
+      art[key] = { w, h, px: [...String(idx)].map((ch) => (ch === "." ? null : colors[PIX.indexOf(ch)] || null)) };
+    }
+    return art;
+  };
+
   // ---------- block art (see blockdash-art.js) ----------
 
   const { drawTile, drawPlayer, drawExplosion, drawEraser } = window.BDArt;
@@ -412,7 +432,7 @@
     const other = el("a", "btn small", editMode ? "▶ Play the game" : "✏ Level Maker");
     other.href = editMode ? "blockdash.html" : "blockdash.html?edit";
     head.appendChild(other);
-    if (devMode && editMode) {
+    if (editMode) {
       const artBtn = el("button", "small", "🎨 Art");
       artBtn.onclick = () => showArtStudio();
       head.appendChild(artBtn);
@@ -628,7 +648,8 @@
       ["r", "Blaze rod — collect them! Blazes drop one when you jump on them"],
       ["e", "End stone — solid block for End levels"],
       ["T", "End TNT — TNT in End colours. Touch it and you explode"],
-      ["I", "Blink — teleports you to the nearest other Blink"],
+      ["I", "Blink — press jump while touching it to teleport to the next Blink ahead"],
+      ["Y", "Staring watcher — like the Watcher, but its eye never shuts"],
       ["W", "Watcher — an eye block that looks down. If you're in its shaded cone while the eye is open, you get DELETED"],
       ["V", "End watcher — ignores you until you jump on it. Then it chases you!"],
       ["Q", "Corrupted end watcher — touching it deletes you, even asleep. Jump on it and it chases you, glitching forward to keep up"],
@@ -647,7 +668,7 @@
       const label = el("span", "hint", text);
       label.style.flex = "1";
       r.appendChild(label);
-      if (devMode) {
+      if (editMode) {
         const paint = el("button", "small", "🎨");
         paint.title = "Repaint this block";
         paint.onclick = () => showArtStudio(ch);
@@ -656,7 +677,7 @@
       tbl.appendChild(r);
     });
     rules.appendChild(tbl);
-    if (devMode) {
+    if (editMode) {
       rules.appendChild(el("p", "hint",
         "Hit 🎨 to repaint any block in the Art Studio."));
     }
@@ -982,6 +1003,50 @@
     fileRow.append(dlJson, loadBtn, resetAllBtn, fileInput);
     filePanel.appendChild(fileRow);
     root.appendChild(filePanel);
+
+    // ---- art codes: share a texture pack as text ----
+    const codePanel = el("div", "panel");
+    codePanel.appendChild(el("h2", null, "Art code"));
+    codePanel.appendChild(el("p", "hint",
+      "<b>Make code</b> turns everything you've painted into a code someone else " +
+      "can paste here and press <b>Use code</b>."));
+    const codeTa = el("textarea");
+    codeTa.placeholder = "paste an art code here…";
+    codePanel.appendChild(codeTa);
+    const codeRow = el("div", "row");
+    codeRow.style.marginTop = "8px";
+    const makeBtn = el("button", "green small", "⧉ Make code");
+    makeBtn.onclick = async () => {
+      const art = Art.customArt();
+      if (!Object.keys(art).length) { toast("Nothing painted yet"); return; }
+      codeTa.value = await encodeArt(art);
+      codeTa.select();
+      try {
+        await navigator.clipboard.writeText(codeTa.value);
+        toast("Code copied!");
+      } catch (e) {
+        toast("Select the code and copy it");
+      }
+    };
+    const useBtn = el("button", "small", "Use code");
+    useBtn.onclick = async () => {
+      try {
+        const loaded = Art.applyPack(await decodeArt(codeTa.value), true);
+        if (!loaded.length) { toast("No art in that code"); return; }
+        undoStack = [];
+        img = Art.getPixels(key);
+        render();
+        refreshThumbs();
+        renderPreview();
+        codeTa.value = "";
+        toast(`Loaded ${loaded.length} drawing${loaded.length === 1 ? "" : "s"}`);
+      } catch (e) {
+        toast("That code didn't work");
+      }
+    };
+    codeRow.append(makeBtn, useBtn);
+    codePanel.appendChild(codeRow);
+    root.appendChild(codePanel);
 
     // ---- painting ----
 
@@ -1445,7 +1510,7 @@
         }
       }
       for (let y = 0; y < H; y++) {
-        for (let x = 0; x < w; x++) if (grid[y][x] === "W") drawCone(ctx, grid, x, y, TS, 0, true);
+        for (let x = 0; x < w; x++) if (grid[y][x] === "W" || grid[y][x] === "Y") drawCone(ctx, grid, x, y, TS, 0, true);
       }
 
       // grid lines + a marker every 5 columns
@@ -1558,7 +1623,7 @@
       rot, coyote, buffer, particles, deadT, time = 0, holding = false,
       checkpoint = null, flying = false, deathKind = "boom",
       movers = [], shooters = [], bullets = [], spawners = [], blazes = [], fireballs = [],
-      rods = 0, eyes = 0, watchers = [], mobs = [], blinkLock = null, runT = 0;
+      rods = 0, eyes = 0, watchers = [], mobs = [], runT = 0, warp = null;
 
     // fromStart: R / Play again. Otherwise (after dying) respawn at the last
     // checkpoint with the level as it was when you got there, so diamonds
@@ -1577,7 +1642,6 @@
       fireballs = [];
       watchers = [];
       mobs = [];
-      blinkLock = null;
       runT = 0;
       for (let y = 0; y < H; y++) {
         for (let x = 0; x < width; x++) {
@@ -1589,8 +1653,8 @@
             shooters.push({ x, y, t: 1 });
           } else if (ch === "Z") {
             spawners.push({ x, y, t: 0.6, alive: 0 });
-          } else if (ch === "W") {
-            watchers.push({ x, y, ph: (x * 0.37) % WATCH_CYCLE });
+          } else if (ch === "W" || ch === "Y") {
+            watchers.push({ x, y, ph: (x * 0.37) % WATCH_CYCLE, stare: ch === "Y" });
           }
           // creatures live outside the grid while you play; they restart on every respawn
           if (isMob(ch)) {
@@ -1613,6 +1677,7 @@
       eyes = checkpoint ? checkpoint.eyes : 0;
       eyesEl.textContent = "👁 " + eyes;
       state = "run";
+      warp = null;
       camX = clamp(player.x - VIEW_COLS * 0.32, 0, Math.max(0, width - VIEW_COLS));
       effect = null;
       effectT = 0;
@@ -1630,6 +1695,19 @@
 
     const solidAt = (x, y) =>
       x >= 0 && x < width && y >= 0 && y < H && isSolid(grid[y][x]);
+
+    // A fresh press while touching a Blink teleports instead of jumping.
+    // Holding jump doesn't count, so you don't chain through every Blink.
+    const pressJump = () => {
+      if (state === "run") {
+        for (let y = Math.floor(player.y); y <= Math.floor(player.y + PLAYER_H - 0.01); y++) {
+          for (let x = Math.floor(player.x); x <= Math.floor(player.x + PLAYER_W - 0.01); x++) {
+            if (grid[y] && grid[y][x] === "I" && blink(x, y)) return;
+          }
+        }
+      }
+      doJump();
+    };
 
     const doJump = () => {
       if (state !== "run") return;
@@ -1723,12 +1801,13 @@
       sparkle(x, y, ["#ffe98a", "#f0a020"]);
     };
 
-    // Jump to the nearest other Blink. Returns true if you moved.
+    // Jump to the nearest Blink further right. Only forward, so Blinks
+    // can't be used to loop back and farm gems.
     const blink = (fromX, fromY) => {
       let best = null, bestD = Infinity;
       for (let y = 0; y < H; y++) {
-        for (let x = 0; x < width; x++) {
-          if (grid[y][x] !== "I" || (x === fromX && y === fromY)) continue;
+        for (let x = fromX + 1; x < width; x++) {
+          if (grid[y][x] !== "I") continue;
           const d = (x - fromX) ** 2 + (y - fromY) ** 2;
           if (d < bestD) { bestD = d; best = { x, y }; }
         }
@@ -1738,8 +1817,9 @@
       player.x = best.x + (1 - PLAYER_W) / 2;
       player.y = best.y + (1 - PLAYER_H);
       player.vy = 0;
-      blinkLock = best;
-      sparkle(player.x + PLAYER_W / 2, player.y + PLAYER_H / 2, ["#b46bff", "#f4f0ff"]);
+      // The game holds still while the camera glides over, so the jump is
+      // easy on the eyes and you're never dropped straight into danger.
+      warp = { t: 0, from: camX };
       return true;
     };
 
@@ -1760,7 +1840,7 @@
       return xs.some((px) => ys.some((py) => inCone(grid, w.x, w.y, px, py)));
     };
     // timed from the (re)start, so each attempt sees the same rhythm, like a rhythm game
-    const eyeOpen = (w) => (runT + w.ph) % WATCH_CYCLE < WATCH_OPEN;
+    const eyeOpen = (w) => w.stare || (runT + w.ph) % WATCH_CYCLE < WATCH_OPEN;
 
     // Player's hit box for things that move, a little forgiving like items.
     const touches = (x0, y0, x1, y1) => {
@@ -1964,6 +2044,19 @@
       }
       particles = particles.filter((p) => p.life > 0);
 
+      if (warp) {
+        warp.t += dt;
+        const k = clamp(warp.t / WARP_TIME, 0, 1);
+        const ease = k * k * (3 - 2 * k);
+        const to = clamp(player.x - VIEW_COLS * 0.32, 0, Math.max(0, width - VIEW_COLS));
+        camX = warp.from + (to - warp.from) * ease;
+        if (k >= 1) {
+          warp = null;
+          sparkle(player.x + PLAYER_W / 2, player.y + PLAYER_H / 2, ["#b46bff", "#f4f0ff"]);
+        }
+        return;
+      }
+
       if (state === "dead") {
         deadT += dt;
         if (deadT > 0.9) reset();
@@ -2080,9 +2173,6 @@
           if (x < 0 || x >= width || y < 0 || y >= H) continue;
           const ch = grid[y][x];
           if (ch === "t" || ch === "T") { die(); return; }
-          if (ch === "I" && !(blinkLock && blinkLock.x === x && blinkLock.y === y)) {
-            if (blink(x, y)) return;
-          }
           if (isHiddenTnt(ch)) { die(); return; }
           if (ch === "L" || ch === "F" || ch === "U" || ch === "D" || ch === FLOWED) {
             die("burn");
@@ -2122,11 +2212,6 @@
             return;
           }
         }
-      }
-
-      // the Blink you arrived on only works again once you've stepped off it
-      if (blinkLock && !touches(blinkLock.x, blinkLock.y, blinkLock.x + 1, blinkLock.y + 1)) {
-        blinkLock = null;
       }
 
       if (updateHazards(dt)) return;
@@ -2233,8 +2318,12 @@
           (player.y + PLAYER_H * 0.45) * TS - ws / 2 + flap, ws, time, false);
       }
       if (state !== "dead") {
-        drawPlayer(ctx, (player.x - camX) * TS, player.y * TS,
-          PLAYER_W * TS, PLAYER_H * TS, rot);
+        const k = warp ? clamp((warp.t / WARP_TIME - 0.7) / 0.3, 0, 1) : 1;
+        if (k > 0) {
+          const pw = PLAYER_W * TS * k, ph = PLAYER_H * TS * k;
+          drawPlayer(ctx, (player.x + PLAYER_W / 2 - camX) * TS - pw / 2,
+            (player.y + PLAYER_H / 2) * TS - ph / 2, pw, ph, rot);
+        }
       }
 
       for (const p of particles) {
@@ -2243,6 +2332,11 @@
         ctx.fillRect((p.x - camX) * TS, p.y * TS, TS * 0.16, TS * 0.16);
       }
       ctx.globalAlpha = 1;
+
+      if (warp) {
+        ctx.fillStyle = "rgba(150, 80, 230, " + (0.35 * Math.sin(Math.PI * clamp(warp.t / WARP_TIME, 0, 1))).toFixed(3) + ")";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      }
 
       if (effect) {
         ctx.fillStyle = effect === "fast" ? "#ffd54a" : "#c9c9d6";
@@ -2307,7 +2401,7 @@
     const onKeyDown = (e) => {
       if (e.key === " " || e.key === "ArrowUp" || e.key === "w" || e.key === "W") {
         e.preventDefault();
-        if (!holding) doJump();
+        if (!holding) pressJump();
         holding = true;
       } else if (e.key === "r" || e.key === "R") {
         reset(true);
@@ -2319,7 +2413,7 @@
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener("keyup", onKeyUp);
 
-    const press = (e) => { e.preventDefault(); holding = true; doJump(); };
+    const press = (e) => { e.preventDefault(); holding = true; pressJump(); };
     const release = () => { holding = false; };
     canvas.addEventListener("pointerdown", press);
     canvas.addEventListener("pointerup", release);

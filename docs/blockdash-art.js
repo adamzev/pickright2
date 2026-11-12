@@ -272,6 +272,13 @@ window.BDArt = (() => {
   });
   const watcher = watcherPx(true);
   const watcherClosed = watcherPx(false);
+  // Staring watcher: the same eye with a red rim, because it never shuts.
+  const staringWatcher = mk(S, S, (c) => {
+    c.drawImage(watcher, 0, 0);
+    c.strokeStyle = "#ff3a50";
+    c.lineWidth = 1;
+    c.strokeRect(0.5, 0.5, S - 1, S - 1);
+  });
 
   // End TNT: TNT retextured in End colours, with an eye where the N goes.
   const endTnt = mk(S, S, (c) => {
@@ -714,6 +721,7 @@ window.BDArt = (() => {
     e: endStone,
     I: blink,
     W: watcher,
+    Y: staringWatcher,
     watcherClosed: watcherClosed,
     T: endTnt,
     o: eyeOfEnder,
@@ -764,6 +772,7 @@ window.BDArt = (() => {
     { key: "I", label: "Blink" },
     { key: "W", label: "Watcher" },
     { key: "watcherClosed", label: "Watcher (eye shut)" },
+    { key: "Y", label: "Staring watcher" },
     { key: "T", label: "End TNT" },
     { key: "o", label: "Eye of ender" },
     { key: "V", label: "End watcher" },
@@ -1036,6 +1045,7 @@ window.BDArt = (() => {
     { key: "nether", label: "🔥 Nether" },
     { key: "mooshroom", label: "🍄 Mooshroom realm" },
     { key: "end", label: "🌌 The End" },
+    { key: "endStorage", label: "📦 End storage rooms" },
   ];
 
   const wrapX = (base, scroll, rate, span, pad) =>
@@ -1128,6 +1138,22 @@ window.BDArt = (() => {
       for (let i = 0; i < 18; i++) {
         const x = wrapX(i * 173, scroll, 0.4, W + 40, 20);
         const y = H - (((t * 18 + i * 61) % (H + 20)));
+        ctx.fillRect(x, y, 3, 3);
+      }
+    } else if (kind === "endStorage") {
+      // Like the Nether, but walled in by end stone: a smooth dark end-stone
+      // backdrop, lighter jagged end stone above and below, no ghasts.
+      ctx.fillStyle = skyGrad(ctx, H, "#1f1c17", "#48413a");
+      ctx.fillRect(0, 0, W, H);
+      jagged(ctx, W, 0, 1, scroll, 0.15, 48, 18, 46, 3, "#6e6c46");
+      jagged(ctx, W, 0, 1, scroll, 0.3, 36, 6, 26, 11, "#8f8d5c");
+      jagged(ctx, W, groundY + ts * 0.3, -1, scroll, 0.25, 44, 30, 80, 5, "#6a6843");
+      jagged(ctx, W, groundY + ts * 0.3, -1, scroll, 0.5, 32, 10, 46, 17, "#949262");
+      // faint purple dust drifting up
+      ctx.fillStyle = "rgba(200, 140, 255, 0.55)";
+      for (let i = 0; i < 14; i++) {
+        const x = wrapX(i * 173, scroll, 0.4, W + 40, 20);
+        const y = H - (((t * 12 + i * 61) % (H + 20)));
         ctx.fillRect(x, y, 3, 3);
       }
     } else if (kind === "end") {
