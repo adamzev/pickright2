@@ -14,7 +14,7 @@
 //   BDArt.loadSprites({ g: "art/grass.png", t: "art/tnt.png" }).then(...)
 //   BDArt.registerSprite("player", someCanvasOrImage);
 //
-// Keys: block letters g s m t h C d b w f n k L U D F S Z r e I W T o V Q N E B P,
+// Keys: block letters g s p A K O M m t h C d b w f n k L U D F S Z r e I W T o V Q N E B P,
 // plus "bullet", "blaze", "fireball", "watcherClosed",
 // "checkpointOn", "wingsWorn", plus "dirt", "cloud", "player",
 // "explosion1", "explosion2". Blocks should be square; the player is drawn at
@@ -643,6 +643,74 @@ window.BDArt = (() => {
     }
   });
 
+  // Deepslate: "tougher stone" — darker, with flat streaks instead of speckle.
+  const deepslate = mk(S, S, (c) => {
+    for (let y = 0; y < S; y++) {
+      for (let x = 0; x < S; x++) {
+        const r = nz(x >> 2, y, 83) * 0.7 + nz(x, y, 84) * 0.3;
+        c.fillStyle = r < 0.3 ? "#2b2b30" : r < 0.6 ? "#3a3a41" : r < 0.85 ? "#4a4a52" : "#5a5a63";
+        c.fillRect(x, y, 1, 1);
+      }
+    }
+  });
+
+  // Spike: a pale iron triangle, darker on its shaded side.
+  const spike = mk(S, S, (c) => {
+    for (let y = 1; y < S; y++) {
+      const half = Math.ceil(y / 2);
+      rect(c, 8 - half, y, half, 1, "#d8dde6");
+      rect(c, 8, y, half, 1, "#8e96a6");
+    }
+    rect(c, 7, 0, 2, 1, "#ffffff");
+    rect(c, 0, S - 1, S, 1, "#5d6472");
+  });
+
+  // Editor-only markers (Dialog, Stop, Free move). Like Hidden TNT they aren't
+  // drawn in play, so each is a symbol inside a dashed frame of its own colour.
+  const marker = (col, paint) => mk(S, S, (c) => {
+    c.fillStyle = "rgba(0, 0, 0, 0.28)";
+    c.fillRect(0, 0, S, S);
+    for (let i = 0; i < S; i += 4) {
+      rect(c, i, 0, 2, 1, col);
+      rect(c, i + 2, S - 1, 2, 1, col);
+      rect(c, 0, i + 2, 1, 2, col);
+      rect(c, S - 1, i, 1, 2, col);
+    }
+    paint(c);
+  });
+
+  const dialogMark = marker("#7cc7ff", (c) => {
+    // speech bubble with three lines of "writing"
+    rect(c, 3, 3, 10, 7, "#ffffff");
+    rect(c, 2, 4, 12, 5, "#ffffff");
+    spans(c, [[10, 5, 7], [11, 5, 6], [12, 5, 5]], "#ffffff");
+    rect(c, 4, 5, 8, 1, "#3a6ea5");
+    rect(c, 4, 7, 6, 1, "#3a6ea5");
+  });
+
+  const stopMark = marker("#ff5a4f", (c) => {
+    rect(c, 0, 4, 15, 9, "#d1402f");
+    const glyphs = {
+      S: ["111", "100", "111", "001", "111"],
+      T: ["111", "010", "010", "010", "010"],
+      O: ["111", "101", "101", "101", "111"],
+      P: ["111", "101", "111", "100", "100"],
+    };
+    [..."STOP"].forEach((ch, i) => {
+      glyphs[ch].forEach((row, ry) => {
+        [...row].forEach((bit, rx) => {
+          if (bit === "1") rect(c, i * 4 + rx, 6 + ry, 1, 1, "#ffffff");
+        });
+      });
+    });
+  });
+
+  const freeMark = marker("#6fe07a", (c) => {
+    // arrows pointing both ways
+    spans(c, [[5, 4, 4], [6, 3, 4], [7, 2, 13], [8, 2, 13], [9, 3, 4], [10, 4, 4]], "#6fe07a");
+    spans(c, [[5, 11, 11], [6, 11, 12], [9, 11, 12], [10, 11, 11]], "#6fe07a");
+  });
+
   const spawnMark = mk(S, S, (c) => {
     c.fillStyle = "rgba(124, 199, 255, 0.16)";
     c.fillRect(0, 0, S, S);
@@ -703,6 +771,11 @@ window.BDArt = (() => {
     g: grass,
     dirt: dirt,
     s: stone,
+    p: deepslate,
+    A: spike,
+    K: dialogMark,
+    O: stopMark,
+    M: freeMark,
     m: slime,
     t: tnt,
     h: hiddenTnt,
@@ -750,6 +823,11 @@ window.BDArt = (() => {
     { key: "g", label: "Grass" },
     { key: "dirt", label: "Dirt" },
     { key: "s", label: "Stone" },
+    { key: "p", label: "Deepslate" },
+    { key: "A", label: "Spike" },
+    { key: "K", label: "Dialog block" },
+    { key: "O", label: "Stop block" },
+    { key: "M", label: "Free move block" },
     { key: "m", label: "Slime" },
     { key: "t", label: "TNT" },
     { key: "h", label: "Hidden TNT" },

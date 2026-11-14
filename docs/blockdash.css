@@ -334,6 +334,14 @@ button.tool-btn.sel {
   font-size: 1.1rem;
   font-weight: 700;
 }
+/* ◀ ▶ sit either side of JUMP, and only show in a free-move zone */
+.move-btn {
+  flex: 0 0 22%;
+  padding: 22px 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+  touch-action: none;
+}
 
 .overlay-msg {
   text-align: center;

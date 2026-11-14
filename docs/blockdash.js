@@ -11,6 +11,12 @@
   const TILES = {
     g: { name: "Grass", solid: true },
     s: { name: "Stone", solid: true },
+    p: { name: "Deepslate", solid: true },
+    A: { name: "Spike" },
+    // hidden: shown in the editor, invisible (but still working) in play
+    K: { name: "Dialog", hidden: true },
+    O: { name: "Stop", hidden: true },
+    M: { name: "Free move", hidden: true },
     m: { name: "Slime", solid: true },
     t: { name: "TNT" },
     h: { name: "Hidden TNT" },
@@ -51,14 +57,15 @@
     P: { name: "Start" },
   };
 
-  const PALETTE = ["g", "s", "n", "k", "e", "m", "t", "T", "h", "L", "U", "D", "F", "S", "Z",
-    "W", "Y", "V", "Q", "N", "I", "C", "d", "r", "o", "b", "w", "f", "E", "B", "P", ERASER];
+  const PALETTE = ["g", "s", "p", "n", "k", "e", "m", "t", "T", "h", "A", "L", "U", "D", "F", "S", "Z",
+    "W", "Y", "V", "Q", "N", "I", "C", "d", "r", "o", "b", "w", "f", "K", "O", "M", "E", "B", "P", ERASER];
 
   const isSolid = (ch) => !!(TILES[ch] && TILES[ch].solid);
   const overOf = (ch) => TILES[ch] && TILES[ch].over;
   const isHiddenTnt = (ch) => ch === "h" || !!overOf(ch);
   const TRAP_OVER = { d: "1", b: "2", w: "3", B: "4", f: "5", r: "6", o: "7" };
   const isMob = (ch) => !!(TILES[ch] && TILES[ch].mob);
+  const isHidden = (ch) => ch === "h" || !!(TILES[ch] && TILES[ch].hidden);
 
   // physics, in blocks and seconds
   const GRAVITY = 62;
@@ -74,6 +81,8 @@
   const PLAYER_W = 0.7;
   const PLAYER_H = 0.9;
   const COYOTE = 0.1;
+  const STOP_DEFAULT = 2; // seconds a Stop block holds you, unless the editor says otherwise
+  const POOF_AFTER = 0.25; // a spiked player tips over this long, then puffs away
   const JUMP_BUFFER = 0.14;
   const LAVA_RISE = 1.2; // new blocks per second from a rising-lava source
   const LAVA_FALL = 0.7; // falling lava "slowly falls"
@@ -258,8 +267,28 @@
   const bgOf = (o) =>
     (window.BDArt.BACKGROUNDS.some((b) => b.key === o.bg) ? o.bg : "overworld");
   // what goes in a saved or downloaded level; overworld levels stay { name, rows }
-  const levelData = (l) =>
-    (bgOf(l) === "overworld" ? { name: l.name, rows: l.rows } : { name: l.name, bg: l.bg, rows: l.rows });
+  // A square holds one letter, which has no room for a Dialog block's words or
+  // a Stop block's seconds. Those ride alongside the rows as notes, keyed by
+  // square: { "x,y": "text" | seconds }. Notes whose block is gone are dropped.
+  const noteKey = (x, y) => x + "," + y;
+  const cleanNotes = (rows, notes) => {
+    const out = {};
+    if (!notes || typeof notes !== "object") return out;
+    for (const [k, v] of Object.entries(notes)) {
+      const [x, y] = k.split(",").map(Number);
+      const ch = rows[y] && rows[y][x];
+      if (ch === "K" && typeof v === "string" && v.trim()) out[k] = v.slice(0, 200);
+      else if (ch === "O" && +v > 0) out[k] = clamp(+v, 0.5, 30);
+    }
+    return out;
+  };
+
+  const levelData = (l) => {
+    const o = bgOf(l) === "overworld" ? { name: l.name, rows: l.rows } : { name: l.name, bg: l.bg, rows: l.rows };
+    const notes = cleanNotes(l.rows, l.notes);
+    if (Object.keys(notes).length) o.notes = notes;
+    return o;
+  };
 
   const normalizeLevel = (o, fallbackName) => {
     if (!o || typeof o !== "object" || !Array.isArray(o.rows) || !o.rows.length) {
@@ -267,10 +296,12 @@
     }
     const rows = o.rows.map(String);
     if (!rows.some((r) => r.length)) throw new Error("empty level");
+    const clean = gridToRows(rowsToGrid(rows));
     return {
       name: String(o.name || fallbackName || "Untitled"),
-      rows: gridToRows(rowsToGrid(rows)),
+      rows: clean,
       bg: bgOf(o),
+      notes: cleanNotes(clean, o.notes),
     };
   };
 
@@ -326,7 +357,7 @@
   // ---------- share codes ----------
 
   const encodeLevel = (lvl) => {
-    const json = JSON.stringify({ n: lvl.name, r: lvl.rows, b: bgOf(lvl) });
+    const json = JSON.stringify({ n: lvl.name, r: lvl.rows, b: bgOf(lvl), x: cleanNotes(lvl.rows, lvl.notes) });
     const bytes = new TextEncoder().encode(json);
     let s = "";
     for (const b of bytes) s += String.fromCharCode(b);
@@ -338,7 +369,7 @@
     const bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0));
     const o = JSON.parse(new TextDecoder().decode(bytes));
     if (!o || !Array.isArray(o.r) || !o.r.length) throw new Error("bad code");
-    return { name: String(o.n || "Imported level"), rows: o.r.map(String), bg: o.b };
+    return { name: String(o.n || "Imported level"), rows: o.r.map(String), bg: o.b, notes: o.x };
   };
 
   // Art codes are much bigger than level codes, so each drawing is stored as
@@ -458,7 +489,7 @@
         const play = el("button", "green small", i ? "▶ Play" : "▶ Start");
         play.onclick = () => playSeries(builtin, i, 0, () => showMenu());
         const copy = el("button", "small", "✏ Copy & edit");
-        copy.onclick = () => showEditor({ name: lvl.name + " copy", rows: lvl.rows, bg: lvl.bg }, -1);
+        copy.onclick = () => showEditor({ name: lvl.name + " copy", rows: lvl.rows, bg: lvl.bg, notes: lvl.notes }, -1);
         list.appendChild(levelCard(lvl, editMode ? [play, copy] : [play], i + 1));
       });
       bp.appendChild(list);
@@ -630,6 +661,8 @@
     [
       ["g", "Grass — solid ground to run on"],
       ["s", "Stone — solid block, build walls and towers"],
+      ["p", "Deepslate — tougher stone. Solid and dark"],
+      ["A", "Spike — sharp to touch. You vanish in a puff of smoke"],
       ["m", "Slime — land on it and you bounce way up"],
       ["t", "TNT — touch it and you explode. Game over!"],
       ["h", "Hidden TNT — invisible when you play. Hide it somewhere tempting!"],
@@ -656,6 +689,9 @@
       ["N", "Short-legged enderman — teleports in front of you when you get close. Jump on it to beat it"],
       ["o", "Eye of ender — collect them!"],
       ["f", "Wings + firework — hold jump to fly up, let go to glide. They come off at the next save point"],
+      ["K", "Dialog block — invisible when you play. Stops the player and shows the words you typed, until they press jump"],
+      ["O", "Stop block — invisible when you play. Holds the player still for the number of seconds you set"],
+      ["M", "Free move block — invisible when you play. The player stops auto-running and moves with ◀ ▶ until the next save point"],
       ["E", "End portal — finish the level here"],
       ["B", "Bush — just decoration, safe to touch"],
       ["P", "Start — where you spawn"],
@@ -1229,6 +1265,11 @@
     let grid = existing ? rowsToGrid(existing.rows) : newGrid(48);
     let name = existing ? existing.name : "My Level " + (loadLevels().length + 1);
     let bg = existing ? bgOf(existing) : "overworld";
+    // Never pruned while editing, so Undo brings a block back with its note;
+    // cleanNotes drops the leftovers whenever the level is saved or tested.
+    const notes = existing ? cleanNotes(existing.rows, existing.notes) : {};
+    let stopSecs = STOP_DEFAULT;
+    let dialogText = "";
     let slot = index;
     let sel = "g";
     let mode = "draw"; // draw | pan
@@ -1256,7 +1297,7 @@
     const savedLabel = el("span", "hint", slot >= 0 ? "✓ Saved" : "");
     const autosave = () => {
       const all = loadLevels();
-      const lvl = levelData({ name: (name || "").trim() || "Untitled", rows: gridToRows(grid), bg });
+      const lvl = levelData({ name: (name || "").trim() || "Untitled", rows: gridToRows(grid), bg, notes });
       if (slot >= 0 && slot < all.length) all[slot] = lvl;
       else { all.push(lvl); slot = all.length - 1; }
       savedLabel.textContent = saveLevels(all) ? "✓ Saved" : "⚠ Not saved";
@@ -1264,7 +1305,8 @@
     nameInput.oninput = () => { name = nameInput.value; autosave(); };
     const testBtn = el("button", "", "▶ Test");
     testBtn.onclick = () => {
-      const lvl = { name: (nameInput.value || "Untitled").trim(), rows: gridToRows(grid), bg };
+      const lvl = { name: (nameInput.value || "Untitled").trim(), rows: gridToRows(grid), bg,
+        notes: cleanNotes(grid, notes) };
       showPlay(lvl, () => showEditor(lvl, slot), true);
     };
     nameRow.append(nameInput, testBtn, savedLabel);
@@ -1305,11 +1347,43 @@
         sel = ch;
         Object.values(palItems).forEach((n) => n.classList.remove("sel"));
         item.classList.add("sel");
+        showOpts();
       };
       palItems[ch] = item;
       pal.appendChild(item);
     });
     palPanel.appendChild(pal);
+
+    // settings for the blocks that carry one: Stop (seconds) and Dialog (words)
+    const optRow = el("div", "row");
+    optRow.style.marginTop = "8px";
+    const stopInput = el("input");
+    stopInput.type = "number";
+    stopInput.min = "0.5";
+    stopInput.max = "30";
+    stopInput.step = "0.5";
+    stopInput.value = String(stopSecs);
+    stopInput.style.width = "5em";
+    stopInput.oninput = () => { stopSecs = clamp(parseFloat(stopInput.value) || STOP_DEFAULT, 0.5, 30); };
+    const dialogInput = el("input");
+    dialogInput.type = "text";
+    dialogInput.maxLength = 200;
+    dialogInput.placeholder = "What should it say?";
+    dialogInput.style.flex = "1";
+    dialogInput.oninput = () => { dialogText = dialogInput.value; };
+    const showOpts = () => {
+      optRow.innerHTML = "";
+      optRow.style.display = sel === "O" || sel === "K" ? "" : "none";
+      if (sel === "O") {
+        optRow.append(el("span", "hint", "Stop for"), stopInput,
+          el("span", "hint", "seconds. Set this, then tap the grid. Tap a Stop block again to change it."));
+      } else if (sel === "K") {
+        optRow.append(el("span", "hint", "Says:"), dialogInput,
+          el("span", "hint", "Type, then tap the grid."));
+      }
+    };
+    showOpts();
+    palPanel.appendChild(optRow);
     root.appendChild(palPanel);
 
     // canvas
@@ -1407,7 +1481,10 @@
       if (ch === "h" && overOf(cur)) return false;
       if (ch === "h" && TRAP_OVER[cur]) ch = TRAP_OVER[cur];
       else if (TRAP_OVER[ch] && isHiddenTnt(cur)) ch = TRAP_OVER[ch];
-      if (cur === ch) return false;
+      const want = ch === "O" ? stopSecs : ch === "K" ? (dialogText.trim() || "Hello!") : undefined;
+      // re-tapping a Stop or Dialog block with a new setting updates it
+      if (cur === ch && (want === undefined || notes[noteKey(cx, cy)] === want)) return false;
+      if (want !== undefined) notes[noteKey(cx, cy)] = want;
       if (ch === "P") {
         for (let y = 0; y < H; y++) {
           for (let x = 0; x < w; x++) if (grid[y][x] === "P") grid[y][x] = AIR;
@@ -1513,6 +1590,27 @@
         for (let x = 0; x < w; x++) if (grid[y][x] === "W" || grid[y][x] === "Y") drawCone(ctx, grid, x, y, TS, 0, true);
       }
 
+      // what each Stop and Dialog block is set to
+      ctx.font = `bold ${Math.round(TS * 0.3)}px ui-monospace, monospace`;
+      ctx.textBaseline = "bottom";
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = "rgba(0,0,0,0.75)";
+      ctx.fillStyle = "#ffffff";
+      for (let y = 0; y < H; y++) {
+        for (let x = 0; x < w; x++) {
+          const ch = grid[y][x];
+          if (ch !== "O" && ch !== "K") continue;
+          const n = notes[noteKey(x, y)];
+          let label = ch === "O" ? (n || STOP_DEFAULT) + "s" : String(n || "…");
+          if (label.length > 16) label = label.slice(0, 15) + "…";
+          ctx.textAlign = ch === "O" ? "center" : "left";
+          const lx = ch === "O" ? (x + 0.5) * TS : x * TS + 2;
+          const ly = ch === "O" ? y * TS + TS * 0.36 : y * TS;
+          ctx.strokeText(label, lx, ly);
+          ctx.fillText(label, lx, ly);
+        }
+      }
+
       // grid lines + a marker every 5 columns
       ctx.strokeStyle = "rgba(0,0,0,0.12)";
       ctx.lineWidth = 1;
@@ -1561,6 +1659,7 @@
     clear();
 
     const template = rowsToGrid(level.rows);
+    const notes = cleanNotes(level.rows, level.notes);
     const width = template[0].length;
     const spawn = findSpawn(template);
 
@@ -1608,12 +1707,19 @@
     const msgSlot = el("div");
     panel.appendChild(msgSlot);
 
+    // ◀ ▶ only appear inside a Free move zone
+    const padRow = el("div", "row");
+    padRow.style.marginTop = "8px";
+    padRow.style.flexWrap = "nowrap";
+    const leftBtn = el("button", "move-btn", "◀");
+    const rightBtn = el("button", "move-btn", "▶");
     const jumpBtn = el("button", "green", "JUMP");
     jumpBtn.id = "jump-btn";
-    jumpBtn.style.marginTop = "8px";
-    panel.appendChild(jumpBtn);
+    padRow.append(leftBtn, jumpBtn, rightBtn);
+    panel.appendChild(padRow);
     panel.appendChild(el("p", "hint",
-      "Tap the screen, press SPACE or ▲ to jump. Hold to keep jumping."));
+      "Tap the screen, press SPACE or ▲ to jump. Hold to keep jumping. " +
+      "In a free-move zone, steer with ◀ ▶ or the arrow keys."));
     root.appendChild(panel);
 
     const TS = canvas.height / H; // 45px per block
@@ -1623,7 +1729,13 @@
       rot, coyote, buffer, particles, deadT, time = 0, holding = false,
       checkpoint = null, flying = false, deathKind = "boom",
       movers = [], shooters = [], bullets = [], spawners = [], blazes = [], fireballs = [],
-      rods = 0, eyes = 0, watchers = [], mobs = [], runT = 0, warp = null;
+      rods = 0, eyes = 0, watchers = [], mobs = [], runT = 0, warp = null,
+      free = false, moveL = false, moveR = false, stopT = 0, talk = null, talkAt = 0, poofed = false;
+
+    const setFree = (on) => {
+      free = on;
+      leftBtn.style.display = rightBtn.style.display = on ? "" : "none";
+    };
 
     // fromStart: R / Play again. Otherwise (after dying) respawn at the last
     // checkpoint with the level as it was when you got there, so diamonds
@@ -1678,6 +1790,9 @@
       eyesEl.textContent = "👁 " + eyes;
       state = "run";
       warp = null;
+      setFree(false);
+      stopT = 0;
+      talk = null;
       camX = clamp(player.x - VIEW_COLS * 0.32, 0, Math.max(0, width - VIEW_COLS));
       effect = null;
       effectT = 0;
@@ -1698,7 +1813,14 @@
 
     // A fresh press while touching a Blink teleports instead of jumping.
     // Holding jump doesn't count, so you don't chain through every Blink.
+    // Returns true when the press was used up closing a dialog, so the caller
+    // doesn't also treat it as "holding jump".
     const pressJump = () => {
+      if (state === "talk") {
+        // a short grace so a jump you were already mashing doesn't skip the words
+        if (time - talkAt > 0.35) { state = "run"; talk = null; }
+        return true;
+      }
       if (state === "run") {
         for (let y = Math.floor(player.y); y <= Math.floor(player.y + PLAYER_H - 0.01); y++) {
           for (let x = Math.floor(player.x); x <= Math.floor(player.x + PLAYER_W - 0.01); x++) {
@@ -1710,7 +1832,7 @@
     };
 
     const doJump = () => {
-      if (state !== "run") return;
+      if (state !== "run" || stopT > 0) return;
       if (player.onGround || coyote > 0) {
         player.vy = -JUMP_V;
         player.onGround = false;
@@ -1735,15 +1857,44 @@
       }
     };
 
+    // g = this particle's own gravity (negative floats up), s = its size in blocks
+    const ember = () => {
+      particles.push({
+        x: player.x + Math.random() * PLAYER_W, y: player.y + Math.random() * PLAYER_H,
+        vx: (Math.random() - 0.5) * 2, vy: -1 - Math.random() * 3, g: -5,
+        life: 0.4 + Math.random() * 0.5,
+        c: ["#ffd54a", "#ff8a3d", "#e04a2f", "#ff5a1f"][(Math.random() * 4) | 0],
+      });
+    };
+
+    const puff = () => {
+      for (let i = 0; i < 16; i++) {
+        const s = 0.22 + Math.random() * 0.26;
+        particles.push({
+          x: player.x + PLAYER_W / 2 + (Math.random() - 0.5) * 0.9 - s / 2,
+          y: player.y + PLAYER_H / 2 + (Math.random() - 0.5) * 0.9 - s / 2,
+          vx: (Math.random() - 0.5) * 1.6, vy: -0.3 - Math.random() * 1.2, g: -1.5, s,
+          life: 0.35 + Math.random() * 0.3,
+          c: ["#ffffff", "#e6e6e6", "#cfcfcf"][(Math.random() * 3) | 0],
+        });
+      }
+    };
+
+    // Each kind of death looks different: TNT and walls go boom, lava and fire
+    // set you alight, a spike makes you tip over and puff away, a watcher deletes.
     const die = (kind = "boom") => {
       if (state !== "run") return;
       state = "dead";
       deathKind = kind;
       deadT = 0;
-      explode(player.x + PLAYER_W / 2, player.y + PLAYER_H / 2,
-        kind === "burn" ? ["#ffd54a", "#ff8a3d", "#e04a2f", "#ff5a1f"]
-          : kind === "delete" ? ["#b46bff", "#2a1240", "#f4f0ff", "#7a2fd0"]
+      poofed = false;
+      if (kind === "burn") {
+        for (let i = 0; i < 14; i++) ember();
+      } else if (kind !== "poof") {
+        explode(player.x + PLAYER_W / 2, player.y + PLAYER_H / 2,
+          kind === "delete" ? ["#b46bff", "#2a1240", "#f4f0ff", "#7a2fd0"]
             : ["#ffd54a", "#ff8a3d", "#e04a2f", "#8c8c8c"]);
+      }
       jumpBtn.disabled = true;
     };
 
@@ -2037,7 +2188,7 @@
       runT += dt;
 
       for (const p of particles) {
-        p.vy += 26 * dt;
+        p.vy += (p.g === undefined ? 26 : p.g) * dt;
         p.x += p.vx * dt;
         p.y += p.vy * dt;
         p.life -= dt;
@@ -2059,6 +2210,8 @@
 
       if (state === "dead") {
         deadT += dt;
+        if (deathKind === "burn" && deadT < 0.7 && Math.random() < 0.5) ember();
+        if (deathKind === "poof" && !poofed && deadT >= POOF_AFTER) { poofed = true; puff(); }
         if (deadT > 0.9) reset();
         return;
       }
@@ -2071,9 +2224,12 @@
 
       const speed = effect === "fast" ? SPEED_FAST : effect === "slow" ? SPEED_SLOW : SPEED_BASE;
 
-      // horizontal
+      // horizontal — always forward, unless a Free move block handed you the controls
       const oldX = player.x;
-      player.x += speed * dt;
+      const dir = free ? (moveR ? 1 : 0) - (moveL ? 1 : 0) : 1;
+      if (stopT > 0) stopT -= dt;
+      else player.x += dir * speed * dt;
+      if (player.x < 0) player.x = 0;
       const y0 = Math.floor(player.y + 0.02);
       const y1 = Math.floor(player.y + PLAYER_H - 0.02);
       const rightCol = Math.floor(player.x + PLAYER_W);
@@ -2098,8 +2254,14 @@
           rot = 0;
         } else {
           player.x = oldX;
-          die(); // ran straight into a wall
-          return;
+          // ran straight into a wall — only deadly when you can't stop yourself
+          if (!free) { die(); return; }
+        }
+      }
+      if (dir < 0) {
+        const leftCol = Math.floor(player.x);
+        for (let y = y0; y <= y1; y++) {
+          if (solidAt(leftCol, y)) { player.x = oldX; break; }
         }
       }
 
@@ -2174,6 +2336,24 @@
           const ch = grid[y][x];
           if (ch === "t" || ch === "T") { die(); return; }
           if (isHiddenTnt(ch)) { die(); return; }
+          if (ch === "A") { die("poof"); return; }
+          // The three invisible blocks work once each, then clear themselves
+          // (they come back when the level resets).
+          if (ch === "K") {
+            grid[y][x] = AIR;
+            talk = notes[noteKey(x, y)] || "…";
+            talkAt = time;
+            state = "talk";
+            holding = false;
+            continue;
+          }
+          if (ch === "O") {
+            grid[y][x] = AIR;
+            stopT = notes[noteKey(x, y)] || STOP_DEFAULT;
+          } else if (ch === "M") {
+            grid[y][x] = AIR;
+            setFree(true);
+          }
           if (ch === "L" || ch === "F" || ch === "U" || ch === "D" || ch === FLOWED) {
             die("burn");
             return;
@@ -2182,6 +2362,7 @@
             // Wings come off here, so each stretch between save points
             // has to earn its own pair.
             flying = false;
+            setFree(false); // like wings, free moving ends at a save point
             grid[y][x] = "checkpointOn";
             checkpoint = { x, y, score, rods, eyes, grid: grid.map((r) => r.slice()) };
             toast("Checkpoint!");
@@ -2230,6 +2411,54 @@
     const drawBackground = () =>
       Art.drawBackground(ctx, bgOf(level), canvas.width, canvas.height, camX * TS, TS, time, effect);
 
+    // The player flashing red as they tip over, the way a beaten mob does.
+    // Tinted on a scratch canvas so only the player's own pixels turn red.
+    const hurtCv = el("canvas");
+    const drawHurtPlayer = (cx, cy, pw, ph, angle) => {
+      hurtCv.width = Math.ceil(pw);
+      hurtCv.height = Math.ceil(ph);
+      const h = hurtCv.getContext("2d");
+      drawPlayer(h, 0, 0, hurtCv.width, hurtCv.height, 0);
+      h.globalCompositeOperation = "source-atop";
+      h.fillStyle = "rgba(255, 40, 40, 0.55)";
+      h.fillRect(0, 0, hurtCv.width, hurtCv.height);
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(angle);
+      ctx.drawImage(hurtCv, -pw / 2, -ph / 2);
+      ctx.restore();
+    };
+
+    const drawDialog = () => {
+      const pad = 22, bw = canvas.width - 120, x0 = 60;
+      ctx.font = "bold 24px ui-monospace, monospace";
+      ctx.textAlign = "left";
+      ctx.textBaseline = "top";
+      const lines = [];
+      let line = "";
+      for (const word of String(talk).split(/\s+/)) {
+        const tryLine = line ? line + " " + word : word;
+        if (line && ctx.measureText(tryLine).width > bw - pad * 2) { lines.push(line); line = word; }
+        else line = tryLine;
+      }
+      if (line) lines.push(line);
+      const bh = pad * 2 + lines.length * 32 + 26;
+      const y0 = 24; // up top, so it never covers the player standing on the ground
+      ctx.fillStyle = "rgba(20, 20, 28, 0.92)";
+      ctx.fillRect(x0, y0, bw, bh);
+      ctx.strokeStyle = "#ffd54a";
+      ctx.lineWidth = 4;
+      ctx.strokeRect(x0, y0, bw, bh);
+      ctx.fillStyle = "#ffffff";
+      lines.forEach((l, i) => ctx.fillText(l, x0 + pad, y0 + pad + i * 32));
+      if (Math.sin(time * 5) > -0.3) {
+        ctx.fillStyle = "#ffd54a";
+        ctx.font = "bold 16px ui-monospace, monospace";
+        ctx.textAlign = "right";
+        ctx.fillText("▶ jump to carry on", x0 + bw - pad, y0 + bh - pad - 8);
+      }
+    };
+
     const render = () => {
       drawBackground();
 
@@ -2238,7 +2467,7 @@
       for (let x = startX; x <= endX; x++) {
         for (let y = 0; y < H; y++) {
           const ch = grid[y][x];
-          if (ch !== AIR && ch !== "P" && ch !== "h") {
+          if (ch !== AIR && ch !== "P" && !isHidden(ch)) {
             let key = ch === FLOWED ? "L" : overOf(ch) || ch;
             if (ch === "W" && !eyeOpen({ x, ph: (x * 0.37) % WATCH_CYCLE })) key = "watcherClosed";
             drawTile(ctx, key, (x - camX) * TS, y * TS, TS, time,
@@ -2317,6 +2546,23 @@
           (player.x + PLAYER_W / 2 - camX) * TS - ws / 2,
           (player.y + PLAYER_H * 0.45) * TS - ws / 2 + flap, ws, time, false);
       }
+      if (state === "dead") {
+        const cx = (player.x + PLAYER_W / 2 - camX) * TS, cy = (player.y + PLAYER_H / 2) * TS;
+        const pw = PLAYER_W * TS, ph = PLAYER_H * TS;
+        if (deathKind === "burn") {
+          // the player fades away inside a flame instead of blowing up
+          const k = clamp(deadT / 0.7, 0, 1);
+          ctx.save();
+          ctx.globalAlpha = 1 - k;
+          drawPlayer(ctx, cx - pw / 2, cy - ph / 2, pw, ph, rot);
+          ctx.globalAlpha = clamp((0.9 - deadT) / 0.2, 0, 1);
+          const fs = TS * (1.1 + 0.5 * k);
+          drawTile(ctx, "F", cx - fs / 2, (player.y + PLAYER_H) * TS - fs, fs, time, false);
+          ctx.restore();
+        } else if (deathKind === "poof" && deadT < POOF_AFTER) {
+          drawHurtPlayer(cx, cy, pw, ph, (deadT / POOF_AFTER) * Math.PI / 2);
+        }
+      }
       if (state !== "dead") {
         const k = warp ? clamp((warp.t / WARP_TIME - 0.7) / 0.3, 0, 1) : 1;
         if (k > 0) {
@@ -2329,7 +2575,8 @@
       for (const p of particles) {
         ctx.globalAlpha = clamp(p.life, 0, 1);
         ctx.fillStyle = p.c;
-        ctx.fillRect((p.x - camX) * TS, p.y * TS, TS * 0.16, TS * 0.16);
+        const ps = TS * (p.s || 0.16);
+        ctx.fillRect((p.x - camX) * TS, p.y * TS, ps, ps);
       }
       ctx.globalAlpha = 1;
 
@@ -2354,10 +2601,21 @@
         ctx.fillText("🪽 FLY! hold jump", canvas.width / 2, y);
       }
 
+      if (state === "run" && (stopT > 0 || free)) {
+        const y = 16 + (effect ? 36 : 0) + (flying ? 36 : 0);
+        ctx.fillStyle = stopT > 0 ? "#ff8a80" : "#8ff09a";
+        ctx.font = "bold 26px ui-monospace, monospace";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "top";
+        ctx.fillText(stopT > 0 ? "✋ STOP " + stopT.toFixed(1) : "◀ FREE MOVE ▶", canvas.width / 2, y);
+      }
+
+      if (state === "talk") drawDialog();
+
       if (state === "dead") {
         ctx.fillStyle = "rgba(0,0,0,0.35)";
         ctx.fillRect(0, 0, canvas.width, canvas.height);
-        if (deathKind !== "delete") {
+        if (deathKind === "boom") {
           drawExplosion(ctx,
             (player.x + PLAYER_W / 2 - camX) * TS,
             (player.y + PLAYER_H / 2) * TS,
@@ -2367,7 +2625,7 @@
         ctx.font = "bold 46px ui-monospace, monospace";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        ctx.fillText(deathKind === "burn" ? "BURNED!" : deathKind === "delete" ? "DELETED!" : "BOOM!",
+        ctx.fillText({ burn: "BURNED!", delete: "DELETED!", poof: "POOF!" }[deathKind] || "BOOM!",
           canvas.width / 2, canvas.height / 2);
       }
     };
@@ -2401,19 +2659,31 @@
     const onKeyDown = (e) => {
       if (e.key === " " || e.key === "ArrowUp" || e.key === "w" || e.key === "W") {
         e.preventDefault();
-        if (!holding) pressJump();
-        holding = true;
+        if (e.repeat || holding) return;
+        if (!pressJump()) holding = true;
+      } else if (e.key === "ArrowLeft" || e.key === "a" || e.key === "A") {
+        moveL = true;
+      } else if (e.key === "ArrowRight" || e.key === "d" || e.key === "D") {
+        moveR = true;
       } else if (e.key === "r" || e.key === "R") {
         reset(true);
       }
     };
     const onKeyUp = (e) => {
       if (e.key === " " || e.key === "ArrowUp" || e.key === "w" || e.key === "W") holding = false;
+      else if (e.key === "ArrowLeft" || e.key === "a" || e.key === "A") moveL = false;
+      else if (e.key === "ArrowRight" || e.key === "d" || e.key === "D") moveR = false;
     };
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener("keyup", onKeyUp);
 
-    const press = (e) => { e.preventDefault(); holding = true; pressJump(); };
+    const press = (e) => { e.preventDefault(); if (!pressJump()) holding = true; };
+    const hold = (btn, set) => {
+      btn.addEventListener("pointerdown", (e) => { e.preventDefault(); set(true); });
+      for (const ev of ["pointerup", "pointercancel", "pointerleave"]) btn.addEventListener(ev, () => set(false));
+    };
+    hold(leftBtn, (v) => { moveL = v; });
+    hold(rightBtn, (v) => { moveR = v; });
     const release = () => { holding = false; };
     canvas.addEventListener("pointerdown", press);
     canvas.addEventListener("pointerup", release);

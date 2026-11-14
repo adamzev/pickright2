@@ -27,8 +27,10 @@ Block rules:
 | Block | What it does |
 | --- | --- |
 | Grass / Stone | Solid ground and walls |
+| Deepslate | Tougher stone: solid and dark |
+| Spike | Sharp to touch: you tip over and vanish in a puff of smoke |
 | Netherrack / Nether bricks | Solid, like Stone, for Nether-themed levels |
-| Lava / Fire | Burns you on touch |
+| Lava / Fire | Burns you on touch: you go up in flames rather than exploding like TNT |
 | Rising / Falling lava | A lava source that stays put and grows new lava upward (or slowly downward) once it's on screen, until it reaches something |
 | Shooter | Solid block that fires a star every 2 seconds; stars steer toward you and explode on touch |
 | Spawner | Solid cage that lets out a blaze every few seconds (up to 2 at a time). Blazes float near it, drift toward you and shoot straight fireballs. Jump on one to pop it and get its blaze rod; touching it any other way burns |
@@ -50,6 +52,9 @@ Block rules:
 | Hidden TNT | Invisible in play (faded in the editor) and explodes on touch. Paint it onto a diamond, bolt, rose, bush or wings to trap that item. |
 | Save point | Reach it and later deaths restart you here, with the diamonds you had. Takes your wings off. |
 | Wings + firework | Picked up once: hold jump to fly up, let go to glide, until the next save point |
+| Dialog block | Invisible in play. Stops the player and shows the words typed into it in the editor, until they press jump |
+| Stop block | Invisible in play. Holds the player still for a number of seconds set in the editor (2 by default); lava and creatures keep moving |
+| Free move block | Invisible in play. Turns off auto-running: move with ◀ ▶ (arrow keys or A/D), walls no longer kill, until the next save point |
 | End portal | Finishes the level |
 | Bush | Decoration only |
 | Start | Where you spawn |
