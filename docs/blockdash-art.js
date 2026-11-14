@@ -1074,14 +1074,81 @@ window.BDArt = (() => {
     }
   };
 
+  // ---------- the player's own blocks ----------
+  //
+  // A block a player invents is a second look for something that already
+  // exists: it keeps a name, the block it acts like (`base`), and its pixels.
+  // It lives in the same store as repainted art, so art files and art codes
+  // carry it, and adding it to the shipped art pack makes it permanent.
+  //
+  // A level square holds one character, so each of these gets a character of
+  // its own from Unicode's private-use range: thousands of single characters
+  // that mean nothing elsewhere. They are handed out at random so blocks made
+  // in two different browsers almost never land on the same one.
+  const LEGACY_SLOTS = "acijquvxyz"; // the first version handed out these letters
+  const PUA_FIRST = 0xe000;
+  const PUA_COUNT = 6400;
+  const MAX_CUSTOM = 200; // a guard against filling the browser's storage, not a design limit
+  const CUSTOM = {}; // character -> { name, base, shipped }
+
+  const isMine = (k) => {
+    if (typeof k !== "string" || k.length !== 1) return false;
+    const c = k.charCodeAt(0);
+    return LEGACY_SLOTS.includes(k) || (c >= PUA_FIRST && c < PUA_FIRST + PUA_COUNT);
+  };
+
+  const cleanName = (n) => (typeof n === "string" ? n.trim().slice(0, 20) : "");
+  const cleanBase = (b) => (typeof b === "string" && b in ORIGINALS && !isMine(b) ? b : "s");
+
+  const baseOf = (k) => (CUSTOM[k] ? CUSTOM[k].base : null);
+
+  const customBlocks = () =>
+    Object.keys(CUSTOM).map((k) => ({ key: k, label: CUSTOM[k].name, base: CUSTOM[k].base, shipped: CUSTOM[k].shipped }));
+
+  // from: the sprite to start from (which also decides what the new block
+  // acts like), or "blank" for a plain grey solid block
+  const addBlock = (name, from) => {
+    if (Object.values(CUSTOM).filter((c) => !c.shipped).length >= MAX_CUSTOM) return null;
+    const look = from === "blank"
+      ? { w: S, h: S, px: Array(S * S).fill("#8a8a8a") }
+      : getPixels(from);
+    if (!look) return null;
+    let key;
+    do key = String.fromCharCode(PUA_FIRST + Math.floor(Math.random() * PUA_COUNT));
+    while (key in CUSTOM);
+    look.name = cleanName(name) || "My block";
+    look.base = from === "blank" ? "s" : CUSTOM[from] ? CUSTOM[from].base : from;
+    return applyPack({ [key]: look }, true).length ? key : null;
+  };
+
+  // Blocks that ship with the game can't be deleted: shipped levels use them.
+  const removeBlock = (key) => {
+    if (!(key in CUSTOM) || CUSTOM[key].shipped) return;
+    delete CUSTOM[key];
+    delete SPRITES[key];
+    const store = readStore();
+    delete store[key];
+    writeStore(store);
+  };
+
   // Apply a whole set of repainted sprites at once. Unknown keys and malformed
   // entries are skipped, so a hand-edited art file can never break the game.
   const applyPack = (pack, persist) => {
     const good = {};
     for (const [key, data] of Object.entries(pack || {})) {
-      if (!(key in ORIGINALS)) continue;
+      const mine = isMine(key);
+      if (!mine && !(key in ORIGINALS)) continue;
       const clean = cleanPixels(data);
       if (!clean) continue;
+      if (mine) {
+        const was = CUSTOM[key];
+        // a repaint of a shipped block keeps the shipped name and behaviour
+        const name = was && was.shipped ? was.name : cleanName(data.name) || (was && was.name) || "My block";
+        const base = was && (was.shipped || data.base === undefined) ? was.base : cleanBase(data.base);
+        CUSTOM[key] = { name, base, shipped: !!(was && was.shipped) };
+        clean.name = name;
+        clean.base = base;
+      }
       SPRITES[key] = bake(clean);
       good[key] = clean;
     }
@@ -1111,7 +1178,11 @@ window.BDArt = (() => {
 
   const resetAllSprites = () => {
     Object.assign(SPRITES, ORIGINALS);
-    writeStore({});
+    // "Reset art" means repaints; blocks the player invented are theirs to delete
+    const store = readStore();
+    const kept = {};
+    for (const k of Object.keys(CUSTOM)) if (store[k] && !CUSTOM[k].shipped) kept[k] = store[k];
+    writeStore(kept);
     syncHidden();
   };
 
@@ -1124,6 +1195,7 @@ window.BDArt = (() => {
   // rather than to whatever the code drew before the pack existed.
   applyPack(window.BDArtPack || {}, false);
   Object.assign(ORIGINALS, SPRITES);
+  for (const k of Object.keys(CUSTOM)) CUSTOM[k].shipped = true;
   applyPack(readStore(), false);
 
   const blit = (ctx, sprite, x, y, w, h) => {
@@ -1133,9 +1205,11 @@ window.BDArt = (() => {
   };
 
   // covered = something solid sits directly above, so grass shows as plain dirt
-  const drawTile = (ctx, ch, x, y, size, time, covered) => {
-    if (ch === "g" && covered) return blit(ctx, SPRITES.dirt, x, y, size, size);
-    const sp = SPRITES[ch];
+  const drawTile = (ctx, key, x, y, size, time, covered) => {
+    if (key === "g" && covered) return blit(ctx, SPRITES.dirt, x, y, size, size);
+    // one of the player's own blocks wobbles, bobs or glows like the block it acts as
+    const ch = CUSTOM[key] ? CUSTOM[key].base : key;
+    const sp = SPRITES[key] || (isMine(key) ? SPRITES.s : null);
     if (!sp) return;
     const sw = sp.width || sp.naturalWidth, sh = sp.height || sp.naturalHeight;
     if (sh > sw) {
@@ -1189,12 +1263,13 @@ window.BDArt = (() => {
     blit(ctx, sp, x, y, size, size);
   };
 
-  const drawPlayer = (ctx, x, y, w, h, rot) => {
+  // look: one of the player's own player looks, if the level picked one
+  const drawPlayer = (ctx, x, y, w, h, rot, look) => {
     ctx.save();
     ctx.translate(x + w / 2, y + h / 2);
     ctx.rotate(rot);
     ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(SPRITES.player, -w / 2, -h / 2, w, h);
+    ctx.drawImage(SPRITES[look] || SPRITES.player, -w / 2, -h / 2, w, h);
     ctx.restore();
   };
 
@@ -1452,5 +1527,11 @@ window.BDArt = (() => {
     resetAllSprites,
     customArt,
     isCustom,
+    isMine,
+    baseOf,
+    MAX_CUSTOM,
+    customBlocks,
+    addBlock,
+    removeBlock,
   };
 })();

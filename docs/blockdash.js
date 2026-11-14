@@ -59,8 +59,22 @@
     P: { name: "Start" },
   };
 
+  // The player's own blocks (made in the Art Studio) are extra looks for the
+  // blocks above. Everywhere the rules care what a square is, they ask baseOf.
+  // One this browser has no art for, or made from something that can't be
+  // placed, acts as stone.
+  const isMine = window.BDArt.isMine;
+  const baseOf = (ch) => {
+    if (!isMine(ch)) return ch;
+    const b = window.BDArt.baseOf(ch);
+    return b && TILES[b] && !TILES[b].over ? b : "s";
+  };
+  const tileOf = (ch) => TILES[baseOf(ch)];
+  const typeName = (base) => (base === "player" ? "Player" : TILES[base] && !isMine(base) ? TILES[base].name : "Stone");
+  const MINE = "*"; // the one palette button that stands for all of them
+
   const PALETTE = ["g", "s", "p", "n", "k", "e", "m", "t", "T", "h", "A", "L", "U", "D", "F", "S", "Z",
-    "W", "Y", "V", "Q", "N", "I", "C", "d", "r", "o", "b", "w", "f", "K", "O", "M", "E", "G", "J", "B", "P", ERASER];
+    "W", "Y", "V", "Q", "N", "I", "C", "d", "r", "o", "b", "w", "f", "K", "O", "M", "E", "G", "J", "B", MINE, "P", ERASER];
 
   // The boss arena is drawn in the same editor as the level, with a slightly
   // different set of blocks: no portals, save points or note-carrying blocks
@@ -68,12 +82,12 @@
   const LEVEL_ONLY = "KOMGEC";
   const ARENA_ONLY = "J";
 
-  const isSolid = (ch) => !!(TILES[ch] && TILES[ch].solid);
+  const isSolid = (ch) => !!(tileOf(ch) && tileOf(ch).solid);
   const overOf = (ch) => TILES[ch] && TILES[ch].over;
   const isHiddenTnt = (ch) => ch === "h" || !!overOf(ch);
   const TRAP_OVER = { d: "1", b: "2", w: "3", B: "4", f: "5", r: "6", o: "7" };
-  const isMob = (ch) => !!(TILES[ch] && TILES[ch].mob);
-  const isHidden = (ch) => ch === "h" || !!(TILES[ch] && TILES[ch].hidden);
+  const isMob = (ch) => !!(tileOf(ch) && tileOf(ch).mob);
+  const isHidden = (ch) => baseOf(ch) === "h" || !!(tileOf(ch) && tileOf(ch).hidden);
 
   // physics, in blocks and seconds
   const GRAVITY = 62;
@@ -211,7 +225,7 @@
       const row = rows[y] || "";
       return Array.from({ length: width }, (_, x) => {
         const ch = row[x];
-        return ch && (TILES[ch] || ch === AIR) ? ch : AIR;
+        return ch && (TILES[ch] || ch === AIR || isMine(ch)) ? ch : AIR;
       });
     });
   };
@@ -237,7 +251,7 @@
     const width = g[0].length;
     for (let y = 0; y < H; y++) {
       for (let x = 0; x < width; x++) {
-        if (g[y][x] === "P") return { x, y };
+        if (baseOf(g[y][x]) === "P") return { x, y };
       }
     }
     // no start block placed — drop in above the first floor we can find
@@ -288,7 +302,7 @@
 
   const countDiamonds = (g) => {
     let n = 0;
-    for (const row of g) for (const ch of row) if (ch === "d") n++;
+    for (const row of g) for (const ch of row) if (baseOf(ch) === "d") n++;
     return n;
   };
 
@@ -308,7 +322,7 @@
     if (!notes || typeof notes !== "object") return out;
     for (const [k, v] of Object.entries(notes)) {
       const [x, y] = k.split(",").map(Number);
-      const ch = rows[y] && rows[y][x];
+      const ch = baseOf(rows[y] && rows[y][x]);
       if (ch === "K" && typeof v === "string" && v.trim()) out[k] = v.slice(0, 200);
       else if (ch === "O" && +v > 0) out[k] = clamp(+v, 0.5, 30);
     }
@@ -325,6 +339,8 @@
     if (Object.keys(notes).length) o.notes = notes;
     if (Array.isArray(l.arena) && l.arena.length) o.arena = l.arena;
     if (arenaBgOf(l) !== bgOf(l)) o.arenaBg = l.arenaBg;
+    // kept even when this browser has no art for it; it just plays as the usual player
+    if (isMine(l.hero)) o.hero = l.hero;
     return o;
   };
 
@@ -340,6 +356,7 @@
       rows: clean,
       bg: bgOf(o),
       ...(arenaBgOf(o) !== bgOf(o) ? { arenaBg: o.arenaBg } : {}),
+      ...(isMine(o.hero) ? { hero: o.hero } : {}),
       notes: cleanNotes(clean, o.notes),
       // only levels whose arena was drawn by hand carry one
       ...(Array.isArray(o.arena) && o.arena.length ? { arena: gridToRows(arenaGrid(o.arena)) } : {}),
@@ -398,7 +415,7 @@
   // ---------- share codes ----------
 
   const encodeLevel = (lvl) => {
-    const json = JSON.stringify({ n: lvl.name, r: lvl.rows, b: bgOf(lvl), x: cleanNotes(lvl.rows, lvl.notes), a: lvl.arena, ab: lvl.arenaBg });
+    const json = JSON.stringify({ n: lvl.name, r: lvl.rows, b: bgOf(lvl), x: cleanNotes(lvl.rows, lvl.notes), a: lvl.arena, ab: lvl.arenaBg, h: lvl.hero });
     const bytes = new TextEncoder().encode(json);
     let s = "";
     for (const b of bytes) s += String.fromCharCode(b);
@@ -410,7 +427,7 @@
     const bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0));
     const o = JSON.parse(new TextDecoder().decode(bytes));
     if (!o || !Array.isArray(o.r) || !o.r.length) throw new Error("bad code");
-    return { name: String(o.n || "Imported level"), rows: o.r.map(String), bg: o.b, notes: o.x, arena: o.a, arenaBg: o.ab };
+    return { name: String(o.n || "Imported level"), rows: o.r.map(String), bg: o.b, notes: o.x, arena: o.a, arenaBg: o.ab, hero: o.h };
   };
 
   // Art codes are much bigger than level codes, so each drawing is stored as
@@ -428,10 +445,11 @@
 
   const encodeArt = async (art) => {
     const o = {};
-    for (const [key, { w, h, px }] of Object.entries(art)) {
+    for (const [key, { w, h, px, name, base }] of Object.entries(art)) {
       const pal = [...new Set(px.filter(Boolean))];
       if (pal.length >= PIX.length) continue; // more colours than letters; skip rather than break
       o[key] = [w, h, pal.map((c) => c.slice(1)).join(","), px.map((c) => (c ? PIX[pal.indexOf(c)] : ".")).join("")];
+      if (name) o[key].push(name, base); // the player's own blocks carry their name and what they act like
     }
     const bytes = new TextEncoder().encode(JSON.stringify(o));
     if (typeof CompressionStream === "undefined") return "A0:" + toB64(bytes);
@@ -445,9 +463,9 @@
     if (m[1] === "1") bytes = await pipe(bytes, new DecompressionStream("gzip"));
     const o = JSON.parse(new TextDecoder().decode(bytes));
     const art = {};
-    for (const [key, [w, h, pal, idx]] of Object.entries(o)) {
+    for (const [key, [w, h, pal, idx, name, base]] of Object.entries(o)) {
       const colors = String(pal).split(",").map((c) => "#" + c);
-      art[key] = { w, h, px: [...String(idx)].map((ch) => (ch === "." ? null : colors[PIX.indexOf(ch)] || null)) };
+      art[key] = { w, h, name, base, px: [...String(idx)].map((ch) => (ch === "." ? null : colors[PIX.indexOf(ch)] || null)) };
     }
     return art;
   };
@@ -530,7 +548,7 @@
         const play = el("button", "green small", i ? "▶ Play" : "▶ Start");
         play.onclick = () => playSeries(builtin, i, 0, () => showMenu());
         const copy = el("button", "small", "✏ Copy & edit");
-        copy.onclick = () => showEditor({ name: lvl.name + " copy", rows: lvl.rows, bg: lvl.bg, notes: lvl.notes, arena: lvl.arena, arenaBg: lvl.arenaBg }, -1);
+        copy.onclick = () => showEditor({ name: lvl.name + " copy", rows: lvl.rows, bg: lvl.bg, notes: lvl.notes, arena: lvl.arena, arenaBg: lvl.arenaBg, hero: lvl.hero }, -1);
         list.appendChild(levelCard(lvl, editMode ? [play, copy] : [play], i + 1));
       });
       bp.appendChild(list);
@@ -733,6 +751,7 @@
       ["K", "Dialog block — invisible when you play. Stops the player and shows the words you typed, until they press jump"],
       ["O", "Stop block — invisible when you play. Holds the player still for the number of seconds you set"],
       ["M", "Free move block — invisible when you play. The player stops auto-running and moves with ◀ ▶ until the next save point"],
+      ["s", "More blocks — blocks you name and paint yourself. In the Art Studio press ＋ New block and pick something to start from: your block acts just like it (a blue slime still bounces). Find them under More blocks in the Level Maker"],
       ["J", "Boss platform — for the boss arena. Only appears while the boss says CLIMB UP, so build the way to its head out of these"],
       ["E", "End portal — finish the level here"],
       ["G", "Boss portal — use it instead of the End portal. The TNT Mech boss is waiting: dodge its TNT rain, climb up and stomp its head, dodge its shooter arm. Three stomps wins"],
@@ -820,7 +839,8 @@
         rows.push("      " + s.px.slice(y * s.w, (y + 1) * s.w)
           .map((p) => JSON.stringify(p === undefined ? null : p)).join(","));
       }
-      return `  ${JSON.stringify(key)}: {\n    "w": ${s.w},\n    "h": ${s.h},\n` +
+      const nm = s.name ? `    "name": ${JSON.stringify(s.name)},\n    "base": ${JSON.stringify(s.base)},\n` : "";
+      return `  ${JSON.stringify(key)}: {\n${nm}    "w": ${s.w},\n    "h": ${s.h},\n` +
         `    "px": [\n${rows.join(",\n")}\n    ]\n  }`;
     });
     return `{\n${parts.join(",\n")}\n}`;
@@ -854,10 +874,15 @@
     return c;
   };
 
-  const showArtStudio = (startKey) => {
+  // onBack: where "back" goes, when the studio was opened from the Level Maker
+  const showArtStudio = (startKey, onBack) => {
     clear();
 
-    const info = Art.SPRITE_INFO;
+    const mine = Art.customBlocks();
+    const mineBy = Object.fromEntries(mine.map((b) => [b.key, b]));
+    const madeHere = mine.filter((b) => !b.shipped).length;
+    const info = Art.SPRITE_INFO.concat(mine);
+    const reopen = (k) => showArtStudio(k, onBack);
     let key = info.some((s) => s.key === startKey) ? startKey : info[0].key;
     let img = Art.getPixels(key);
     let color = "#e5401f";
@@ -867,8 +892,8 @@
     const header = el("div", "row");
     header.appendChild(el("h1", null, "Art Studio"));
     header.appendChild(el("div", "spacer"));
-    const backBtn = el("button", "small", "← Levels");
-    backBtn.onclick = showMenu;
+    const backBtn = el("button", "small", onBack ? "← Back to my level" : "← Levels");
+    backBtn.onclick = onBack || showMenu;
     header.appendChild(backBtn);
     root.appendChild(header);
     root.appendChild(el("p", "sub",
@@ -891,6 +916,81 @@
       pickGrid.appendChild(item);
     });
     pickPanel.appendChild(pickGrid);
+
+    // ---- inventing a new block ----
+    const newRow = el("div", "row");
+    newRow.style.marginTop = "8px";
+    const newBtn = el("button", "green small", "＋ New block");
+    newRow.append(newBtn, el("span", "hint",
+      madeHere >= Art.MAX_CUSTOM
+        ? `You've made ${Art.MAX_CUSTOM} blocks of your own, which is the most there's room for. Delete one to make another.`
+        : "Make your own block: name it, pick something to start from, then paint it. It acts just like " +
+          "the thing you started from. Find it under <b>More blocks</b> in the Level Maker."));
+    pickPanel.appendChild(newRow);
+
+    const newForm = el("div");
+    newForm.style.display = "none";
+    newForm.style.marginTop = "8px";
+    const newName = el("input");
+    newName.type = "text";
+    newName.maxLength = 20;
+    newName.placeholder = "Name your block";
+    const nameRow2 = el("div", "row");
+    nameRow2.append(el("span", "hint", "1. Name:"), newName);
+    newForm.appendChild(nameRow2);
+    const lookHint = el("p", "hint", "2. Pick what to start from. Your block will look like it to begin with, and act like it for good:");
+    lookHint.style.margin = "8px 0 4px";
+    newForm.appendChild(lookHint);
+    const lookGrid = el("div", "palette");
+    let from = "s";
+    const lookItems = {};
+    const actsLike = el("p", "hint", "");
+    actsLike.style.margin = "8px 0 0";
+    const showActs = () => {
+      const base = from === "blank" ? "s" : mineBy[from] ? mineBy[from].base : from;
+      actsLike.innerHTML = base === "player"
+        ? "It will be a new <b>player look</b>. Pick it with Player look in the Level Maker."
+        : `It will act like <b>${typeName(base)}</b>.`;
+    };
+    Art.SPRITE_INFO.filter((s) => s.key === "player" || s.key === "dirt" || (TILES[s.key] && !TILES[s.key].over))
+      .map((s) => [s.key, s.label])
+      .concat(mine.map((b) => [b.key, b.label]), [["blank", "Blank"]])
+      .forEach(([k, label]) => {
+        const item = el("div", "pal-item" + (k === from ? " sel" : ""));
+        let thumb = spriteThumb(k, 32, 32);
+        if (k === "blank") {
+          thumb.getContext("2d").fillStyle = "#8a8a8a";
+          thumb.getContext("2d").fillRect(0, 0, 32, 32);
+        }
+        item.append(thumb, el("div", "lbl", label));
+        item.onclick = () => {
+          from = k;
+          Object.entries(lookItems).forEach(([lk, n]) => n.classList.toggle("sel", lk === k));
+          showActs();
+        };
+        lookItems[k] = item;
+        lookGrid.appendChild(item);
+      });
+    newForm.appendChild(lookGrid);
+    newForm.appendChild(actsLike);
+    showActs();
+    const makeRow = el("div", "row");
+    makeRow.style.marginTop = "8px";
+    const makeBlockBtn = el("button", "green small", "3. Make it!");
+    makeBlockBtn.onclick = () => {
+      if (!newName.value.trim()) { toast("Give it a name first"); newName.focus(); return; }
+      const made = Art.addBlock(newName.value, from);
+      if (!made) { toast("Couldn't make the block"); return; }
+      reopen(made);
+      toast("Made! Now paint it");
+    };
+    const cancelBtn = el("button", "small", "Cancel");
+    cancelBtn.onclick = () => { newForm.style.display = "none"; };
+    makeRow.append(makeBlockBtn, cancelBtn);
+    newForm.appendChild(makeRow);
+    pickPanel.appendChild(newForm);
+    newBtn.disabled = madeHere >= Art.MAX_CUSTOM;
+    newBtn.onclick = () => { newForm.style.display = ""; newName.focus(); };
     root.appendChild(pickPanel);
 
     const refreshThumbs = () => {
@@ -898,7 +998,7 @@
         const { item, holder, lbl, label } = pickItems[k];
         holder.innerHTML = "";
         holder.appendChild(spriteThumb(k, 32, 32));
-        lbl.textContent = Art.isCustom(k) ? label + " ✎" : label;
+        lbl.textContent = Art.isCustom(k) && !isMine(k) ? label + " ✎" : label;
         item.classList.toggle("sel", k === key);
       });
     };
@@ -941,6 +1041,16 @@
       commit();
     };
     const resetBtn = el("button", "small", "↺ Original");
+    // A block made in this browser has no original to go back to; it can be deleted instead.
+    // One that ships with the game works like any built-in block: repaint or reset, never delete.
+    const deleteBtn = el("button", "danger small", "🗑 Delete this block");
+    deleteBtn.onclick = () => {
+      if (!confirm(`Delete your block "${pickItems[key].label}"? ` +
+        "Levels that use it will show plain stone there instead.")) return;
+      Art.removeBlock(key);
+      reopen();
+      toast("Block deleted");
+    };
     resetBtn.onclick = () => {
       if (!confirm(`Put ${pickItems[key].label} back the way it was?`)) return;
       Art.resetSprite(key);
@@ -951,7 +1061,7 @@
       renderPreview();
       toast("Back to the original");
     };
-    tools.append(undoBtn, resetBtn);
+    tools.append(undoBtn, resetBtn, deleteBtn);
     gridPanel.appendChild(tools);
     gridPanel.appendChild(el("p", "hint",
       "Tap or drag on the big grid to paint. <b>🪣 Fill</b> floods everything the " +
@@ -1054,11 +1164,7 @@
       try {
         const loaded = Art.applyPack(parseArtFile(await f.text()), true);
         if (!loaded.length) { toast("No art in that file"); return; }
-        undoStack = [];
-        img = Art.getPixels(key);
-        render();
-        refreshThumbs();
-        renderPreview();
+        reopen(key);
         toast(`Loaded ${loaded.length} sprite${loaded.length === 1 ? "" : "s"}`);
       } catch (e) {
         toast("Couldn't read that file");
@@ -1069,7 +1175,7 @@
 
     const resetAllBtn = el("button", "danger small", "Reset ALL art");
     resetAllBtn.onclick = () => {
-      if (!confirm("Throw away every painting and go back to the original art?")) return;
+      if (!confirm("Throw away every painting and go back to the original art? (Blocks you made yourself stay.)")) return;
       Art.resetAllSprites();
       undoStack = [];
       img = Art.getPixels(key);
@@ -1112,12 +1218,7 @@
       try {
         const loaded = Art.applyPack(await decodeArt(codeTa.value), true);
         if (!loaded.length) { toast("No art in that code"); return; }
-        undoStack = [];
-        img = Art.getPixels(key);
-        render();
-        refreshThumbs();
-        renderPreview();
-        codeTa.value = "";
+        reopen(key);
         toast(`Loaded ${loaded.length} drawing${loaded.length === 1 ? "" : "s"}`);
       } catch (e) {
         toast("That code didn't work");
@@ -1279,7 +1380,11 @@
       key = k;
       img = Art.getPixels(key);
       undoStack = [];
-      title.textContent = `${pickItems[k].label} — ${img.w} × ${img.h}`;
+      const own = mineBy[k];
+      title.textContent = `${pickItems[k].label} — ${img.w} × ${img.h}` +
+        (own ? (own.base === "player" ? " — a player look" : ` — acts like ${typeName(own.base)}`) : "");
+      resetBtn.style.display = own && !own.shipped ? "none" : "";
+      deleteBtn.style.display = own && !own.shipped ? "" : "none";
       render();
       refreshThumbs();
       renderPreview();
@@ -1317,6 +1422,7 @@
     // null = "same as the level", so changing the level's background carries
     // over until the arena is given one of its own
     let arenaBg = existing && arenaBgOf(existing) !== bg ? existing.arenaBg : null;
+    let hero = existing && isMine(existing.hero) ? existing.hero : null;
     const shownBg = () => (editing === "arena" ? arenaBg || bg : bg);
     let other = arenaGrid(existing && existing.arena, arenaBg || bg);
     let arenaDrawn = !!(existing && existing.arena); // until it's opened, the level uses the default arena
@@ -1353,7 +1459,7 @@
     const autosave = () => {
       const all = loadLevels();
       const lvl = levelData({ name: (name || "").trim() || "Untitled", rows: gridToRows(levelG()), bg, notes,
-        arena: arenaRows(), arenaBg });
+        arena: arenaRows(), arenaBg, hero });
       if (slot >= 0 && slot < all.length) all[slot] = lvl;
       else { all.push(lvl); slot = all.length - 1; }
       savedLabel.textContent = saveLevels(all) ? "✓ Saved" : "⚠ Not saved";
@@ -1362,7 +1468,7 @@
     const testBtn = el("button", "", "▶ Test");
     testBtn.onclick = () => {
       const lvl = { name: (nameInput.value || "Untitled").trim(), rows: gridToRows(levelG()), bg,
-        notes: cleanNotes(levelG(), notes), arena: arenaRows(), arenaBg };
+        notes: cleanNotes(levelG(), notes), arena: arenaRows(), arenaBg, hero };
       showPlay(lvl, () => showEditor(lvl, slot), true);
     };
     nameRow.append(nameInput, testBtn, savedLabel);
@@ -1387,6 +1493,29 @@
       bgBtns.forEach((x, i) => x.classList.toggle("green", Art.BACKGROUNDS[i].key === shownBg()));
     bgRow.append(...bgBtns);
     namePanel.appendChild(bgRow);
+
+    // which player this level uses: the usual one, or a look made in the Art Studio
+    const heroRow = el("div", "row");
+    heroRow.style.marginTop = "8px";
+    heroRow.appendChild(el("span", "hint", "Player look:"));
+    const heroItems = [[null, "Usual"]]
+      .concat(Art.customBlocks().filter((b) => b.base === "player").map((b) => [b.key, b.label]))
+      .map(([k, label]) => {
+        const item = el("div", "pal-item");
+        item.style.minWidth = "62px";
+        item.append(spriteThumb(k || "player", 32, 32), el("div", "lbl", label));
+        item.onclick = () => { hero = k; showHero(); autosave(); };
+        heroRow.appendChild(item);
+        return [k, item];
+      });
+    const showHero = () => heroItems.forEach(([k, item]) => item.classList.toggle("sel", k === hero));
+    // a look this browser has no art for stays saved on the level, but shows as the usual player
+    if (!heroItems.some(([k]) => k === hero)) heroItems[0][1].classList.add("sel");
+    else showHero();
+    const heroNew = el("button", "small", "🎨 New look");
+    heroNew.onclick = () => toStudio(hero || "player");
+    heroRow.appendChild(heroNew);
+    namePanel.appendChild(heroRow);
 
     // level <-> boss arena
     const editRow = el("div", "row");
@@ -1420,25 +1549,84 @@
     palPanel.appendChild(el("h2", null, "Blocks"));
     const pal = el("div", "palette");
     const palItems = {};
+    // The player's own blocks share one palette button, so the palette stays
+    // the same size however many they make; a tray under it picks which one.
+    const hiddenNow = () => (editing === "arena" ? LEVEL_ONLY : ARENA_ONLY);
+    // player looks aren't blocks; they're picked with Player look above
+    const myBlocks = Art.customBlocks().filter((b) => b.base !== "player")
+      .map((b) => ({ key: b.key, label: b.label, base: baseOf(b.key) }));
+    let myLast = myBlocks.length ? myBlocks[0].key : null;
+    let trayOpen = false;
+    const tray = el("div", "palette");
+    tray.style.marginTop = "8px";
+    tray.style.paddingTop = "8px";
+    tray.style.borderTop = "3px solid #2a2a35";
+    const toStudio = (k) => {
+      // every change is already saved, so it's safe to leave and come back
+      const s = slot;
+      showArtStudio(k, () => (s >= 0 ? showEditor(loadLevels()[s], s) : showEditor(null, -1)));
+    };
+    const drawMine = () => {
+      const cx = palItems[MINE].firstChild.getContext("2d");
+      cx.clearRect(0, 0, 32, 32);
+      if (myLast) drawTile(cx, myLast, 0, 0, 32, 0, false);
+      else {
+        cx.fillStyle = "#8a8a8a";
+        cx.font = "bold 26px sans-serif";
+        cx.textAlign = "center";
+        cx.fillText("+", 16, 25);
+      }
+    };
+    const showTray = () => {
+      tray.innerHTML = "";
+      tray.style.display = trayOpen ? "" : "none";
+      if (!trayOpen) return;
+      myBlocks.forEach(({ key: k, label, base }) => {
+        if (hiddenNow().includes(base)) return;
+        const item = el("div", "pal-item" + (k === sel ? " sel" : ""));
+        // the small print says what it acts like, so a bouncy block and a solid one can't be mixed up
+        const kind = el("div", "lbl", typeName(base));
+        kind.style.opacity = "0.6";
+        item.append(spriteThumb(k, 32, 32), el("div", "lbl", label), kind);
+        item.onclick = () => { sel = k; myLast = k; drawMine(); showTray(); showOpts(); };
+        tray.appendChild(item);
+      });
+      const add = el("div", "pal-item");
+      const plus = el("div", null, myBlocks.length ? "🎨" : "＋");
+      plus.style.cssText = "height:32px;line-height:32px;font-size:22px;margin-bottom:3px";
+      add.append(plus, el("div", "lbl", myBlocks.length ? "New / paint" : "Make a block"));
+      add.title = "Make your own block in the Art Studio, or repaint the one picked here";
+      add.onclick = () => toStudio(isMine(sel) ? sel : undefined);
+      tray.appendChild(add);
+    };
     PALETTE.forEach((ch) => {
       const item = el("div", "pal-item" + (ch === sel ? " sel" : ""));
       const c = el("canvas");
       c.width = c.height = 32;
       const cx = c.getContext("2d");
       if (ch === ERASER) drawEraser(cx, 0, 0, 32);
-      else drawTile(cx, ch, 0, 0, 32, 0, false);
+      else if (ch !== MINE) drawTile(cx, ch, 0, 0, 32, 0, false);
       item.appendChild(c);
-      item.appendChild(el("div", "lbl", ch === ERASER ? "Erase" : TILES[ch].name));
+      item.appendChild(el("div", "lbl", ch === ERASER ? "Erase" : ch === MINE ? "More blocks ▾" : TILES[ch].name));
       item.onclick = () => {
-        sel = ch;
-        Object.values(palItems).forEach((n) => n.classList.remove("sel"));
-        item.classList.add("sel");
+        // with no blocks made yet there is nothing to draw with: keep the old block picked
+        if (ch !== MINE) sel = ch;
+        else if (myLast) sel = myLast;
+        trayOpen = ch === MINE;
+        if (ch !== MINE || myLast) {
+          Object.values(palItems).forEach((n) => n.classList.remove("sel"));
+          item.classList.add("sel");
+        }
+        showTray();
         showOpts();
       };
       palItems[ch] = item;
       pal.appendChild(item);
     });
+    drawMine();
     palPanel.appendChild(pal);
+    palPanel.appendChild(tray);
+    showTray();
 
     // settings for the blocks that carry one: Stop (seconds) and Dialog (words)
     const optRow = el("div", "row");
@@ -1459,11 +1647,12 @@
     dialogInput.oninput = () => { dialogText = dialogInput.value; };
     const showOpts = () => {
       optRow.innerHTML = "";
-      optRow.style.display = sel === "O" || sel === "K" ? "" : "none";
-      if (sel === "O") {
+      const kind = baseOf(sel);
+      optRow.style.display = kind === "O" || kind === "K" ? "" : "none";
+      if (kind === "O") {
         optRow.append(el("span", "hint", "Stop for"), stopInput,
           el("span", "hint", "seconds. Set this, then tap the grid. Tap a Stop block again to change it."));
-      } else if (sel === "K") {
+      } else if (kind === "K") {
         optRow.append(el("span", "hint", "Says:"), dialogInput,
           el("span", "hint", "Type, then tap the grid."));
       }
@@ -1473,9 +1662,10 @@
 
     // show only the blocks that make sense for what's being edited
     const refreshPalette = () => {
-      const hide = editing === "arena" ? LEVEL_ONLY : ARENA_ONLY;
+      const hide = hiddenNow();
       for (const [ch, item] of Object.entries(palItems)) item.style.display = hide.includes(ch) ? "none" : "";
-      if (hide.includes(sel)) palItems.g.onclick();
+      if (hide.includes(baseOf(sel))) palItems.g.onclick();
+      else showTray();
       editHint.textContent = editing === "arena"
         ? "This is where the boss fight happens (reached through a Boss portal). The faded boss shows where it stands. " +
           "Boss platforms only appear during CLIMB UP; everything else is always there. " +
@@ -1581,13 +1771,14 @@
       if (ch === "h" && overOf(cur)) return false;
       if (ch === "h" && TRAP_OVER[cur]) ch = TRAP_OVER[cur];
       else if (TRAP_OVER[ch] && isHiddenTnt(cur)) ch = TRAP_OVER[ch];
-      const want = ch === "O" ? stopSecs : ch === "K" ? (dialogText.trim() || "Hello!") : undefined;
+      const kind = baseOf(ch);
+      const want = kind === "O" ? stopSecs : kind === "K" ? (dialogText.trim() || "Hello!") : undefined;
       // re-tapping a Stop or Dialog block with a new setting updates it
       if (cur === ch && (want === undefined || notes[noteKey(cx, cy)] === want)) return false;
       if (want !== undefined) notes[noteKey(cx, cy)] = want;
-      if (ch === "P") {
+      if (kind === "P") {
         for (let y = 0; y < H; y++) {
-          for (let x = 0; x < w; x++) if (grid[y][x] === "P") grid[y][x] = AIR;
+          for (let x = 0; x < w; x++) if (baseOf(grid[y][x]) === "P") grid[y][x] = AIR;
         }
       }
       grid[cy][cx] = ch;
@@ -1687,7 +1878,7 @@
         }
       }
       for (let y = 0; y < H; y++) {
-        for (let x = 0; x < w; x++) if (grid[y][x] === "W" || grid[y][x] === "Y") drawCone(ctx, grid, x, y, TS, 0, true);
+        for (let x = 0; x < w; x++) if ("WY".includes(baseOf(grid[y][x]))) drawCone(ctx, grid, x, y, TS, 0, true);
       }
 
       if (editing === "arena") {
@@ -1705,7 +1896,7 @@
       ctx.fillStyle = "#ffffff";
       for (let y = 0; y < H; y++) {
         for (let x = 0; x < w; x++) {
-          const ch = grid[y][x];
+          const ch = baseOf(grid[y][x]);
           if (ch !== "O" && ch !== "K") continue;
           const n = notes[noteKey(x, y)];
           let label = ch === "O" ? (n || STOP_DEFAULT) + "s" : String(n || "…");
@@ -1767,11 +1958,24 @@
 
     // These three describe the level being played. A Boss portal swaps them
     // for the boss arena; `home` is how a full restart gets the level back.
-    let template = rowsToGrid(level.rows);
+    // The rules only ever see built-in blocks: each of the player's own blocks
+    // is swapped for the block it acts like, and `looks` remembers which
+    // squares should be drawn with the player's picture instead.
+    const strip = (g) => {
+      const lk = {};
+      const out = g.map((row, y) => row.map((ch, x) => {
+        if (!isMine(ch)) return ch;
+        lk[noteKey(x, y)] = ch;
+        return baseOf(ch);
+      }));
+      return [out, lk];
+    };
+    let [template, looks] = strip(rowsToGrid(level.rows));
+    const hero = Art.baseOf(level.hero) === "player" ? level.hero : null;
     const notes = cleanNotes(level.rows, level.notes);
     let width = template[0].length;
     let spawn = findSpawn(template);
-    const home = { template, width, spawn };
+    const home = { template, width, spawn, looks };
 
     const header = el("div", "row");
     header.appendChild(el("h1", null, level.name || "Level"));
@@ -1857,7 +2061,7 @@
         checkpoint = null;
         inBoss = false;
         introSeen = false;
-        ({ template, width, spawn } = home);
+        ({ template, width, spawn, looks } = home);
       }
       const at = checkpoint || spawn;
       grid = (checkpoint ? checkpoint.grid : template).map((r) => r.slice());
@@ -1891,7 +2095,7 @@
           // creatures live outside the grid while you play; they restart on every respawn
           if (isMob(ch)) {
             grid[y][x] = AIR;
-            mobs.push({ kind: ch, x: x + (1 - MOB_W) / 2, y: y + 1 - MOB_H, vy: 0,
+            mobs.push({ kind: ch, look: looks[noteKey(x, y)], x: x + (1 - MOB_W) / 2, y: y + 1 - MOB_H, vy: 0,
               awake: false, glitchT: GLITCH_EVERY, onGround: false });
           }
         }
@@ -1936,7 +2140,7 @@
     // Walking into a Boss portal swaps the level for a one-screen arena. The
     // arena is set up as a save point, so dying restarts the fight, not the level.
     const enterBoss = () => {
-      template = arenaGrid(level.arena, arenaBgOf(level));
+      [template, looks] = strip(arenaGrid(level.arena, arenaBgOf(level)));
       width = ARENA_W;
       spawn = findSpawn(template);
       checkpoint = { x: spawn.x, y: spawn.y, score, rods, eyes, grid: template.map((r) => r.slice()) };
@@ -2725,7 +2929,7 @@
       hurtCv.width = Math.ceil(pw);
       hurtCv.height = Math.ceil(ph);
       const h = hurtCv.getContext("2d");
-      drawPlayer(h, 0, 0, hurtCv.width, hurtCv.height, 0);
+      drawPlayer(h, 0, 0, hurtCv.width, hurtCv.height, 0, hero);
       h.globalCompositeOperation = "source-atop";
       h.fillStyle = "rgba(255, 40, 40, 0.55)";
       h.fillRect(0, 0, hurtCv.width, hurtCv.height);
@@ -2847,6 +3051,9 @@
           if (ch !== AIR && ch !== "P" && !isHidden(ch)) {
             let key = ch === FLOWED ? "L" : overOf(ch) || ch;
             if (ch === "W" && !eyeOpen({ x, ph: (x * 0.37) % WATCH_CYCLE })) key = "watcherClosed";
+            // still the block it started as (not blown up, switched on or grown over)? use its own look
+            const own = looks[noteKey(x, y)];
+            if (own && key === ch && baseOf(own) === ch) key = own;
             drawTile(ctx, key, (x - camX) * TS, y * TS, TS, time,
               y > 0 && isSolid(grid[y - 1][x]));
           }
@@ -2883,7 +3090,7 @@
       for (const m of mobs) {
         // a corrupted watcher flickers sideways now and then
         const jit = m.kind === "Q" && Math.sin(time * 37 + m.x) > 0.8 ? TS * 0.12 : 0;
-        Art.drawSprite(ctx, m.kind, (m.x - camX) * TS - TS * 0.05 + jit, (m.y + MOB_H - 2) * TS,
+        Art.drawSprite(ctx, m.look || m.kind, (m.x - camX) * TS - TS * 0.05 + jit, (m.y + MOB_H - 2) * TS,
           TS * 0.9, TS * 2);
         if (m.awake && m.kind !== "N") {
           ctx.fillStyle = "#ff4f6b";
@@ -2933,7 +3140,7 @@
           const k = clamp(deadT / 0.7, 0, 1);
           ctx.save();
           ctx.globalAlpha = 1 - k;
-          drawPlayer(ctx, cx - pw / 2, cy - ph / 2, pw, ph, rot);
+          drawPlayer(ctx, cx - pw / 2, cy - ph / 2, pw, ph, rot, hero);
           ctx.globalAlpha = clamp((0.9 - deadT) / 0.2, 0, 1);
           const fs = TS * (1.1 + 0.5 * k);
           drawTile(ctx, "F", cx - fs / 2, (player.y + PLAYER_H) * TS - fs, fs, time, false);
@@ -2947,7 +3154,7 @@
         if (k > 0) {
           const pw = PLAYER_W * TS * k, ph = PLAYER_H * TS * k;
           drawPlayer(ctx, (player.x + PLAYER_W / 2 - camX) * TS - pw / 2,
-            (player.y + PLAYER_H / 2) * TS - ph / 2, pw, ph, rot);
+            (player.y + PLAYER_H / 2) * TS - ph / 2, pw, ph, rot, hero);
         }
       }
 
