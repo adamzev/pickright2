@@ -43,7 +43,11 @@ Block rules:
 | End watcher | Ignores you, even if you run through it, until you jump on it. Then it chases you, a little slower than you run; touching it deletes you |
 | Corrupted end watcher | Touching it deletes you even while it's asleep, so you have to jump over or onto it. Jump on it and it chases you, glitching 2 blocks forward every couple of seconds to keep pace |
 | Short-legged enderman | When you get within 7 blocks, it teleports to stand 3½ blocks in front of you. Jump on it to beat it; touching it deletes you |
-| Eye of ender | Collectible with its own 👁 counter |
+| Ender pearl | Collectible with its own 🔮 counter |
+| Eye of ender | Collectible with its own 👁 counter. Also made at a crafting table |
+| Crafting table | Run past it and every blaze rod + ender pearl pair you carry becomes an eye of ender |
+| Portal frame | Run past it and one of your eyes of ender goes in. A level with frames keeps its Boss portal shut (faded, and you run straight through) until every frame has an eye. Levels with no frames work as before |
+| Inventory | Blaze rods, ender pearls and eyes of ender carry over from level to level and between visits (shown on the menu). What you pick up is only kept when you finish the level |
 | Slime | Bounces you high — from the top or the side |
 | TNT | Instant game over |
 | Diamond | +10 points |

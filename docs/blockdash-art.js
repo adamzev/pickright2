@@ -14,9 +14,9 @@
 //   BDArt.loadSprites({ g: "art/grass.png", t: "art/tnt.png" }).then(...)
 //   BDArt.registerSprite("player", someCanvasOrImage);
 //
-// Keys: block letters g s p A K O M m t h C d b w f n k L U D F S Z r e I W T o V Q N E B P,
+// Keys: block letters g s p A K O M m t h C d b w f n k L U D F S Z r e I W T o 9 H R V Q N E B P,
 // G J, plus "boss", "dragon", "bullet", "blaze", "fireball", "watcherClosed",
-// "checkpointOn", "wingsWorn", plus "dirt", "cloud", "player",
+// "checkpointOn", "frameOn", "wingsWorn", plus "dirt", "cloud", "player",
 // "explosion1", "explosion2". Blocks should be square; the player is drawn at
 // roughly 3:4. Anything not replaced keeps the built-in pixel art.
 //
@@ -305,6 +305,55 @@ window.BDArt = (() => {
     rect(c, 7, 5, 2, 6, "#0e2a24");
     rect(c, 5, 4, 2, 1, "#c8fff0");
   });
+
+  // Ender pearl: a dark teal ball. One of these plus a blaze rod makes an eye.
+  const enderPearl = mk(S, S, (c) => {
+    spans(c, [[3, 6, 9], [4, 4, 11], [5, 3, 12], [6, 3, 12], [7, 3, 12], [8, 3, 12],
+      [9, 3, 12], [10, 4, 11], [11, 4, 11], [12, 6, 9]], "#0f3d38");
+    spans(c, [[4, 6, 9], [5, 4, 11], [6, 4, 11], [7, 4, 11], [8, 4, 11], [9, 4, 11],
+      [10, 5, 10], [11, 6, 9]], "#1c6b60");
+    spans(c, [[6, 6, 9], [7, 5, 10], [8, 5, 10], [9, 6, 9]], "#12514a");
+    rect(c, 5, 5, 2, 2, "#8ff0dc");
+    rect(c, 7, 5, 1, 1, "#4fc4ae");
+  });
+
+  const craftingTable = mk(S, S, (c) => {
+    noiseFill(c, 51, ["#8a5a2b", "#7a4e24", "#95632f"]);
+    rect(c, 0, 0, 16, 4, "#b9813f"); // the worktop
+    rect(c, 0, 4, 16, 1, "#4a2f14");
+    for (let i = 0; i < 16; i += 5) rect(c, i, 0, 1, 4, "#4a2f14"); // its 3x3 grid, seen edge-on
+    rect(c, 0, 0, 16, 1, "#d9a55c");
+    // tools hanging on the side: a saw and a hammer
+    rect(c, 2, 7, 5, 2, "#c9c9c9");
+    rect(c, 2, 9, 1, 4, "#5a3a1a");
+    rect(c, 10, 7, 4, 2, "#8c8c8c");
+    rect(c, 11, 9, 2, 5, "#5a3a1a");
+  });
+
+  // Portal frame: end stone with a green rim and an empty socket on top.
+  // The filled one has an eye of ender sitting in the socket.
+  const frameWith = (filled) => mk(S, S, (c) => {
+    rect(c, 0, 5, 16, 11, "#dcd9a0");
+    for (let y = 5; y < 16; y++) {
+      for (let x = 0; x < 16; x++) {
+        const r = nz(x, y, 57);
+        if (r < 0.25) rect(c, x, y, 1, 1, "#c9c58a");
+        else if (r > 0.85) rect(c, x, y, 1, 1, "#ebe8b8");
+      }
+    }
+    rect(c, 0, 4, 16, 3, "#2f7d63");
+    rect(c, 0, 4, 16, 1, "#4fb08e");
+    rect(c, 4, 4, 8, 3, "#123d31"); // the socket
+    if (filled) {
+      rect(c, 5, 1, 6, 5, "#1f6b5a");
+      rect(c, 6, 0, 4, 7, "#1f6b5a");
+      rect(c, 6, 1, 4, 5, "#7be0c2");
+      rect(c, 7, 1, 2, 5, "#0e2a24");
+      rect(c, 6, 1, 1, 1, "#c8fff0");
+    }
+  });
+  const portalFrame = frameWith(false);
+  const frameOn = frameWith(true);
 
   // Two blocks tall. Characters: K body, k body shade, P eye, p pupil, R arm.
   const endWatcher = paintMap([
@@ -889,6 +938,10 @@ window.BDArt = (() => {
     watcherClosed: watcherClosed,
     T: endTnt,
     o: eyeOfEnder,
+    9: enderPearl,
+    H: craftingTable,
+    R: portalFrame,
+    frameOn: frameOn,
     V: endWatcher,
     Q: corruptedWatcher,
     N: shortEnderman,
@@ -948,6 +1001,10 @@ window.BDArt = (() => {
     { key: "Y", label: "Staring watcher" },
     { key: "T", label: "End TNT" },
     { key: "o", label: "Eye of ender" },
+    { key: "9", label: "Ender pearl" },
+    { key: "H", label: "Crafting table" },
+    { key: "R", label: "Portal frame" },
+    { key: "frameOn", label: "Portal frame (with eye)" },
     { key: "V", label: "End watcher" },
     { key: "Q", label: "Corrupted end watcher" },
     { key: "N", label: "Short-legged enderman" },
@@ -1221,7 +1278,7 @@ window.BDArt = (() => {
       const wob = (Math.sin(time * 4 + x * 0.03) * 0.04 + 0.04) * size;
       return blit(ctx, sp, x, y + wob, size, size - wob);
     }
-    if (ch === "d" || ch === "r" || ch === "o") {
+    if (ch === "d" || ch === "r" || ch === "o" || ch === "9") {
       const bob = Math.sin(time * 3 + x * 0.05) * size * 0.08;
       return blit(ctx, sp, x, y + bob, size, size);
     }

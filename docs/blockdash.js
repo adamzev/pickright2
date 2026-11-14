@@ -49,6 +49,9 @@
     Y: { name: "Staring watcher", solid: true },
     T: { name: "End TNT" },
     o: { name: "Eye of ender" },
+    9: { name: "Ender pearl" },
+    H: { name: "Crafting table" },
+    R: { name: "Portal frame" },
     V: { name: "End watcher", mob: true },
     Q: { name: "Corrupted end watcher", mob: true },
     N: { name: "Short-legged enderman", mob: true },
@@ -74,12 +77,12 @@
   const MINE = "*"; // the one palette button that stands for all of them
 
   const PALETTE = ["g", "s", "p", "n", "k", "e", "m", "t", "T", "h", "A", "L", "U", "D", "F", "S", "Z",
-    "W", "Y", "V", "Q", "N", "I", "C", "d", "r", "o", "b", "w", "f", "K", "O", "M", "E", "G", "J", "B", MINE, "P", ERASER];
+    "W", "Y", "V", "Q", "N", "I", "C", "d", "r", "9", "o", "H", "R", "b", "w", "f", "K", "O", "M", "E", "G", "J", "B", MINE, "P", ERASER];
 
   // The boss arena is drawn in the same editor as the level, with a slightly
   // different set of blocks: no portals, save points or note-carrying blocks
   // in the arena, and Boss platforms only there.
-  const LEVEL_ONLY = "KOMGEC";
+  const LEVEL_ONLY = "KOMGECHR";
   const ARENA_ONLY = "J";
 
   const isSolid = (ch) => !!(tileOf(ch) && tileOf(ch).solid);
@@ -146,6 +149,7 @@
 
   const STORE_KEY = "blockdash_levels_v1";
   const BEST_KEY = "blockdash_best_v1";
+  const BAG_KEY = "blockdash_bag_v1";
 
   const root = document.getElementById("bd-root");
 
@@ -206,6 +210,19 @@
         localStorage.setItem(BEST_KEY, JSON.stringify(all));
       }
     } catch (e) { /* ignore */ }
+  };
+
+  // The bag: blaze rods, ender pearls and eyes of ender you're carrying.
+  // Unlike diamonds it is kept from level to level and between visits.
+  const loadBag = () => {
+    let b = {};
+    try { b = JSON.parse(localStorage.getItem(BAG_KEY) || "{}") || {}; } catch (e) { /* empty bag */ }
+    const n = (v) => (Number.isFinite(v) && v > 0 ? Math.floor(v) : 0);
+    return { rods: n(b.rods), pearls: n(b.pearls), eyes: n(b.eyes) };
+  };
+
+  const saveBag = (bag) => {
+    try { localStorage.setItem(BAG_KEY, JSON.stringify(bag)); } catch (e) { /* ignore */ }
   };
 
   // ---------- grid helpers ----------
@@ -511,6 +528,43 @@
     return list;
   };
 
+  // What you're carrying, and the recipe, laid out like inventory slots.
+  const bagPanel = () => {
+    const bag = loadBag();
+    const panel = el("div", "panel");
+    panel.appendChild(el("h2", null, "🎒 Inventory"));
+    const slot = (ch, count) => {
+      const d = el("div", "bag-slot");
+      const c = el("canvas");
+      c.width = c.height = 40;
+      drawTile(c.getContext("2d"), ch, 0, 0, 40, 0, false);
+      d.appendChild(c);
+      if (count !== undefined) d.appendChild(el("span", "bag-count", String(count)));
+      d.title = TILES[ch].name;
+      return d;
+    };
+    const have = el("div", "row tight");
+    have.append(slot("r", bag.rods), slot("9", bag.pearls), slot("o", bag.eyes));
+    panel.appendChild(have);
+    const recipe = el("div", "row tight bag-recipe");
+    recipe.append(slot("r"), el("span", null, "+"), slot("9"), el("span", null, "+"),
+      slot("H"), el("span", null, "="), slot("o"));
+    panel.appendChild(recipe);
+    panel.appendChild(el("p", "hint",
+      "Blaze rods, ender pearls and eyes of ender stay with you from level to level. " +
+      "Put eyes in portal frames to open the boss portal."));
+    if (editMode && (bag.rods || bag.pearls || bag.eyes)) {
+      const empty = el("button", "small", "Empty the inventory");
+      empty.onclick = () => {
+        if (!confirm("Throw away every rod, pearl and eye you're carrying?")) return;
+        saveBag({ rods: 0, pearls: 0, eyes: 0 });
+        showMenu();
+      };
+      panel.appendChild(empty);
+    }
+    return panel;
+  };
+
   const showMenu = () => {
     clear();
     const levels = loadLevels();
@@ -558,10 +612,12 @@
           "across the whole run."));
       }
       root.appendChild(bp);
+      if (!editMode) root.appendChild(bagPanel());
     }
     if (!editMode) return;
 
     // ---- levels saved in this browser ----
+    root.appendChild(bagPanel());
     const panel = el("div", "panel");
     panel.appendChild(el("h2", null, "My levels"));
 
@@ -737,7 +793,7 @@
       ["F", "Fire — burns you if you touch it"],
       ["S", "Shooter — solid block that fires stars that chase you"],
       ["Z", "Spawner — solid cage that lets out blazes. Blazes shoot fireballs; jump on one to get its blaze rod"],
-      ["r", "Blaze rod — collect them! Blazes drop one when you jump on them"],
+      ["r", "Blaze rod — collect them! Blazes drop one when you jump on them. Rods, pearls and eyes stay in your inventory from level to level"],
       ["e", "End stone — solid block for End levels"],
       ["T", "End TNT — TNT in End colours. Touch it and you explode"],
       ["I", "Blink — press jump while touching it to teleport to the next Blink ahead"],
@@ -746,7 +802,10 @@
       ["V", "End watcher — ignores you until you jump on it. Then it chases you!"],
       ["Q", "Corrupted end watcher — touching it deletes you, even asleep. Jump on it and it chases you, glitching forward to keep up"],
       ["N", "Short-legged enderman — teleports in front of you when you get close. Jump on it to beat it"],
-      ["o", "Eye of ender — collect them!"],
+      ["9", "Ender pearl — collect them! One pearl and one blaze rod make an eye of ender"],
+      ["H", "Crafting table — run past it and every blaze rod + ender pearl pair you carry turns into an eye of ender"],
+      ["o", "Eye of ender — collect them, or craft them. They go in portal frames"],
+      ["R", "Portal frame — run past it and one of your eyes of ender pops in. If a level has frames, its Boss portal stays shut until every frame has an eye"],
       ["f", "Wings + firework — hold jump to fly up, let go to glide. They come off at the next save point"],
       ["K", "Dialog block — invisible when you play. Stops the player and shows the words you typed, until they press jump"],
       ["O", "Stop block — invisible when you play. Holds the player still for the number of seconds you set"],
@@ -754,7 +813,7 @@
       ["s", "More blocks — blocks you name and paint yourself. In the Art Studio press ＋ New block and pick something to start from: your block acts just like it (a blue slime still bounces). Find them under More blocks in the Level Maker"],
       ["J", "Boss platform — for the boss arena. Only appears while the boss says CLIMB UP, so build the way to its head out of these"],
       ["E", "End portal — finish the level here"],
-      ["G", "Boss portal — use it instead of the End portal. The TNT Mech boss is waiting: dodge its TNT rain, climb up and stomp its head, dodge its shooter arm. Three stomps wins"],
+      ["G", "Boss portal — use it instead of the End portal. Add Portal frames to keep it shut until they're filled. The TNT Mech boss is waiting: dodge its TNT rain, climb up and stomp its head, dodge its shooter arm. Three stomps wins"],
       ["B", "Bush — just decoration, safe to touch"],
       ["P", "Start — where you spawn"],
     ].forEach(([ch, text]) => {
@@ -1993,10 +2052,16 @@
     const pctEl = el("span", "att", "0%");
     // only levels that have rods or spawners show a rod counter
     const allRows = level.rows.concat(level.arena || []);
-    const hasRods = allRows.some((r) => /[Zr6]/.test(r));
+    // …or ones you walk in already carrying some. Same for pearls and eyes.
+    const bag = loadBag();
+    const crafts = allRows.some((r) => r.includes("H"));
+    const hasRods = crafts || bag.rods > 0 || allRows.some((r) => /[Zr6]/.test(r));
+    const pearlsEl = el("span", "score", "🔮 0");
+    const hasPearls = crafts || bag.pearls > 0 || allRows.some((r) => r.includes("9"));
     const eyesEl = el("span", "score", "👁 0");
-    const hasEyes = allRows.some((r) => /[o7]/.test(r));
-    hud.append(scoreEl, ...(hasRods ? [rodsEl] : []), ...(hasEyes ? [eyesEl] : []), pctEl, attEl);
+    const hasEyes = crafts || bag.eyes > 0 || allRows.some((r) => /[o7R]/.test(r));
+    hud.append(scoreEl, ...(hasRods ? [rodsEl] : []), ...(hasPearls ? [pearlsEl] : []),
+      ...(hasEyes ? [eyesEl] : []), pctEl, attEl);
     panel.appendChild(hud);
 
     if (chain && chain.count > 1) {
@@ -2044,9 +2109,22 @@
       rot, coyote, buffer, particles, deadT, time = 0, holding = false,
       checkpoint = null, flying = false, deathKind = "boom",
       movers = [], shooters = [], bullets = [], spawners = [], blazes = [], fireballs = [],
-      rods = 0, eyes = 0, watchers = [], mobs = [], runT = 0, warp = null,
+      rods = 0, pearls = 0, eyes = 0, framesLeft = 0, told = {}, watchers = [], mobs = [], runT = 0, warp = null,
       free = false, moveL = false, moveR = false, stopT = 0, talk = null, talkAt = 0, poofed = false,
       inBoss = false, boss = null, introSeen = false, cutT = 0, downT = 0, knock = 0, plats = [];
+
+    const showItems = () => {
+      rodsEl.textContent = "🪄 " + rods;
+      pearlsEl.textContent = "🔮 " + pearls;
+      eyesEl.textContent = "👁 " + eyes;
+    };
+
+    // toasts for things you stand in for many frames: once per attempt
+    const tellOnce = (what, msg) => {
+      if (told[what]) return;
+      told[what] = true;
+      toast(msg);
+    };
 
     const setFree = (on) => {
       free = on;
@@ -2108,10 +2186,12 @@
       };
       score = checkpoint ? checkpoint.score : 0;
       scoreEl.textContent = "💎 " + score;
-      rods = checkpoint ? checkpoint.rods : 0;
-      rodsEl.textContent = "🪄 " + rods;
-      eyes = checkpoint ? checkpoint.eyes : 0;
-      eyesEl.textContent = "👁 " + eyes;
+      // Without a save point you start with what's in the bag. What you pick
+      // up only goes into the bag for keeps when you finish the level.
+      ({ rods, pearls, eyes } = checkpoint || bag);
+      showItems();
+      framesLeft = grid.reduce((n, row) => n + row.filter((ch) => ch === "R").length, 0);
+      told = {};
       state = "run";
       warp = null;
       setFree(false);
@@ -2143,7 +2223,7 @@
       [template, looks] = strip(arenaGrid(level.arena, arenaBgOf(level)));
       width = ARENA_W;
       spawn = findSpawn(template);
-      checkpoint = { x: spawn.x, y: spawn.y, score, rods, eyes, grid: template.map((r) => r.slice()) };
+      checkpoint = { x: spawn.x, y: spawn.y, score, rods, pearls, eyes, grid: template.map((r) => r.slice()) };
       inBoss = true;
       attempts--; // stepping through the portal isn't a new attempt
       reset();
@@ -2399,6 +2479,10 @@
       if (state !== "run") return;
       state = "win";
       setBest(bestKey(level), score);
+      bag.rods = rods;
+      bag.pearls = pearls;
+      bag.eyes = eyes;
+      saveBag(bag);
       jumpBtn.disabled = true;
       explode(player.x + PLAYER_W / 2, player.y + PLAYER_H / 2,
         ["#4fe0d8", "#b6fffa", "#ffd54a", "#c58bff"]);
@@ -2410,8 +2494,8 @@
       box.innerHTML =
         `<div class="big">${more || !chain ? "Level Complete!" : "You Finished!"}</div>` +
         `<div>Score: ${score} · Best: ${getBest(bestKey(level))}</div>` +
-        (hasRods ? `<div>Blaze rods: ${rods} 🪄</div>` : "") +
-        (hasEyes ? `<div>Eyes of ender: ${eyes} 👁</div>` : "") +
+        (hasRods || hasPearls || hasEyes
+          ? `<div>In your inventory: ${rods} 🪄 · ${pearls} 🔮 · ${eyes} 👁</div>` : "") +
         (chain && chain.count > 1
           ? `<div class="run-total">Run total: ${runTotal} 💎` +
             (more ? ` · ${chain.count - chain.i - 1} to go` : ` · all ${chain.count} levels!`) +
@@ -2445,7 +2529,7 @@
 
     const gotRod = (x, y) => {
       rods++;
-      rodsEl.textContent = "🪄 " + rods;
+      showItems();
       sparkle(x, y, ["#ffe98a", "#f0a020"]);
     };
 
@@ -2871,7 +2955,7 @@
             flying = false;
             setFree(false); // like wings, free moving ends at a save point
             grid[y][x] = "checkpointOn";
-            checkpoint = { x, y, score, rods, eyes, grid: grid.map((r) => r.slice()) };
+            checkpoint = { x, y, score, rods, pearls, eyes, grid: grid.map((r) => r.slice()) };
             toast("Checkpoint!");
           }
           if (ch === "d") {
@@ -2890,8 +2974,36 @@
           } else if (ch === "o") {
             grid[y][x] = AIR;
             eyes++;
-            eyesEl.textContent = "👁 " + eyes;
+            showItems();
             sparkle(x + 0.5, y + 0.5, ["#7be0c2", "#c8fff0"]);
+          } else if (ch === "9") {
+            grid[y][x] = AIR;
+            pearls++;
+            showItems();
+            sparkle(x + 0.5, y + 0.5, ["#1c6b60", "#8ff0dc"]);
+          } else if (ch === "H") {
+            const made = Math.min(rods, pearls);
+            if (made) {
+              rods -= made;
+              pearls -= made;
+              eyes += made;
+              showItems();
+              sparkle(x + 0.5, y + 0.2, ["#7be0c2", "#c8fff0", "#ffe98a"]);
+              toast(made === 1 ? "Crafted an eye of ender!" : `Crafted ${made} eyes of ender!`);
+            } else if (!eyes) {
+              tellOnce("craft", "Crafting needs a blaze rod and an ender pearl");
+            }
+          } else if (ch === "R") {
+            if (eyes) {
+              eyes--;
+              framesLeft--;
+              grid[y][x] = "frameOn";
+              showItems();
+              sparkle(x + 0.5, y + 0.2, ["#7be0c2", "#c8fff0"]);
+              if (!framesLeft) toast("The boss portal is open!");
+            } else {
+              tellOnce("frame", "This frame needs an eye of ender");
+            }
           } else if (ch === "f") {
             grid[y][x] = AIR;
             flying = true;
@@ -2899,6 +3011,13 @@
             win();
             return;
           } else if (ch === "G") {
+            // Shut until every portal frame in the level has its eye. You run
+            // straight through a shut one and the level carries on.
+            if (framesLeft) {
+              tellOnce("portal", framesLeft === 1 ? "The boss portal needs 1 more eye"
+                : `The boss portal needs ${framesLeft} more eyes`);
+              continue;
+            }
             enterBoss();
             return;
           }
@@ -3054,8 +3173,11 @@
             // still the block it started as (not blown up, switched on or grown over)? use its own look
             const own = looks[noteKey(x, y)];
             if (own && key === ch && baseOf(own) === ch) key = own;
+            const shut = ch === "G" && framesLeft > 0;
+            if (shut) ctx.globalAlpha = 0.35;
             drawTile(ctx, key, (x - camX) * TS, y * TS, TS, time,
               y > 0 && isSolid(grid[y - 1][x]));
+            if (shut) ctx.globalAlpha = 1;
           }
         }
       }

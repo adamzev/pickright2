@@ -384,3 +384,24 @@ button.tool-btn.sel {
 @media (min-width: 1600px) { html { zoom: 1.5; } }
 @media (min-width: 1850px) { html { zoom: 1.75; } }
 @media (min-width: 2300px) { html { zoom: 2.1; } }
+
+/* inventory slots on the menu */
+.bag-slot {
+  position: relative;
+  width: 58px;
+  height: 58px;
+  padding: 6px;
+  background: #1b1b22;
+  border: 3px solid #4a4a5a;
+}
+.bag-slot canvas { display: block; image-rendering: pixelated; }
+.bag-count {
+  position: absolute;
+  right: 3px;
+  bottom: 1px;
+  font-weight: 700;
+  font-size: 0.85rem;
+  text-shadow: 1px 1px 0 #000;
+}
+.bag-recipe { margin-top: 10px; align-items: center; }
+.bag-recipe .bag-slot { transform: scale(0.8); margin: -5px; }
