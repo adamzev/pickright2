@@ -53,12 +53,20 @@
     Q: { name: "Corrupted end watcher", mob: true },
     N: { name: "Short-legged enderman", mob: true },
     E: { name: "End" },
+    G: { name: "Boss portal" },
+    J: { name: "Boss platform", solid: true },
     B: { name: "Bush" },
     P: { name: "Start" },
   };
 
   const PALETTE = ["g", "s", "p", "n", "k", "e", "m", "t", "T", "h", "A", "L", "U", "D", "F", "S", "Z",
-    "W", "Y", "V", "Q", "N", "I", "C", "d", "r", "o", "b", "w", "f", "K", "O", "M", "E", "B", "P", ERASER];
+    "W", "Y", "V", "Q", "N", "I", "C", "d", "r", "o", "b", "w", "f", "K", "O", "M", "E", "G", "J", "B", "P", ERASER];
+
+  // The boss arena is drawn in the same editor as the level, with a slightly
+  // different set of blocks: no portals, save points or note-carrying blocks
+  // in the arena, and Boss platforms only there.
+  const LEVEL_ONLY = "KOMGEC";
+  const ARENA_ONLY = "J";
 
   const isSolid = (ch) => !!(TILES[ch] && TILES[ch].solid);
   const overOf = (ch) => TILES[ch] && TILES[ch].over;
@@ -82,6 +90,18 @@
   const PLAYER_H = 0.9;
   const COYOTE = 0.1;
   const STOP_DEFAULT = 2; // seconds a Stop block holds you, unless the editor says otherwise
+  // The TNT Mech boss fight (starts at a Boss portal)
+  const ARENA_W = 22; // just wider than one screen
+  const BOSS_HP = 3; // stomps on its head to win
+  const BOSS_STAGE = 9; // seconds each of its three attacks lasts
+  const BOSS_PX = 0.2; // blocks per pixel of the 24x32 boss sprite
+  const BOSS_X = 15.2; // where its left (spike) arm starts
+  const BOSS_TOP = H - 1 - 32 * BOSS_PX; // top of its head
+  const BOSS_BODY = BOSS_X + 5 * BOSS_PX; // left edge of the head-and-torso column
+  const BOSS_PLATS = [[4, 9], [5, 9], [6, 9], [8, 7], [9, 7], [10, 7], [12, 5], [13, 5], [14, 5]];
+  const RAIN_SPEED = 10; // blocks per second for falling TNT
+  const BOSS_SHOT_SPEED = 7; // its stars fly straight, so this can beat the Shooter's 5.5
+  const CUT_END = 5; // seconds the intro runs for
   const POOF_AFTER = 0.25; // a spiked player tips over this long, then puffs away
   const JUMP_BUFFER = 0.14;
   const LAVA_RISE = 1.2; // new blocks per second from a rising-lava source
@@ -201,6 +221,18 @@
       Array.from({ length: width }, (_, x) => (x < row.length ? row[x] : AIR)),
     );
 
+  // The arena a level gets until someone draws their own: a floor, a start
+  // and three Boss platforms stepping up toward the boss's head.
+  const defaultArena = (bg) => {
+    const floor = { nether: "n", end: "e", endStorage: "e" }[bg] || "g";
+    const g = Array.from({ length: H }, (_, y) => Array(ARENA_W).fill(y === H - 1 ? floor : AIR));
+    g[H - 2][2] = "P";
+    for (const [x, y] of BOSS_PLATS) g[y][x] = "J";
+    return g;
+  };
+  const arenaGrid = (rows, bg) =>
+    (Array.isArray(rows) && rows.length ? resizeGrid(rowsToGrid(rows.map(String)), ARENA_W) : defaultArena(bg));
+
   const findSpawn = (g) => {
     const width = g[0].length;
     for (let y = 0; y < H; y++) {
@@ -283,10 +315,16 @@
     return out;
   };
 
+  // the boss arena can have its own background; without one it matches the level
+  const arenaBgOf = (o) =>
+    (window.BDArt.BACKGROUNDS.some((b) => b.key === o.arenaBg) ? o.arenaBg : bgOf(o));
+
   const levelData = (l) => {
     const o = bgOf(l) === "overworld" ? { name: l.name, rows: l.rows } : { name: l.name, bg: l.bg, rows: l.rows };
     const notes = cleanNotes(l.rows, l.notes);
     if (Object.keys(notes).length) o.notes = notes;
+    if (Array.isArray(l.arena) && l.arena.length) o.arena = l.arena;
+    if (arenaBgOf(l) !== bgOf(l)) o.arenaBg = l.arenaBg;
     return o;
   };
 
@@ -301,7 +339,10 @@
       name: String(o.name || fallbackName || "Untitled"),
       rows: clean,
       bg: bgOf(o),
+      ...(arenaBgOf(o) !== bgOf(o) ? { arenaBg: o.arenaBg } : {}),
       notes: cleanNotes(clean, o.notes),
+      // only levels whose arena was drawn by hand carry one
+      ...(Array.isArray(o.arena) && o.arena.length ? { arena: gridToRows(arenaGrid(o.arena)) } : {}),
     };
   };
 
@@ -357,7 +398,7 @@
   // ---------- share codes ----------
 
   const encodeLevel = (lvl) => {
-    const json = JSON.stringify({ n: lvl.name, r: lvl.rows, b: bgOf(lvl), x: cleanNotes(lvl.rows, lvl.notes) });
+    const json = JSON.stringify({ n: lvl.name, r: lvl.rows, b: bgOf(lvl), x: cleanNotes(lvl.rows, lvl.notes), a: lvl.arena, ab: lvl.arenaBg });
     const bytes = new TextEncoder().encode(json);
     let s = "";
     for (const b of bytes) s += String.fromCharCode(b);
@@ -369,7 +410,7 @@
     const bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0));
     const o = JSON.parse(new TextDecoder().decode(bytes));
     if (!o || !Array.isArray(o.r) || !o.r.length) throw new Error("bad code");
-    return { name: String(o.n || "Imported level"), rows: o.r.map(String), bg: o.b, notes: o.x };
+    return { name: String(o.n || "Imported level"), rows: o.r.map(String), bg: o.b, notes: o.x, arena: o.a, arenaBg: o.ab };
   };
 
   // Art codes are much bigger than level codes, so each drawing is stored as
@@ -489,7 +530,7 @@
         const play = el("button", "green small", i ? "▶ Play" : "▶ Start");
         play.onclick = () => playSeries(builtin, i, 0, () => showMenu());
         const copy = el("button", "small", "✏ Copy & edit");
-        copy.onclick = () => showEditor({ name: lvl.name + " copy", rows: lvl.rows, bg: lvl.bg, notes: lvl.notes }, -1);
+        copy.onclick = () => showEditor({ name: lvl.name + " copy", rows: lvl.rows, bg: lvl.bg, notes: lvl.notes, arena: lvl.arena, arenaBg: lvl.arenaBg }, -1);
         list.appendChild(levelCard(lvl, editMode ? [play, copy] : [play], i + 1));
       });
       bp.appendChild(list);
@@ -692,7 +733,9 @@
       ["K", "Dialog block — invisible when you play. Stops the player and shows the words you typed, until they press jump"],
       ["O", "Stop block — invisible when you play. Holds the player still for the number of seconds you set"],
       ["M", "Free move block — invisible when you play. The player stops auto-running and moves with ◀ ▶ until the next save point"],
+      ["J", "Boss platform — for the boss arena. Only appears while the boss says CLIMB UP, so build the way to its head out of these"],
       ["E", "End portal — finish the level here"],
+      ["G", "Boss portal — use it instead of the End portal. The TNT Mech boss is waiting: dodge its TNT rain, climb up and stomp its head, dodge its shooter arm. Three stomps wins"],
       ["B", "Bush — just decoration, safe to touch"],
       ["P", "Start — where you spawn"],
     ].forEach(([ch, text]) => {
@@ -1268,6 +1311,18 @@
     // Never pruned while editing, so Undo brings a block back with its note;
     // cleanNotes drops the leftovers whenever the level is saved or tested.
     const notes = existing ? cleanNotes(existing.rows, existing.notes) : {};
+    // `grid` is whichever of the level and its boss arena is on screen, and
+    // `other` is the one that isn't; switching just swaps them over.
+    let editing = "level";
+    // null = "same as the level", so changing the level's background carries
+    // over until the arena is given one of its own
+    let arenaBg = existing && arenaBgOf(existing) !== bg ? existing.arenaBg : null;
+    const shownBg = () => (editing === "arena" ? arenaBg || bg : bg);
+    let other = arenaGrid(existing && existing.arena, arenaBg || bg);
+    let arenaDrawn = !!(existing && existing.arena); // until it's opened, the level uses the default arena
+    const levelG = () => (editing === "level" ? grid : other);
+    const arenaG = () => (editing === "arena" ? grid : other);
+    const arenaRows = () => (arenaDrawn ? gridToRows(arenaG()) : undefined);
     let stopSecs = STOP_DEFAULT;
     let dialogText = "";
     let slot = index;
@@ -1297,7 +1352,8 @@
     const savedLabel = el("span", "hint", slot >= 0 ? "✓ Saved" : "");
     const autosave = () => {
       const all = loadLevels();
-      const lvl = levelData({ name: (name || "").trim() || "Untitled", rows: gridToRows(grid), bg, notes });
+      const lvl = levelData({ name: (name || "").trim() || "Untitled", rows: gridToRows(levelG()), bg, notes,
+        arena: arenaRows(), arenaBg });
       if (slot >= 0 && slot < all.length) all[slot] = lvl;
       else { all.push(lvl); slot = all.length - 1; }
       savedLabel.textContent = saveLevels(all) ? "✓ Saved" : "⚠ Not saved";
@@ -1305,8 +1361,8 @@
     nameInput.oninput = () => { name = nameInput.value; autosave(); };
     const testBtn = el("button", "", "▶ Test");
     testBtn.onclick = () => {
-      const lvl = { name: (nameInput.value || "Untitled").trim(), rows: gridToRows(grid), bg,
-        notes: cleanNotes(grid, notes) };
+      const lvl = { name: (nameInput.value || "Untitled").trim(), rows: gridToRows(levelG()), bg,
+        notes: cleanNotes(levelG(), notes), arena: arenaRows(), arenaBg };
       showPlay(lvl, () => showEditor(lvl, slot), true);
     };
     nameRow.append(nameInput, testBtn, savedLabel);
@@ -1317,16 +1373,46 @@
     const bgBtns = Art.BACKGROUNDS.map((b) => {
       const btn = el("button", "small", b.label);
       btn.onclick = () => {
-        bg = b.key;
-        bgBtns.forEach((x, i) => x.classList.toggle("green", Art.BACKGROUNDS[i].key === bg));
+        // the buttons set the background of whichever one is being edited
+        if (editing === "arena") arenaBg = b.key;
+        else bg = b.key;
+        showBg();
         autosave();
         render();
       };
       btn.classList.toggle("green", b.key === bg);
       return btn;
     });
+    const showBg = () =>
+      bgBtns.forEach((x, i) => x.classList.toggle("green", Art.BACKGROUNDS[i].key === shownBg()));
     bgRow.append(...bgBtns);
     namePanel.appendChild(bgRow);
+
+    // level <-> boss arena
+    const editRow = el("div", "row");
+    editRow.style.marginTop = "8px";
+    editRow.appendChild(el("span", "hint", "Editing:"));
+    const levelTab = el("button", "small green", "🗺 Level");
+    const arenaTab = el("button", "small", "💥 Boss arena");
+    const editHint = el("span", "hint", "");
+    const setEditing = (m) => {
+      if (m === editing) return;
+      [grid, other] = [other, grid];
+      editing = m;
+      if (m === "arena") arenaDrawn = true;
+      undoStack.length = 0; // undo steps belong to the grid they were made on
+      levelTab.classList.toggle("green", m === "level");
+      arenaTab.classList.toggle("green", m === "arena");
+      showBg();
+      refreshPalette();
+      autosave();
+      wrap.scrollLeft = 0;
+      render();
+    };
+    levelTab.onclick = () => setEditing("level");
+    arenaTab.onclick = () => setEditing("arena");
+    editRow.append(levelTab, arenaTab, editHint);
+    namePanel.appendChild(editRow);
     root.appendChild(namePanel);
 
     // palette
@@ -1384,6 +1470,19 @@
     };
     showOpts();
     palPanel.appendChild(optRow);
+
+    // show only the blocks that make sense for what's being edited
+    const refreshPalette = () => {
+      const hide = editing === "arena" ? LEVEL_ONLY : ARENA_ONLY;
+      for (const [ch, item] of Object.entries(palItems)) item.style.display = hide.includes(ch) ? "none" : "";
+      if (hide.includes(sel)) palItems.g.onclick();
+      editHint.textContent = editing === "arena"
+        ? "This is where the boss fight happens (reached through a Boss portal). The faded boss shows where it stands. " +
+          "Boss platforms only appear during CLIMB UP; everything else is always there. " +
+          "The Background buttons above now change the arena's background, not the level's."
+        : "";
+    };
+    refreshPalette();
     root.appendChild(palPanel);
 
     // canvas
@@ -1464,6 +1563,7 @@
     };
 
     const setWidth = (w) => {
+      if (editing === "arena") { toast("The boss arena is always one screen wide"); return; }
       w = clamp(w, 20, 400);
       if (w === grid[0].length) return;
       pushUndo();
@@ -1567,7 +1667,7 @@
         ctx.beginPath();
         ctx.rect(0, 0, view, canvas.height);
         ctx.clip();
-        Art.drawBackground(ctx, bg, view, canvas.height, 0, TS, 0, null);
+        Art.drawBackground(ctx, shownBg(), view, canvas.height, 0, TS, 0, null);
         ctx.restore();
       }
 
@@ -1588,6 +1688,13 @@
       }
       for (let y = 0; y < H; y++) {
         for (let x = 0; x < w; x++) if (grid[y][x] === "W" || grid[y][x] === "Y") drawCone(ctx, grid, x, y, TS, 0, true);
+      }
+
+      if (editing === "arena") {
+        ctx.save();
+        ctx.globalAlpha = 0.45;
+        Art.drawSprite(ctx, "boss", BOSS_X * TS, BOSS_TOP * TS, 24 * BOSS_PX * TS, 32 * BOSS_PX * TS);
+        ctx.restore();
       }
 
       // what each Stop and Dialog block is set to
@@ -1658,10 +1765,13 @@
   const showPlay = (level, onExit, fromEditor, chain) => {
     clear();
 
-    const template = rowsToGrid(level.rows);
+    // These three describe the level being played. A Boss portal swaps them
+    // for the boss arena; `home` is how a full restart gets the level back.
+    let template = rowsToGrid(level.rows);
     const notes = cleanNotes(level.rows, level.notes);
-    const width = template[0].length;
-    const spawn = findSpawn(template);
+    let width = template[0].length;
+    let spawn = findSpawn(template);
+    const home = { template, width, spawn };
 
     const header = el("div", "row");
     header.appendChild(el("h1", null, level.name || "Level"));
@@ -1678,9 +1788,10 @@
     const attEl = el("span", "att", "Attempt 1");
     const pctEl = el("span", "att", "0%");
     // only levels that have rods or spawners show a rod counter
-    const hasRods = level.rows.some((r) => /[Zr6]/.test(r));
+    const allRows = level.rows.concat(level.arena || []);
+    const hasRods = allRows.some((r) => /[Zr6]/.test(r));
     const eyesEl = el("span", "score", "👁 0");
-    const hasEyes = level.rows.some((r) => /[o7]/.test(r));
+    const hasEyes = allRows.some((r) => /[o7]/.test(r));
     hud.append(scoreEl, ...(hasRods ? [rodsEl] : []), ...(hasEyes ? [eyesEl] : []), pctEl, attEl);
     panel.appendChild(hud);
 
@@ -1730,7 +1841,8 @@
       checkpoint = null, flying = false, deathKind = "boom",
       movers = [], shooters = [], bullets = [], spawners = [], blazes = [], fireballs = [],
       rods = 0, eyes = 0, watchers = [], mobs = [], runT = 0, warp = null,
-      free = false, moveL = false, moveR = false, stopT = 0, talk = null, talkAt = 0, poofed = false;
+      free = false, moveL = false, moveR = false, stopT = 0, talk = null, talkAt = 0, poofed = false,
+      inBoss = false, boss = null, introSeen = false, cutT = 0, downT = 0, knock = 0, plats = [];
 
     const setFree = (on) => {
       free = on;
@@ -1741,7 +1853,12 @@
     // checkpoint with the level as it was when you got there, so diamonds
     // grabbed before it stay grabbed.
     const reset = (fromStart) => {
-      if (fromStart) checkpoint = null;
+      if (fromStart) {
+        checkpoint = null;
+        inBoss = false;
+        introSeen = false;
+        ({ template, width, spawn } = home);
+      }
       const at = checkpoint || spawn;
       grid = (checkpoint ? checkpoint.grid : template).map((r) => r.slice());
       // Lava sources and shooters always restart, even after a save point:
@@ -1754,11 +1871,14 @@
       fireballs = [];
       watchers = [];
       mobs = [];
+      plats = [];
       runT = 0;
       for (let y = 0; y < H; y++) {
         for (let x = 0; x < width; x++) {
           if (grid[y][x] === FLOWED) grid[y][x] = AIR;
           const ch = template[y][x];
+          // Boss platforms start out missing; the climb stage puts them in
+          if (ch === "J") { grid[y][x] = AIR; plats.push([x, y]); }
           if (ch === "U" || ch === "D") {
             movers.push({ x, tip: y, dir: ch === "U" ? -1 : 1, t: 0, active: false, done: false });
           } else if (ch === "S") {
@@ -1806,6 +1926,178 @@
       attEl.textContent = "Attempt " + attempts;
       msgSlot.innerHTML = "";
       jumpBtn.disabled = false;
+      knock = 0;
+      boss = null;
+      if (inBoss) startBoss();
+    };
+
+    // ----- the TNT Mech boss fight -----
+
+    // Walking into a Boss portal swaps the level for a one-screen arena. The
+    // arena is set up as a save point, so dying restarts the fight, not the level.
+    const enterBoss = () => {
+      template = arenaGrid(level.arena, arenaBgOf(level));
+      width = ARENA_W;
+      spawn = findSpawn(template);
+      checkpoint = { x: spawn.x, y: spawn.y, score, rods, eyes, grid: template.map((r) => r.slice()) };
+      inBoss = true;
+      attempts--; // stepping through the portal isn't a new attempt
+      reset();
+    };
+
+    const startBoss = () => {
+      setFree(true);
+      boss = { hp: BOSS_HP, stage: -1, t: 0, spawnT: 0, hurtT: 0, x: BOSS_X, rain: [], gone: false };
+      if (introSeen) nextStage();
+      else { state = "cut"; cutT = 0; }
+    };
+
+    const endCut = () => {
+      introSeen = true;
+      state = "run";
+      particles = [];
+      nextStage();
+    };
+
+    // The climb stage's platforms only exist while that stage is on.
+    const setPlats = (on) => {
+      for (const [x, y] of plats) {
+        grid[y][x] = on ? "J" : AIR;
+        // one appearing on top of you lifts you onto it rather than trapping you
+        if (on && touches(x, y, x + 1, y + 1)) { player.y = y - PLAYER_H; player.vy = 0; }
+      }
+    };
+
+    // rain TNT -> climb up and stomp -> shooter arm -> repeat
+    const nextStage = () => {
+      boss.stage = (boss.stage + 1) % 3;
+      boss.t = BOSS_STAGE;
+      boss.spawnT = 0.9;
+      setPlats(boss.stage === 1);
+      bullets = bullets.filter((b) => !b.straight); // its stars don't outlive the shooter stage
+    };
+
+    const smoke = (cx, cy, n, spread) => {
+      for (let i = 0; i < n; i++) {
+        const sz = 0.5 + Math.random() * 0.9;
+        particles.push({
+          x: cx + (Math.random() - 0.5) * spread - sz / 2, y: cy + (Math.random() - 0.5) * spread - sz / 2,
+          vx: (Math.random() - 0.5) * 1.2, vy: -Math.random() * 0.8, g: -0.4, s: sz,
+          life: 1 + Math.random() * 1.4,
+          c: ["#8a8a8a", "#a8a8a8", "#6f6f6f", "#c4c4c4"][(Math.random() * 4) | 0],
+        });
+      }
+    };
+
+    // where the dragon is during the intro: swoops in, then hangs there shaking
+    const dragonAt = () => {
+      const k = clamp(cutT / 1.8, 0, 1);
+      const ease = 1 - (1 - k) * (1 - k);
+      return { x: ARENA_W + 2 + (11 - ARENA_W - 2) * ease, y: 3 + Math.sin(cutT * 4) * 0.5 };
+    };
+
+    // Intro: the dragon flies in, is blown up, and the boss walks out of the smoke.
+    const updateCut = (dt) => {
+      const before = cutT;
+      cutT += dt;
+      const at = (t) => before < t && cutT >= t;
+      const d = dragonAt();
+      for (const t of [1.8, 2.05, 2.3, 2.55]) {
+        if (at(t)) explode(d.x + 1 + Math.random() * 4.4, d.y + 0.5 + Math.random() * 2.6,
+          ["#d05bff", "#f4f0ff", "#ffd54a", "#ff8a3d"]);
+      }
+      if (at(2.6)) smoke(16, 6.5, 70, 7);
+      if (at(3.2)) smoke(17, 7.5, 30, 5);
+      // the boss strides out from deep in the smoke to its spot
+      boss.x = BOSS_X + 3 * (1 - clamp((cutT - 2.8) / 1.6, 0, 1));
+      if (cutT >= CUT_END) endCut();
+    };
+
+    // Returns true if the player died or the fight ended this step.
+    const updateBoss = (dt) => {
+      const b = boss;
+      if (b.hurtT > 0) b.hurtT -= dt;
+
+      for (const r of b.rain) {
+        r.y += RAIN_SPEED * dt;
+        if (touches(r.x, r.y, r.x + 1, r.y + 1)) { die(); return true; }
+        if (r.y >= H - 2) {
+          r.dead = true;
+          sparkle(r.x + 0.5, H - 1.2, ["#ffd54a", "#ff8a3d", "#e04a2f", "#8c8c8c"]);
+        }
+      }
+      b.rain = b.rain.filter((r) => !r.dead);
+
+      // Its head and torso are one tall column: land on top to stomp it, and
+      // anywhere else it's simply a wall.
+      const feet = player.y + PLAYER_H;
+      if (player.x + PLAYER_W > BOSS_BODY && feet > BOSS_TOP) {
+        if (player.vy > 0 && feet < BOSS_TOP + 0.5) {
+          player.y = BOSS_TOP - PLAYER_H;
+          player.vy = -JUMP_V;
+          knock = -18; // thrown clear, so you don't drop onto its spike arm
+          if (b.hurtT <= 0) {
+            b.hp--;
+            b.hurtT = 1.5;
+            explode(player.x + PLAYER_W / 2, BOSS_TOP + 0.5, ["#ffd54a", "#ff8a3d", "#e04a2f", "#ffffff"]);
+            if (b.hp <= 0) {
+              state = "bossdown";
+              downT = 0;
+              setPlats(false);
+              bullets = [];
+              b.rain = [];
+              return true;
+            }
+            // a stomp ends the climb early and moves it on to its next attack
+            b.stage = 1;
+            nextStage();
+          }
+        } else {
+          player.x = BOSS_BODY - PLAYER_W;
+        }
+      }
+      // the spike arm hanging at its side
+      if (touches(b.x + 0.1, BOSS_TOP + 12 * BOSS_PX, b.x + 0.9, BOSS_TOP + 28 * BOSS_PX)) {
+        die("poof");
+        return true;
+      }
+
+      b.t -= dt;
+      if (b.t <= 0) nextStage();
+      b.spawnT -= dt;
+      if (b.spawnT <= 0) {
+        const anger = BOSS_HP - b.hp; // it speeds up each time it's hit
+        if (b.stage === 0) {
+          b.spawnT = [0.3, 0.25, 0.2][anger] || 0.2;
+          // nearly half are aimed right at you, so you have to keep moving
+          const x = Math.random() < 0.45 ? player.x - 0.15 : Math.random() * (BOSS_X - 1);
+          b.rain.push({ x: clamp(x, 0, BOSS_X - 1), y: -1 });
+        } else if (b.stage === 2) {
+          b.spawnT = [1.2, 1, 0.8][anger] || 0.8;
+          const mx = b.x + 21.5 * BOSS_PX, my = BOSS_TOP + 21 * BOSS_PX;
+          const a = Math.atan2(player.y + PLAYER_H / 2 - my, player.x + PLAYER_W / 2 - mx);
+          // Unlike a Shooter block's stars these fly straight at where you were:
+          // in a small arena there's no outrunning ones that steer.
+          bullets.push({ x: mx, y: my, a, life: BULLET_LIFE, fromX: -9, fromY: -9, straight: true });
+        }
+      }
+      return false;
+    };
+
+    // Beaten: it shakes apart in a string of explosions, then the level is won.
+    const updateBossDown = (dt) => {
+      const before = downT;
+      downT += dt;
+      if (Math.floor(before / 0.15) !== Math.floor(downT / 0.15)) {
+        explode(boss.x + Math.random() * 4.8, BOSS_TOP + Math.random() * 6.4,
+          ["#ffd54a", "#ff8a3d", "#e04a2f", "#8c8c8c"]);
+      }
+      if (downT >= 1.8) {
+        boss.gone = true;
+        smoke(boss.x + 2.4, BOSS_TOP + 3.5, 40, 5);
+        state = "run";
+        win();
+      }
     };
 
     const solidAt = (x, y) =>
@@ -1816,6 +2108,7 @@
     // Returns true when the press was used up closing a dialog, so the caller
     // doesn't also treat it as "holding jump".
     const pressJump = () => {
+      if (state === "cut") { boss.x = BOSS_X; endCut(); return true; } // skip the intro
       if (state === "talk") {
         // a short grace so a jump you were already mashing doesn't skip the words
         if (time - talkAt > 0.35) { state = "run"; talk = null; }
@@ -2033,9 +2326,10 @@
         let diff = want - b.a;
         while (diff > Math.PI) diff -= Math.PI * 2;
         while (diff < -Math.PI) diff += Math.PI * 2;
-        b.a += clamp(diff, -BULLET_TURN * dt, BULLET_TURN * dt);
-        b.x += Math.cos(b.a) * BULLET_SPEED * dt;
-        b.y += Math.sin(b.a) * BULLET_SPEED * dt;
+        if (!b.straight) b.a += clamp(diff, -BULLET_TURN * dt, BULLET_TURN * dt);
+        const sp = b.straight ? BOSS_SHOT_SPEED : BULLET_SPEED;
+        b.x += Math.cos(b.a) * sp * dt;
+        b.y += Math.sin(b.a) * sp * dt;
         b.life -= dt;
         const cx = Math.floor(b.x), cy = Math.floor(b.y);
         if ((cx !== b.fromX || cy !== b.fromY) && solidAt(cx, cy)) b.life = 0;
@@ -2215,6 +2509,8 @@
         if (deadT > 0.9) reset();
         return;
       }
+      if (state === "cut") { updateCut(dt); return; }
+      if (state === "bossdown") { updateBossDown(dt); return; }
       if (state !== "run") return;
 
       if (effect) {
@@ -2229,7 +2525,14 @@
       const dir = free ? (moveR ? 1 : 0) - (moveL ? 1 : 0) : 1;
       if (stopT > 0) stopT -= dt;
       else player.x += dir * speed * dt;
+      if (knock) {
+        // the shove from stomping the boss, fading out over about half a second
+        player.x += knock * dt;
+        knock *= Math.max(0, 1 - 4 * dt);
+        if (Math.abs(knock) < 0.5) knock = 0;
+      }
       if (player.x < 0) player.x = 0;
+      if (inBoss) player.x = Math.min(player.x, width - PLAYER_W);
       const y0 = Math.floor(player.y + 0.02);
       const y1 = Math.floor(player.y + PLAYER_H - 0.02);
       const rightCol = Math.floor(player.x + PLAYER_W);
@@ -2258,7 +2561,7 @@
           if (!free) { die(); return; }
         }
       }
-      if (dir < 0) {
+      if (player.x < oldX) {
         const leftCol = Math.floor(player.x);
         for (let y = y0; y <= y1; y++) {
           if (solidAt(leftCol, y)) { player.x = oldX; break; }
@@ -2391,11 +2694,15 @@
           } else if (ch === "E") {
             win();
             return;
+          } else if (ch === "G") {
+            enterBoss();
+            return;
           }
         }
       }
 
       if (updateHazards(dt)) return;
+      if (boss && updateBoss(dt)) return;
 
       if (player.y > H + 1) { die(); return; }
       if (player.x > width) { win(); return; }
@@ -2409,7 +2716,7 @@
 
     // --- rendering ---
     const drawBackground = () =>
-      Art.drawBackground(ctx, bgOf(level), canvas.width, canvas.height, camX * TS, TS, time, effect);
+      Art.drawBackground(ctx, inBoss ? arenaBgOf(level) : bgOf(level), canvas.width, canvas.height, camX * TS, TS, time, effect);
 
     // The player flashing red as they tip over, the way a beaten mob does.
     // Tinted on a scratch canvas so only the player's own pixels turn red.
@@ -2427,6 +2734,76 @@
       ctx.rotate(angle);
       ctx.drawImage(hurtCv, -pw / 2, -ph / 2);
       ctx.restore();
+    };
+
+    const drawBoss = () => {
+      const b = boss;
+      const px = TS * BOSS_PX;
+      if (state === "cut" && cutT < 2.6) {
+        const d = dragonAt();
+        // once it's been hit it shakes and flickers
+        const hit = cutT > 1.8;
+        ctx.save();
+        if (hit && Math.sin(time * 50) > 0) ctx.globalAlpha = 0.45;
+        const flap = 1 + Math.sin(time * 14) * 0.12;
+        Art.drawSprite(ctx, "dragon", (d.x - camX) * TS + (hit ? Math.sin(time * 70) * 5 : 0),
+          d.y * TS + (1 - flap) * 9 * px, 32 * px, 18 * px * flap);
+        ctx.restore();
+      }
+      if (b.gone || (state === "cut" && cutT < 2.8)) return;
+      const walking = state === "cut" && cutT < 4.4;
+      const bob = walking ? Math.abs(Math.sin(time * 9)) * -5 : Math.sin(time * 3) * 2;
+      const shake = state === "bossdown" ? Math.sin(time * 80) * 5 : 0;
+      ctx.save();
+      if (state === "cut") ctx.globalAlpha = clamp((cutT - 2.8) / 0.9, 0, 1);
+      else if (state === "bossdown") ctx.globalAlpha = clamp(1.2 - downT / 1.8, 0, 1);
+      else if (b.hurtT > 0 && Math.sin(time * 40) > 0) ctx.globalAlpha = 0.35;
+      Art.drawSprite(ctx, "boss", (b.x - camX) * TS + shake, BOSS_TOP * TS + bob, 24 * px, 32 * px);
+      ctx.restore();
+
+      for (const r of b.rain) {
+        // a red mark on the floor shows where each one will land
+        ctx.fillStyle = "rgba(255, 60, 60, 0.55)";
+        ctx.fillRect((r.x - camX) * TS, (H - 1) * TS - 5, TS, 5);
+        drawTile(ctx, "t", (r.x - camX) * TS, r.y * TS, TS, time, false);
+      }
+    };
+
+    const drawBossHud = () => {
+      const b = boss;
+      ctx.textBaseline = "top";
+      if (state === "cut") {
+        if (cutT > 4.2) {
+          ctx.fillStyle = "#ff6b6b";
+          ctx.font = "bold 54px ui-monospace, monospace";
+          ctx.textAlign = "center";
+          ctx.fillText("TNT MECH", canvas.width / 2, 150);
+        }
+        ctx.fillStyle = "rgba(255,255,255,0.7)";
+        ctx.font = "bold 16px ui-monospace, monospace";
+        ctx.textAlign = "right";
+        ctx.fillText("jump to skip ▶", canvas.width - 16, canvas.height - 28);
+        return;
+      }
+      if (b.gone) return;
+      // health: one chunk per stomp it can still take
+      ctx.font = "bold 18px ui-monospace, monospace";
+      ctx.textAlign = "right";
+      ctx.fillStyle = "#ffffff";
+      const bx = canvas.width / 2 - 90;
+      ctx.fillText("TNT MECH", bx - 10, 14);
+      for (let i = 0; i < BOSS_HP; i++) {
+        ctx.fillStyle = "#1c1c1c";
+        ctx.fillRect(bx + i * 64, 12, 60, 20);
+        ctx.fillStyle = i < b.hp ? "#e04a2f" : "#4a4a4a";
+        ctx.fillRect(bx + i * 64 + 3, 15, 54, 14);
+      }
+      if (state !== "run") return;
+      ctx.textAlign = "center";
+      ctx.font = "bold 22px ui-monospace, monospace";
+      ctx.fillStyle = ["#ff8a80", "#8ff09a", "#ffd54a"][b.stage];
+      ctx.fillText(["TNT RAIN! Dodge!", "CLIMB UP! Stomp its head!", "SHOOTER ARM! Dodge!"][b.stage] +
+        "  " + Math.ceil(b.t), canvas.width / 2, 42);
     };
 
     const drawDialog = () => {
@@ -2517,6 +2894,8 @@
         }
       }
 
+      if (boss) drawBoss();
+
       for (const bz of blazes) {
         const bs = TS * 0.8;
         const px = (bz.x - camX) * TS, py = bz.y * TS;
@@ -2601,7 +2980,9 @@
         ctx.fillText("🪽 FLY! hold jump", canvas.width / 2, y);
       }
 
-      if (state === "run" && (stopT > 0 || free)) {
+      if (boss) drawBossHud();
+
+      if (state === "run" && (stopT > 0 || (free && !boss))) {
         const y = 16 + (effect ? 36 : 0) + (flying ? 36 : 0);
         ctx.fillStyle = stopT > 0 ? "#ff8a80" : "#8ff09a";
         ctx.font = "bold 26px ui-monospace, monospace";

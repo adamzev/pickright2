@@ -56,6 +56,8 @@ Block rules:
 | Stop block | Invisible in play. Holds the player still for a number of seconds set in the editor (2 by default); lava and creatures keep moving |
 | Free move block | Invisible in play. Turns off auto-running: move with ◀ ▶ (arrow keys or A/D), walls no longer kill, until the next save point |
 | End portal | Finishes the level |
+| Boss platform | Boss arena only. Solid only while the boss's climb stage is on. The Level Maker's **💥 Boss arena** button switches from the level to its one-screen arena, where you can place these and most other blocks. While the arena is showing, the Background buttons set the arena's own background, separate from the level's |
+| Boss portal | Use it instead of the End portal. Walking in swaps the level for a one-screen arena: a dragon flies in and is blown up, and the TNT Mech walks out of the smoke (jump skips the intro). You move freely with ◀ ▶. The boss cycles three 9-second attacks: TNT rains down (red marks show where), platforms appear so you can climb up and stomp its head, then its shooter arm fires stars straight at where you are. Three stomps wins the level; it gets faster after each one. Its spike arm is deadly, and dying restarts the fight, not the level |
 | Bush | Decoration only |
 | Start | Where you spawn |
 

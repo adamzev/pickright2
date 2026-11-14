@@ -15,7 +15,7 @@
 //   BDArt.registerSprite("player", someCanvasOrImage);
 //
 // Keys: block letters g s p A K O M m t h C d b w f n k L U D F S Z r e I W T o V Q N E B P,
-// plus "bullet", "blaze", "fireball", "watcherClosed",
+// G J, plus "boss", "dragon", "bullet", "blaze", "fireball", "watcherClosed",
 // "checkpointOn", "wingsWorn", plus "dirt", "cloud", "player",
 // "explosion1", "explosion2". Blocks should be square; the player is drawn at
 // roughly 3:4. Anything not replaced keeps the built-in pixel art.
@@ -711,6 +711,97 @@ window.BDArt = (() => {
     spans(c, [[5, 11, 11], [6, 11, 12], [9, 11, 12], [10, 11, 11]], "#6fe07a");
   });
 
+  // Boss portal: the End portal's angry red cousin. Walking in starts the boss fight.
+  const bossPortal = mk(S, S, (c) => {
+    noiseFill(c, 33, ["#3f3a55", "#4a4463", "#332f47", "#565073"]);
+    for (let y = 1; y < 15; y++) {
+      for (let x = 2; x < 14; x++) {
+        const r = nz(x, y, 43);
+        c.fillStyle = r < 0.3 ? "#8f1d1d" : r < 0.7 ? "#b32a22" : "#d1402f";
+        c.fillRect(x, y, 1, 1);
+      }
+    }
+    // angry eyes and a white "TNT label" band, like the boss's head
+    spans(c, [[4, 4, 4], [5, 5, 5], [6, 6, 6], [4, 11, 11], [5, 10, 10], [6, 9, 9]], "#1c1c1c");
+    rect(c, 4, 6, 2, 2, "#ffe14a");
+    rect(c, 10, 6, 2, 2, "#ffe14a");
+    rect(c, 2, 10, 12, 3, "#efefef");
+    rect(c, 4, 11, 8, 1, "#1c1c1c");
+  });
+
+  // The TNT Mech boss, from the drawing: a big angry TNT block for a head, a
+  // long arm ending in a spike on the left, a shorter shooter arm on the right,
+  // one solid leg and one jagged stiff one. 24 x 32, drawn at 0.2 blocks a pixel.
+  const boss = mk(24, 32, (c) => {
+    // torso
+    rect(c, 5, 11, 14, 13, "#4a4d57");
+    rect(c, 6, 12, 12, 11, "#5d616d");
+    rect(c, 6, 12, 12, 1, "#767b89");
+    rect(c, 10, 15, 4, 4, "#2a2c33");
+    rect(c, 11, 16, 2, 2, "#ff5a1f"); // glowing core
+    for (const [x, y] of [[7, 13], [16, 13], [7, 21], [16, 21]]) rect(c, x, y, 1, 1, "#2a2c33");
+    // head: a TNT block
+    rect(c, 5, 0, 14, 11, "#8c8c8c");
+    for (let y = 1; y < 10; y++) {
+      for (let x = 5; x < 19; x++) rect(c, x, y, 1, 1, x % 4 === 1 || x % 4 === 0 ? "#a8291f" : "#d1402f");
+    }
+    spans(c, [[1, 7, 7], [2, 8, 8], [3, 9, 9], [1, 16, 16], [2, 15, 15], [3, 14, 14]], "#1c1c1c"); // angry brows
+    rect(c, 7, 3, 2, 2, "#ffe14a");
+    rect(c, 15, 3, 2, 2, "#ffe14a");
+    rect(c, 5, 5, 14, 5, "#efefef");
+    const glyphs = { T: ["111", "010", "010", "010", "010"], N: ["101", "111", "111", "101", "101"] };
+    [["T", 6], ["N", 10], ["T", 14]].forEach(([g, ox]) => {
+      glyphs[g].forEach((row, ry) => {
+        [...row].forEach((bit, rx) => { if (bit === "1") rect(c, ox + rx, 5 + ry, 1, 1, "#1c1c1c"); });
+      });
+    });
+    // left arm, ending in a spike
+    rect(c, 0, 12, 5, 11, "#5d616d");
+    rect(c, 0, 12, 1, 11, "#4a4d57");
+    spans(c, [[23, 0, 4], [24, 0, 3], [25, 1, 3], [26, 1, 2], [27, 1, 2], [28, 1, 1]], "#d8dde6");
+    spans(c, [[23, 3, 4], [24, 3, 3], [25, 3, 3]], "#8e96a6");
+    // right arm: shorter, with the shooter's muzzle at the end
+    rect(c, 19, 12, 5, 8, "#5d616d");
+    rect(c, 23, 12, 1, 8, "#4a4d57");
+    rect(c, 20, 20, 3, 1, "#1c1c1c");
+    // legs: one solid, one jagged
+    rect(c, 7, 24, 4, 8, "#3b3d45");
+    rect(c, 6, 30, 6, 2, "#2a2c33");
+    spans(c, [[24, 14, 16], [25, 15, 17], [26, 14, 16], [27, 13, 15], [28, 14, 16],
+      [29, 15, 17], [30, 14, 16], [31, 13, 17]], "#7a5a48");
+  });
+
+  // The dragon that gets beaten in the boss intro. 32 x 18, facing left.
+  const dragon = mk(32, 18, (c) => {
+    // wings, swept back
+    for (let i = 0; i < 8; i++) {
+      rect(c, 12 + i, 7 - i, 12 - i, 1, i % 3 === 0 ? "#3d3d4d" : "#2b2b38");
+    }
+    rect(c, 12, 0, 1, 8, "#55556a");
+    // body, neck, head, tail
+    rect(c, 10, 8, 14, 4, "#16161d");
+    rect(c, 5, 7, 6, 3, "#16161d");
+    rect(c, 0, 5, 6, 4, "#1f1f29");
+    rect(c, 0, 8, 4, 1, "#0e0e13");
+    rect(c, 2, 6, 1, 1, "#d05bff");
+    rect(c, 24, 9, 5, 2, "#16161d");
+    rect(c, 28, 8, 4, 1, "#16161d");
+    for (const x of [7, 11, 15, 19, 23, 27]) rect(c, x, x < 10 ? 6 : 7, 1, 1, "#8a8a9a"); // back spikes
+    rect(c, 12, 12, 2, 3, "#1f1f29");
+    rect(c, 20, 12, 2, 3, "#1f1f29");
+    rect(c, 11, 15, 3, 1, "#8a8a9a");
+    rect(c, 19, 15, 3, 1, "#8a8a9a");
+  });
+
+  // Boss platform: only solid while the boss's "climb" stage is on, so it gets
+  // deepslate with a red warning stripe to tell it apart from ordinary blocks.
+  const bossPlat = mk(S, S, (c) => {
+    c.drawImage(deepslate, 0, 0);
+    rect(c, 0, 0, S, 2, "#d1402f");
+    for (let x = 0; x < S; x += 4) rect(c, x, 0, 2, 2, "#ffd54a");
+    rect(c, 0, S - 1, S, 1, "#1c1c1c");
+  });
+
   const spawnMark = mk(S, S, (c) => {
     c.fillStyle = "rgba(124, 199, 255, 0.16)";
     c.fillRect(0, 0, S, S);
@@ -809,6 +900,10 @@ window.BDArt = (() => {
     b: bolt,
     w: rose,
     E: portal,
+    G: bossPortal,
+    J: bossPlat,
+    boss: boss,
+    dragon: dragon,
     B: bush,
     P: spawnMark,
     cloud: cloud,
@@ -861,6 +956,10 @@ window.BDArt = (() => {
     { key: "fireball", label: "Fireball" },
     { key: "wingsWorn", label: "Wings (worn)" },
     { key: "E", label: "Portal" },
+    { key: "G", label: "Boss portal" },
+    { key: "J", label: "Boss platform" },
+    { key: "boss", label: "TNT Mech boss" },
+    { key: "dragon", label: "Dragon" },
     { key: "B", label: "Bush" },
     { key: "P", label: "Start" },
     { key: "cloud", label: "Cloud" },
