@@ -256,7 +256,7 @@
   // The arena a level gets until someone draws their own: a floor, a start
   // and three Boss platforms stepping up toward the boss's head.
   const defaultArena = (bg) => {
-    const floor = { nether: "n", end: "e", endStorage: "e" }[bg] || "g";
+    const floor = { nether: "n", end: "e", endStorage: "e", deepCave: "p" }[bg] || "g";
     const g = Array.from({ length: H }, (_, y) => Array(ARENA_W).fill(y === H - 1 ? floor : AIR));
     g[H - 2][2] = "P";
     for (const [x, y] of BOSS_PLATS) g[y][x] = "J";

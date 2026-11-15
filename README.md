@@ -73,8 +73,9 @@ itself to localStorage as you go; there's no Save button. Each level also has a
 background, picked under its name: Overworld (sky and hills), Nether (netherrack
 above and below, ghasts drifting in the distance), Mooshroom realm (giant
 mushrooms on a purple-pink sky), The End (stars, floating islands, dark
-pillars) or End storage rooms (like the Nether, but end stone above and below,
-a darker end-stone wall behind, no ghasts). It's saved as `"bg"` in the level; levels without it use Overworld. The **Code** button turns a level into a text code that someone
+pillars), End storage rooms (like the Nether, but end stone above and below,
+a darker end-stone wall behind, no ghasts) or Deep cave (dark deepslate above
+and below, ore glinting in the far wall, big sculk patches that pulse with light). It's saved as `"bg"` in the level; levels without it use Overworld. The **Code** button turns a level into a text code that someone
 else can paste into Import.
 
 **Shipped with the game (us).** Build the levels you want everyone to get, then

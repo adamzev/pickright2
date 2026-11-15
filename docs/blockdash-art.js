@@ -1355,6 +1355,7 @@ window.BDArt = (() => {
     { key: "mooshroom", label: "🍄 Mooshroom realm" },
     { key: "end", label: "🌌 The End" },
     { key: "endStorage", label: "📦 End storage rooms" },
+    { key: "deepCave", label: "⛏ Deep cave" },
   ];
 
   const wrapX = (base, scroll, rate, span, pad) =>
@@ -1465,6 +1466,86 @@ window.BDArt = (() => {
         const y = H - (((t * 12 + i * 61) % (H + 20)));
         ctx.fillRect(x, y, 3, 3);
       }
+    } else if (kind === "deepCave") {
+      // Far underground: near-black deepslate all around, with ore glinting
+      // in the far wall and big sculk patches that pulse with light.
+      ctx.fillStyle = skyGrad(ctx, H, "#08080c", "#1d1d26");
+      ctx.fillRect(0, 0, W, H);
+      // ore in the far wall: diamond, redstone, gold, each catching the light now and then
+      // One vein somewhere inside each square of a loose 5x3 grid, with a few
+      // squares left empty: spread over the whole wall, but never in rows.
+      // Sized off the block size, so the Level Maker's smaller picture shows
+      // the same cave as the game.
+      const ores = ["#4fe0d8", "#e0483a", "#ffd54a"];
+      const u = ts / 45;
+      const rnd = (n) => { const v = Math.sin(n * 12.9898 + 4.1) * 43758.5453; return v - Math.floor(v); };
+      const span = W + 60 * u;
+      for (let i = 0; i < 15; i++) {
+        if (rnd(i + 50) < 0.2) continue;
+        const x = wrapX((i % 5 + 0.1 + rnd(i) * 0.8) / 5 * span, scroll, 0.08, span, 30 * u);
+        const y = (0.12 + (Math.floor(i / 5) + 0.1 + rnd(i + 20) * 0.8) / 3 * 0.66) * H;
+        ctx.globalAlpha = 0.4 + 0.4 * Math.max(0, Math.sin(t * 1.3 + i * 2.1));
+        ctx.fillStyle = ores[(i * 2 + Math.floor(i / 5)) % 3]; // an even mix of the three
+        ctx.fillRect(x, y, 6 * u, 6 * u);
+        ctx.fillRect(x + 9 * u, y + 6 * u, 6 * u, 6 * u);
+        if (rnd(i + 110) < 0.5) ctx.fillRect(x - 3 * u, y + 12 * u, 6 * u, 6 * u);
+      }
+      ctx.globalAlpha = 1;
+      // Sculk: two big dark patches spreading over the far wall, ragged at
+      // the edges, with thin veins creeping out around them. Every few seconds a ring of light starts at a patch's
+      // heart and ripples out to its rim.
+      const cell = 10 * u;
+      for (let p = 0; p < 2; p++) {
+        const cx = wrapX((p + 0.25 + rnd(p + 200) * 0.5) / 2 * span, scroll, 0.08, span, 30 * u);
+        const cy = (0.32 + rnd(p + 210) * 0.3) * H;
+        const R = 6 + p; // in sculk squares
+        const phase = (t * 5 + p * 19) % 46; // one ripple, then a long dark wait
+        // Veins: thin tendrils creeping out from under the patch in every
+        // direction, each wandering as it goes. The ripple runs on along them.
+        const thin = cell / 2;
+        for (let v = 0; v < 7; v++) {
+          const ang = (v + rnd(p * 50 + v + 700) * 0.7) / 7 * Math.PI * 2;
+          const ax = Math.cos(ang), ay = Math.sin(ang);
+          // step along whichever way it mostly points; sideways now and then
+          const main = Math.abs(ax) > Math.abs(ay) ? [Math.sign(ax), 0] : [0, Math.sign(ay)];
+          const side = Math.abs(ax) > Math.abs(ay) ? [0, Math.sign(ay) || 1] : [Math.sign(ax) || 1, 0];
+          let hx = Math.round(ax * R * 0.8), hy = Math.round(ay * R * 0.6); // in half squares
+          const len = 12 + Math.floor(rnd(p * 50 + v + 720) * 12);
+          for (let k = 0; k < len; k++) {
+            const r = rnd(p * 5000 + v * 100 + k + 800);
+            const step = r < 0.55 ? main : r < 0.85 ? side : [-side[0], -side[1]];
+            hx += step[0];
+            hy += step[1];
+            ctx.fillStyle = "#0b2a33";
+            ctx.fillRect(cx + hx * thin, cy + hy * thin, thin, thin);
+            const g = Math.max(0, 1 - Math.abs(phase - Math.hypot(hx / 2, hy / 2 * 1.3)) / 2);
+            if (g > 0) {
+              ctx.fillStyle = `rgba(70, 235, 225, ${g * 0.85})`;
+              ctx.fillRect(cx + hx * thin, cy + hy * thin, thin, thin);
+            }
+          }
+        }
+        for (let gy = -R; gy <= R; gy++) {
+          for (let gx = -R; gx <= R; gx++) {
+            const d = Math.hypot(gx, gy * 1.3); // wider than tall
+            // a lumpy outline, with squares missing here and there near the rim
+            const reach = R * (0.72 + 0.28 * Math.sin(Math.atan2(gy, gx) * 3 + p * 2)) - rnd(p * 1000 + gx * 31 + gy * 57 + 300) * 1.6;
+            if (d > reach) continue;
+            const x = cx + gx * cell, y = cy + gy * cell;
+            ctx.fillStyle = rnd(p * 1000 + gx * 13 + gy * 71 + 600) < 0.12 ? "#12414c" : "#0b2a33";
+            ctx.fillRect(x, y, cell, cell);
+            const g = Math.max(0, 1 - Math.abs(phase - d) / 2);
+            if (g > 0) {
+              ctx.fillStyle = `rgba(70, 235, 225, ${g * 0.85})`;
+              ctx.fillRect(x, y, cell, cell);
+            }
+          }
+        }
+      }
+      jagged(ctx, W, 0, 1, scroll, 0.15, 48, 24, 70, 3, "#1a1a22");
+      jagged(ctx, W, 0, 1, scroll, 0.3, 36, 8, 34, 11, "#2a2a35");
+      jagged(ctx, W, groundY + ts * 0.3, -1, scroll, 0.25, 44, 30, 90, 5, "#1c1c25");
+      jagged(ctx, W, groundY + ts * 0.3, -1, scroll, 0.5, 32, 10, 46, 17, "#30303c");
     } else if (kind === "end") {
       ctx.fillStyle = skyGrad(ctx, H, "#07040d", "#2a1640");
       ctx.fillRect(0, 0, W, H);
