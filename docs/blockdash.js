@@ -150,6 +150,7 @@
   const STORE_KEY = "blockdash_levels_v1";
   const BEST_KEY = "blockdash_best_v1";
   const BAG_KEY = "blockdash_bag_v1";
+  const HERO_KEY = "blockdash_hero_v1";
 
   const root = document.getElementById("bd-root");
 
@@ -528,6 +529,38 @@
     return list;
   };
 
+  // The look the player picked on the menu. A level that sets its own
+  // Player look in the Level Maker still wins over this.
+  const pickedHero = () => {
+    let k = null;
+    try { k = localStorage.getItem(HERO_KEY); } catch (e) { /* the usual player */ }
+    return window.BDArt.baseOf(k) === "player" ? k : null;
+  };
+
+  const heroPanel = () => {
+    const panel = el("div", "panel");
+    panel.appendChild(el("h2", null, "Pick your player"));
+    const row = el("div", "row");
+    const picked = pickedHero();
+    [[null, "Usual"]]
+      .concat(window.BDArt.customBlocks().filter((b) => b.base === "player").map((b) => [b.key, b.label]))
+      .forEach(([k, label]) => {
+        const item = el("div", "pal-item" + (k === picked ? " sel" : ""));
+        item.style.minWidth = "76px";
+        item.append(spriteThumb(k || "player", 48, 48), el("div", "lbl", label));
+        item.onclick = () => {
+          try {
+            if (k) localStorage.setItem(HERO_KEY, k);
+            else localStorage.removeItem(HERO_KEY);
+          } catch (e) { /* ignore */ }
+          showMenu();
+        };
+        row.appendChild(item);
+      });
+    panel.appendChild(row);
+    return panel;
+  };
+
   // What you're carrying, and the recipe, laid out like inventory slots.
   const bagPanel = () => {
     const bag = loadBag();
@@ -612,12 +645,12 @@
           "across the whole run."));
       }
       root.appendChild(bp);
-      if (!editMode) root.appendChild(bagPanel());
+      if (!editMode) root.append(heroPanel(), bagPanel());
     }
     if (!editMode) return;
 
     // ---- levels saved in this browser ----
-    root.appendChild(bagPanel());
+    root.append(heroPanel(), bagPanel());
     const panel = el("div", "panel");
     panel.appendChild(el("h2", null, "My levels"));
 
@@ -2030,7 +2063,7 @@
       return [out, lk];
     };
     let [template, looks] = strip(rowsToGrid(level.rows));
-    const hero = Art.baseOf(level.hero) === "player" ? level.hero : null;
+    const hero = Art.baseOf(level.hero) === "player" ? level.hero : pickedHero();
     const notes = cleanNotes(level.rows, level.notes);
     let width = template[0].length;
     let spawn = findSpawn(template);

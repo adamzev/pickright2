@@ -99,6 +99,10 @@ The **🎨 Art** button in the Level Maker (`blockdash.html?edit`) opens a pixel
 art editor. Play mode never shows it; players who don't paint just get whatever
 art ships in `blockdash-artpack.js`.
 
+Player looks that ship in the art pack (entries with `"base": "player"`) show up
+under **Pick your player** on the menu. The pick is remembered in the browser; a
+level that sets its own Player look in the Level Maker still uses that one.
+
 **Art code** shares a texture pack as text, like a level code: **Make code**
 turns everything painted in this browser into a code (about 2,000 characters
 for the whole pack) and copies it; paste one in and press **Use code** to load

@@ -788,5 +788,64 @@ window.BDArtPack = {
       "#8b5a2b","#9c6b43","#9c6b43","#9c6b43","#633718","#6f6369","#9c6b43","#9c6b43","#7a4e24","#8b5a2b","#8b5a2b","#8b5a2b","#9c6b43","#633718","#9c6b43","#8b5a2b",
       "#8b5a2b","#8b5a2b","#8b5a2b","#633718","#8b5a2b","#8b5a2b","#8b5a2b","#8b5a2b","#8b5a2b","#7a4e24","#8b5a2b","#633718","#8b5a2b","#9c6b43","#8b5a2b","#633718"
     ]
+  },
+  // Player looks: pickable on the menu (base "player").
+  "\ue98d": {
+    "name": "Rachel Jr the 2nd",
+    "base": "player",
+    "w": 16,
+    "h": 21,
+    "px": [
+      null,null,null,"#000000","#000000","#000000","#000000","#000000","#000000","#000000","#000000","#000000","#000000",null,null,null,
+      null,null,null,"#000000","#4a3520","#4a3520","#4a3520","#4a3520","#4a3520","#4a3520","#4a3520","#4a3520","#000000",null,null,null,
+      null,null,null,"#000000","#9c6b43","#9c6b43","#9c6b43","#4a3520","#4a3520","#4a3520","#4a3520","#4a3520","#000000",null,null,null,
+      null,null,null,"#000000","#9c6b43","#9c6b43","#9c6b43","#9c6b43","#9c6b43","#9c6b43","#4a3520","#4a3520","#000000",null,null,null,
+      null,null,null,"#000000","#9c6b43","#ffffff","#5b1f96","#9c6b43","#9c6b43","#ffffff","#5b1f96","#9c6b43","#000000",null,null,null,
+      null,null,null,"#000000","#9c6b43","#9c6b43","#9c6b43","#9c6b43","#9c6b43","#9c6b43","#9c6b43","#9c6b43","#000000",null,null,null,
+      null,null,null,"#000000","#9c6b43","#9c6b43","#9c6b43","#9c6b43","#9c6b43","#9c6b43","#9c6b43","#9c6b43","#000000",null,null,null,
+      null,null,null,"#000000","#9c6b43","#9c6b43","#9c6b43","#9c6b43","#9c6b43","#9c6b43","#9c6b43","#9c6b43","#000000",null,null,null,
+      "#000000","#000000","#000000","#000000","#000000","#000000","#000000","#000000","#000000","#000000","#000000","#000000","#000000","#000000","#000000",null,
+      "#000000","#1c1c1a","#1c1c1a","#1c1c1a","#000000","#1c1c1a","#3a3a48","#1c1c1a","#3a3a48","#1c1c1a","#000000","#1c1c1a","#1c1c1a","#1c1c1a","#000000",null,
+      "#000000","#1c1c1a","#1c1c1a","#1c1c1a","#000000","#1c1c1a","#3a3a48","#1c1c1a","#3a3a48","#1c1c1a","#000000","#1c1c1a","#1c1c1a","#1c1c1a","#000000",null,
+      "#000000","#1c1c1a","#1c1c1a","#1c1c1a","#000000","#1c1c1a","#8a8a8a","#1c1c1a","#8a8a8a","#1c1c1a","#000000","#1c1c1a","#1c1c1a","#1c1c1a","#000000",null,
+      "#000000","#9c6b43","#9c6b43","#9c6b43","#000000","#1c1c1a","#1c1c1a","#1c1c1a","#1c1c1a","#1c1c1a","#000000","#9c6b43","#9c6b43","#9c6b43","#000000",null,
+      "#000000","#9c6b43","#9c6b43","#9c6b43","#000000","#1c1c1a","#1c1c1a","#1c1c1a","#1c1c1a","#1c1c1a","#000000","#9c6b43","#9c6b43","#9c6b43","#000000",null,
+      "#000000","#9c6b43","#9c6b43","#9c6b43","#000000","#1c1c1a","#1c1c1a","#1c1c1a","#1c1c1a","#1c1c1a","#000000","#9c6b43","#9c6b43","#9c6b43","#000000",null,
+      "#000000","#9c6b43","#9c6b43","#9c6b43","#000000","#1c1c1a","#1c1c1a","#1c1c1a","#1c1c1a","#1c1c1a","#000000","#9c6b43","#9c6b43","#9c6b43","#000000",null,
+      "#000000","#000000","#000000","#000000","#000000","#000000","#000000","#000000","#000000","#000000","#000000","#000000","#000000","#000000","#000000",null,
+      null,null,null,"#000000","#1d3a12","#1d3a12","#1d3a12","#000000","#000000","#1d3a12","#1d3a12","#1d3a12","#000000","#000000",null,null,
+      null,null,null,"#000000","#1d3a12","#1d3a12","#1d3a12","#000000","#000000","#1d3a12","#1d3a12","#1d3a12","#000000",null,null,null,
+      null,null,null,"#000000","#1d3a12","#1d3a12","#1d3a12","#000000","#000000","#1d3a12","#1d3a12","#1d3a12","#000000",null,null,null,
+      null,null,null,"#000000","#1d3a12","#1d3a12","#1d3a12","#000000","#000000","#1d3a12","#1d3a12","#1d3a12","#000000",null,null,null
+    ]
+  },
+  "\ue934": {
+    "name": "Player2",
+    "base": "player",
+    "w": 16,
+    "h": 21,
+    "px": [
+      null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,
+      null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,
+      null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,
+      null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,
+      null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,
+      null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,
+      null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,
+      null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,
+      null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,
+      null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,
+      null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,
+      null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,
+      null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,
+      null,null,null,null,null,null,null,null,null,null,null,null,"#000000",null,"#000000",null,
+      "#000000",null,null,null,null,null,null,null,null,null,null,"#000000","#000000","#000000","#000000","#000000",
+      "#000000","#000000",null,null,null,null,null,null,null,null,null,"#ffffff","#1f56a8","#000000","#ffffff","#1f56a8",
+      null,"#000000","#000000",null,"#000000","#000000","#000000","#000000","#000000","#000000","#000000","#000000","#000000","#000000","#000000","#000000",
+      null,null,"#000000","#000000","#000000","#000000","#000000","#000000","#000000","#000000","#000000","#000000","#1c1c1a","#a855e8","#1c1c1a","#000000",
+      null,null,null,null,"#000000","#000000","#000000","#000000","#000000","#000000","#000000","#000000","#1c1c1a","#1c1c1a","#1c1c1a","#000000",
+      null,null,null,null,null,"#000000",null,"#000000",null,"#000000",null,"#000000",null,null,null,null,
+      null,null,null,null,null,"#000000",null,"#000000",null,"#000000",null,"#000000",null,null,null,null
+    ]
   }
 };
