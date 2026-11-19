@@ -59,8 +59,39 @@
     G: { name: "Boss portal" },
     J: { name: "Boss platform", solid: true },
     B: { name: "Bush" },
+    $: { name: "Emerald" },
+    "+": { name: "Gold" },
+    "@": { name: "Megatite" },
+    "%": { name: "Fake lightning" },
+    // mega blocks: placing one in the Level Maker means buying it in the shop first
+    8: { name: "Mega TNT", mega: true },
+    0: { name: "Mega slime", solid: true, mega: true },
+    "&": { name: "Mega bush", mega: true },
     P: { name: "Start" },
+    // Doors are two blocks tall: the letter sits in the bottom square and the
+    // square above it counts as door too. Shut, they're solid; they open as
+    // you reach them. `reach` is how close (in blocks) that is.
+    "\u0180": { name: "Normal door", solid: true, door: true, reach: 0.4 },
+    "\u0181": { name: "Nether door", solid: true, door: true, reach: 0.4 },
+    "\u0182": { name: "End door", solid: true, door: true, reach: 0.4 },
+    "\u0183": { name: "Mushroom door", solid: true, door: true, reach: 0.4 },
+    "\u0184": { name: "Mechanical door", solid: true, door: true, reach: 2.5 },
+    "\u0185": { name: "Upgraded door", solid: true, door: true, reach: 0.4, locked: true },
+    "\u0186": { name: "Key" },
   };
+  const KEY = "\u0186";
+  const DOORS = ["\u0180", "\u0181", "\u0182", "\u0183", "\u0184", "\u0185"];
+  const isDoor = (ch) => !!(TILES[ch] && TILES[ch].door);
+  // an opened door stays in its square as "/" + the door, so it can still be drawn
+  const isOpenDoor = (ch) => ch.length === 2 && ch[0] === "/";
+  // the rest of the mega blocks: one per ordinary block (see BDArt.MEGA)
+  const MEGA = window.BDArt.MEGA;
+  const MEGA_BASE = window.BDArt.MEGA_BASE;
+  for (const [b, m] of Object.entries(MEGA)) {
+    const nm = { b: "Lightning", w: "Wither rose", "%": "Fake lightning" }[b] || TILES[b].name;
+    TILES[m] = { name: "Mega " + nm[0].toLowerCase() + nm.slice(1), mega: true, solid: TILES[b].solid };
+  }
+  const megaOf = (base) => MEGA[base];
 
   // The player's own blocks (made in the Art Studio) are extra looks for the
   // blocks above. Everywhere the rules care what a square is, they ask baseOf.
@@ -68,6 +99,7 @@
   // placed, acts as stone.
   const isMine = window.BDArt.isMine;
   const baseOf = (ch) => {
+    if (MEGA_BASE[ch]) return MEGA_BASE[ch];
     if (!isMine(ch)) return ch;
     const b = window.BDArt.baseOf(ch);
     return b && TILES[b] && !TILES[b].over ? b : "s";
@@ -75,9 +107,10 @@
   const tileOf = (ch) => TILES[baseOf(ch)];
   const typeName = (base) => (base === "player" ? "Player" : TILES[base] && !isMine(base) ? TILES[base].name : "Stone");
   const MINE = "*"; // the one palette button that stands for all of them
+  const MEGA_PICK = "~"; // likewise, the palette button that opens the mega blocks
 
   const PALETTE = ["g", "s", "p", "n", "k", "e", "m", "t", "T", "h", "A", "L", "U", "D", "F", "S", "Z",
-    "W", "Y", "V", "Q", "N", "I", "C", "d", "r", "9", "o", "H", "R", "b", "w", "f", "K", "O", "M", "E", "G", "J", "B", MINE, "P", ERASER];
+    "W", "Y", "V", "Q", "N", "I", "C", "d", "+", "$", "@", "r", "9", "o", "H", "R", "b", "%", "w", "f", "K", "O", "M", "E", "G", "J", "B", ...DOORS, KEY, MEGA_PICK, MINE, "P", ERASER];
 
   // The boss arena is drawn in the same editor as the level, with a slightly
   // different set of blocks: no portals, save points or note-carrying blocks
@@ -96,10 +129,15 @@
   const GRAVITY = 62;
   const JUMP_V = 17.5;
   const BOUNCE_V = 25;
+  const MEGA_BOUNCE_V = 33; // a mega slime throws you about 1.7 times as high
+  const MEGA_BLAST = 1; // a mega TNT goes off when you come within this many blocks of it
   const SPEED_BASE = 7.5;
   const SPEED_FAST = 12;
   const SPEED_SLOW = 4.2;
   const EFFECT_TIME = 3;
+  const DOOR_SWING = 0.25; // seconds for a door to swing open
+  const BOOST_TIME = 1.5; // a mega wings boost
+  const BOOST_RECHARGE = 3;
   const FLY_THRUST = 110; // upward push while jump is held (beats GRAVITY)
   const FLY_UP_V = 10; // fastest climb
   const GLIDE_FALL = 3; // fastest fall with wings on and jump let go
@@ -109,7 +147,7 @@
   const STOP_DEFAULT = 2; // seconds a Stop block holds you, unless the editor says otherwise
   // The TNT Mech boss fight (starts at a Boss portal)
   const ARENA_W = 22; // just wider than one screen
-  const BOSS_HP = 3; // stomps on its head to win
+  const BOSS_HP = 5; // stomps on its head to win, bare-handed
   const BOSS_STAGE = 9; // seconds each of its three attacks lasts
   const BOSS_PX = 0.2; // blocks per pixel of the 24x32 boss sprite
   const BOSS_X = 15.2; // where its left (spike) arm starts
@@ -124,6 +162,12 @@
   const LAVA_RISE = 1.2; // new blocks per second from a rising-lava source
   const LAVA_FALL = 0.7; // falling lava "slowly falls"
   const FLOWED = "l"; // lava grown from a source during play; never in saved levels
+  // Lava logging: flowing lava soaks through a plant instead of stopping at
+  // it. The square becomes "l" + the plant, so it still shows the plant (lava
+  // behind it) and burns like lava. Play-only, like FLOWED.
+  const LOGGABLE = "wB";
+  const isLogged = (ch) => ch.length === 2 && ch[0] === FLOWED;
+  const isLava = (ch) => ch === "L" || ch === "U" || ch === "D" || ch === FLOWED || isLogged(ch);
   const SHOOT_EVERY = 2; // seconds between stars
   const BULLET_SPEED = 5.5; // slower than you run, so they hit from ahead
   const BULLET_TURN = 2.2; // how hard a star can steer toward you, per second
@@ -151,6 +195,49 @@
   const BEST_KEY = "blockdash_best_v1";
   const BAG_KEY = "blockdash_bag_v1";
   const HERO_KEY = "blockdash_hero_v1";
+
+  // Money. Picking these up pays coins (which is also the level's score);
+  // megatite pays megacoins instead.
+  const COIN_VALUE = { d: 10, "+": 15, $: 20 };
+  const MEGATITE_PAYS = 30;
+  const COINS_PER_MEGACOIN = 2;
+  // The coin shop. A better sword means fewer stomps to beat the boss; you
+  // always fight with the best one you own.
+  const SWORDS = [
+    null,
+    { key: "swordStone", name: "Stone sword", cost: 10, hits: 4 },
+    { key: "swordIron", name: "Iron sword", cost: 20, hits: 3 },
+    { key: "swordDiamond", name: "Diamond sword", cost: 40, hits: 2 },
+  ];
+  const SHIELD_COST = 50;
+  const SHIELD_TIME = 2; // seconds nothing can hurt you after a shield saves you
+  const MEGA_COST = 30; // megacoins to unlock one mega block
+  // What each mega does. Blocks not listed with a power just glow: they
+  // act exactly like the ordinary block.
+  const MEGA_POWER = {
+    8: "Explodes when you come within a block of it, not just on touch",
+    0: "Bounces you much higher than a normal slime",
+    "&": "A bush in bloom. Just decoration",
+    d: "Pays double: 20 coins", "+": "Pays double: 30 coins", $: "Pays double: 40 coins",
+    "@": "Pays double: 60 megacoins",
+    r: "Counts as 2 blaze rods", 9: "Counts as 2 ender pearls", o: "Counts as 2 eyes of ender",
+    T: "Explodes when you come within a block of it, not just on touch",
+    b: "Super fast for twice as long: 6 seconds",
+    w: "Slows you for twice as long: 6 seconds",
+    L: "Burns you from a block away, not just on touch",
+    U: "Burns you from a block away, not just on touch",
+    D: "Burns you from a block away, not just on touch",
+    F: "Burns you from a block away, not just on touch",
+    f: "Wings with a ⚡ Boost button (or Shift): a burst of speed whenever it's charged",
+  };
+  const MEGA_GLOW = "Glows. Otherwise just like the normal block";
+  const MEGA_BLOCKS = [
+    ["8", MEGA_POWER[8]], ["0", MEGA_POWER[0]], ["&", MEGA_POWER["&"]],
+    ...Object.entries(MEGA).map(([b, m]) => [m, MEGA_POWER[b] || MEGA_GLOW]),
+  ];
+  // the ones with a power come first in the shop and the Level Maker
+  MEGA_BLOCKS.sort((a, b) => (a[1] === MEGA_GLOW) - (b[1] === MEGA_GLOW));
+  const MEGA_LIST = MEGA_BLOCKS.map(([ch]) => ch);
 
   const root = document.getElementById("bd-root");
 
@@ -219,7 +306,12 @@
     let b = {};
     try { b = JSON.parse(localStorage.getItem(BAG_KEY) || "{}") || {}; } catch (e) { /* empty bag */ }
     const n = (v) => (Number.isFinite(v) && v > 0 ? Math.floor(v) : 0);
-    return { rods: n(b.rods), pearls: n(b.pearls), eyes: n(b.eyes) };
+    return {
+      rods: n(b.rods), pearls: n(b.pearls), eyes: n(b.eyes),
+      coins: n(b.coins), mega: n(b.mega), shields: n(b.shields),
+      sword: Math.min(n(b.sword), SWORDS.length - 1),
+      unlocked: Array.isArray(b.unlocked) ? b.unlocked.filter((k) => TILES[k] && TILES[k].mega) : [],
+    };
   };
 
   const saveBag = (bag) => {
@@ -573,7 +665,7 @@
       drawTile(c.getContext("2d"), ch, 0, 0, 40, 0, false);
       d.appendChild(c);
       if (count !== undefined) d.appendChild(el("span", "bag-count", String(count)));
-      d.title = TILES[ch].name;
+      d.title = TILES[ch] ? TILES[ch].name : { coin: "Coins", megacoin: "Megacoins", shield: "Shields" }[ch] || "Sword";
       return d;
     };
     const have = el("div", "row tight");
@@ -586,16 +678,116 @@
     panel.appendChild(el("p", "hint",
       "Blaze rods, ender pearls and eyes of ender stay with you from level to level. " +
       "Put eyes in portal frames to open the boss portal."));
+    const money = el("div", "row tight bag-recipe");
+    money.append(slot("coin", bag.coins), slot("megacoin", bag.mega));
+    if (bag.sword) money.append(slot(SWORDS[bag.sword].key));
+    if (bag.shields) money.append(slot("shield", bag.shields));
+    const shop = el("button", "green small", "🛒 Shop");
+    shop.onclick = () => showShop();
+    money.append(el("div", "spacer"), shop);
+    panel.appendChild(money);
     if (editMode && (bag.rods || bag.pearls || bag.eyes)) {
       const empty = el("button", "small", "Empty the inventory");
       empty.onclick = () => {
         if (!confirm("Throw away every rod, pearl and eye you're carrying?")) return;
-        saveBag({ rods: 0, pearls: 0, eyes: 0 });
+        saveBag(Object.assign(loadBag(), { rods: 0, pearls: 0, eyes: 0 }));
         showMenu();
       };
       panel.appendChild(empty);
     }
     return panel;
+  };
+
+  // ---------- the shop ----------
+
+  const showShop = () => {
+    clear();
+    const bag = loadBag();
+    const head = el("div", "row");
+    head.appendChild(el("h1", null, "Shop"));
+    head.appendChild(el("div", "spacer"));
+    const back = el("button", "small", "← Back");
+    back.onclick = () => showMenu();
+    head.appendChild(back);
+    root.appendChild(head);
+
+    const thumb = (key) => {
+      const c = el("canvas");
+      c.width = c.height = 48;
+      drawTile(c.getContext("2d"), key, 0, 0, 48, 0, false);
+      return c;
+    };
+    const spend = (change) => { saveBag(Object.assign(bag, change)); showShop(); };
+
+    const wallet = el("div", "panel");
+    wallet.appendChild(el("h2", null, "Your money"));
+    const have = el("div", "row tight");
+    have.append(thumb("coin"), el("b", null, `${bag.coins} coins`), el("div", "spacer"),
+      thumb("megacoin"), el("b", null, `${bag.mega} megacoins`));
+    wallet.appendChild(have);
+    wallet.appendChild(el("p", "hint",
+      `Diamonds pay 10 coins, gold 15, emeralds 20. Megatite pays ${MEGATITE_PAYS} megacoins. ` +
+      "You keep what you picked up when you finish the level."));
+    const conv = el("div", "row tight");
+    const toCoins = el("button", "small", `1 megacoin → ${COINS_PER_MEGACOIN} coins`);
+    toCoins.disabled = bag.mega < 1;
+    toCoins.onclick = () => spend({ mega: bag.mega - 1, coins: bag.coins + COINS_PER_MEGACOIN });
+    const toMega = el("button", "small", `${COINS_PER_MEGACOIN} coins → 1 megacoin`);
+    toMega.disabled = bag.coins < COINS_PER_MEGACOIN;
+    toMega.onclick = () => spend({ coins: bag.coins - COINS_PER_MEGACOIN, mega: bag.mega + 1 });
+    const allMega = el("button", "small", "All coins → megacoins");
+    allMega.disabled = bag.coins < COINS_PER_MEGACOIN;
+    allMega.onclick = () => {
+      const n = Math.floor(bag.coins / COINS_PER_MEGACOIN);
+      spend({ coins: bag.coins - n * COINS_PER_MEGACOIN, mega: bag.mega + n });
+    };
+    const allCoins = el("button", "small", "All megacoins → coins");
+    allCoins.disabled = bag.mega < 1;
+    allCoins.onclick = () => spend({ mega: 0, coins: bag.coins + bag.mega * COINS_PER_MEGACOIN });
+    conv.append(el("span", "hint", "Convert:"), toCoins, toMega, allCoins, allMega);
+    wallet.appendChild(conv);
+    root.appendChild(wallet);
+
+    // one row of a shop: picture, what it is, and a Buy button (or why not)
+    const item = (key, name, what, price, unit, state, onBuy) => {
+      const row = el("div", "row tight shop-item");
+      const words = el("div");
+      words.style.flex = "1";
+      words.append(el("b", null, name), el("div", "hint", what));
+      const have = unit === "coins" ? bag.coins : bag.mega;
+      const buy = el("button", "green small", state || `Buy · ${price} ${unit}`);
+      buy.disabled = !!state || have < price;
+      if (!state && have < price) buy.title = `You need ${price - have} more ${unit}`;
+      buy.onclick = onBuy;
+      row.append(thumb(key), words, buy);
+      return row;
+    };
+
+    const coinShop = el("div", "panel");
+    coinShop.appendChild(el("h2", null, "Coin shop"));
+    coinShop.appendChild(el("p", "hint",
+      `With no sword the boss takes ${BOSS_HP} stomps. You always use the best sword you own.`));
+    SWORDS.forEach((sw, i) => {
+      if (!sw) return;
+      const state = bag.sword === i ? "Yours ✓" : bag.sword > i ? "You have better" : "";
+      coinShop.appendChild(item(sw.key, sw.name, `Beat the boss in ${sw.hits} stomps`, sw.cost, "coins", state,
+        () => spend({ coins: bag.coins - sw.cost, sword: i })));
+    });
+    coinShop.appendChild(item("shield", `Shield${bag.shields ? ` (you have ${bag.shields})` : ""}`,
+      "Saves you once from a mob hit (blazes, fireballs, end mobs, the boss). Then it's used up",
+      SHIELD_COST, "coins", "", () => spend({ coins: bag.coins - SHIELD_COST, shields: bag.shields + 1 })));
+    root.appendChild(coinShop);
+
+    const megaShop = el("div", "panel");
+    megaShop.appendChild(el("h2", null, "Megacoin shop"));
+    megaShop.appendChild(el("p", "hint",
+      "Mega blocks are stronger or fancier versions of normal blocks. Buy one and you can place it in the Level Maker."));
+    MEGA_BLOCKS.forEach(([ch, what]) => {
+      megaShop.appendChild(item(ch, TILES[ch].name, what, MEGA_COST, "megacoins",
+        bag.unlocked.includes(ch) ? "Yours ✓" : "",
+        () => spend({ mega: bag.mega - MEGA_COST, unlocked: bag.unlocked.concat(ch) })));
+    });
+    root.appendChild(megaShop);
   };
 
   const showMenu = () => {
@@ -815,8 +1007,12 @@
       ["t", "TNT — touch it and you explode. Game over!"],
       ["h", "Hidden TNT — invisible when you play. Hide it somewhere tempting!"],
       ["C", "Saving point — die after passing it and you come back here"],
-      ["d", "Diamond — worth 10 points"],
+      ["d", "Diamond — worth 10 coins"],
+      ["+", "Gold — worth 15 coins"],
+      ["$", "Emerald — worth 20 coins"],
+      ["@", "Megatite — worth 30 megacoins. Spend coins and megacoins in the Shop"],
       ["b", "Lightning — go super fast for 3 seconds"],
+      ["%", "Fake lightning — looks just like Lightning, but does nothing at all"],
       ["w", "Wither rose — slows you down for 3 seconds"],
       ["n", "Netherrack — solid, like stone but for the Nether"],
       ["k", "Nether bricks — solid bricks for Nether builds"],
@@ -846,8 +1042,21 @@
       ["s", "More blocks — blocks you name and paint yourself. In the Art Studio press ＋ New block and pick something to start from: your block acts just like it (a blue slime still bounces). Find them under More blocks in the Level Maker"],
       ["J", "Boss platform — for the boss arena. Only appears while the boss says CLIMB UP, so build the way to its head out of these"],
       ["E", "End portal — finish the level here"],
-      ["G", "Boss portal — use it instead of the End portal. Add Portal frames to keep it shut until they're filled. The TNT Mech boss is waiting: dodge its TNT rain, climb up and stomp its head, dodge its shooter arm. Three stomps wins"],
+      ["G", "Boss portal — use it instead of the End portal. Add Portal frames to keep it shut until they're filled. The TNT Mech boss is waiting: dodge its TNT rain, climb up and stomp its head, dodge its shooter arm. Five stomps wins, or fewer with a sword from the Shop"],
       ["B", "Bush — just decoration, safe to touch"],
+      ["8", "Mega TNT — goes off when you come within a block of it, with a much bigger bang. Buy it in the Shop to place it"],
+      ["0", "Mega slime — bounces you much higher than Slime. Buy it in the Shop to place it"],
+      ["&", "Mega bush — a bush in bloom. Buy it in the Shop to place it"],
+      ...MEGA_BLOCKS.filter(([ch, what]) => MEGA_BASE[ch] && what !== MEGA_GLOW)
+        .map(([ch, what]) => [ch, `${TILES[ch].name} — ${what[0].toLowerCase()}${what.slice(1)}. Buy it in the Shop to place it`]),
+      [megaOf("s"), "Every other block has a mega version too (Mega stone, Mega netherrack…). They glow but act just like the normal block. Find them all under Mega blocks"],
+      ["\u0180", "Normal door — two blocks tall. Shut, it's a wall; it swings open as you reach it"],
+      ["\u0181", "Nether door — like the Normal door, in Nether crimson"],
+      ["\u0182", "End door — like the Normal door, in End stone"],
+      ["\u0183", "Mushroom door — like the Normal door, with a mushroom on top"],
+      ["\u0184", "Mechanical door — opens by itself when you get within a couple of blocks"],
+      ["\u0185", "Upgraded door — locked! It only opens if you're carrying a key, and uses the key up. Without one it's a wall"],
+      ["\u0186", "Key — opens one Upgraded door. Keys only work in the level you find them in"],
       ["P", "Start — where you spawn"],
     ].forEach(([ch, text]) => {
       const r = el("div", "row tight");
@@ -858,7 +1067,8 @@
       const label = el("span", "hint", text);
       label.style.flex = "1";
       r.appendChild(label);
-      if (editMode) {
+      // the Art Studio paints square blocks; doors are two tall
+      if (editMode && !isDoor(ch) && ch !== KEY) {
         const paint = el("button", "small", "🎨");
         paint.title = "Repaint this block";
         paint.onclick = () => showArtStudio(ch);
@@ -1044,7 +1254,10 @@
         ? "It will be a new <b>player look</b>. Pick it with Player look in the Level Maker."
         : `It will act like <b>${typeName(base)}</b>.`;
     };
-    Art.SPRITE_INFO.filter((s) => s.key === "player" || s.key === "dirt" || (TILES[s.key] && !TILES[s.key].over))
+    // not megas: a homemade block acts like its starting block, and the
+    // rules only know megas by their own letters
+    Art.SPRITE_INFO.filter((s) => s.key === "player" || s.key === "dirt" ||
+      (TILES[s.key] && !TILES[s.key].over && !MEGA_BASE[s.key]))
       .map((s) => [s.key, s.label])
       .concat(mine.map((b) => [b.key, b.label]), [["blank", "Blank"]])
       .forEach(([k, label]) => {
@@ -1673,6 +1886,30 @@
       tray.innerHTML = "";
       tray.style.display = trayOpen ? "" : "none";
       if (!trayOpen) return;
+      if (trayOpen === MEGA_PICK) {
+        // a mega block has to be bought in the shop before it can be placed
+        const owned = loadBag().unlocked;
+        MEGA_LIST.forEach((k) => {
+          if (hiddenNow().includes(baseOf(k))) return;
+          const locked = !owned.includes(k);
+          const item = el("div", "pal-item" + (k === sel ? " sel" : ""));
+          const c = el("canvas");
+          c.width = c.height = 32;
+          drawTile(c.getContext("2d"), k, 0, 0, 32, 0, false);
+          if (locked) c.style.opacity = "0.35";
+          item.append(c, el("div", "lbl", (locked ? "🔒 " : "") + TILES[k].name));
+          item.onclick = () => {
+            if (locked) { toast(`Buy ${TILES[k].name} in the Shop: ${MEGA_COST} megacoins`); return; }
+            sel = k;
+            Object.values(palItems).forEach((n) => n.classList.remove("sel"));
+            palItems[MEGA_PICK].classList.add("sel");
+            showTray();
+            showOpts();
+          };
+          tray.appendChild(item);
+        });
+        return;
+      }
       myBlocks.forEach(({ key: k, label, base }) => {
         if (hiddenNow().includes(base)) return;
         const item = el("div", "pal-item" + (k === sel ? " sel" : ""));
@@ -1697,14 +1934,22 @@
       c.width = c.height = 32;
       const cx = c.getContext("2d");
       if (ch === ERASER) drawEraser(cx, 0, 0, 32);
+      else if (ch === MEGA_PICK) drawTile(cx, megaOf("s"), 0, 0, 32, 0, false);
       else if (ch !== MINE) drawTile(cx, ch, 0, 0, 32, 0, false);
       item.appendChild(c);
-      item.appendChild(el("div", "lbl", ch === ERASER ? "Erase" : ch === MINE ? "More blocks ▾" : TILES[ch].name));
+      item.appendChild(el("div", "lbl", ch === ERASER ? "Erase" : ch === MINE ? "More blocks ▾"
+        : ch === MEGA_PICK ? "Mega blocks ▾" : TILES[ch].name));
       item.onclick = () => {
+        if (ch === MEGA_PICK) {
+          // opening the mega tray keeps the block you had; pick one inside it
+          trayOpen = MEGA_PICK;
+          showTray();
+          return;
+        }
         // with no blocks made yet there is nothing to draw with: keep the old block picked
         if (ch !== MINE) sel = ch;
         else if (myLast) sel = myLast;
-        trayOpen = ch === MINE;
+        trayOpen = ch === MINE ? MINE : false;
         if (ch !== MINE || myLast) {
           Object.values(palItems).forEach((n) => n.classList.remove("sel"));
           item.classList.add("sel");
@@ -1963,6 +2208,8 @@
               drawTile(ctx, "h", x * TS, y * TS, TS, animT, false);
             } else if (isMob(ch)) {
               Art.drawSprite(ctx, ch, x * TS + TS * 0.05, (y - 1) * TS, TS * 0.9, TS * 2);
+            } else if (isDoor(ch)) {
+              Art.drawSprite(ctx, ch, x * TS, (y - 1) * TS, TS, TS * 2);
             } else {
               drawTile(ctx, ch, x * TS, y * TS, TS, animT, y > 0 && isSolid(grid[y - 1][x]));
             }
@@ -2056,13 +2303,18 @@
     const strip = (g) => {
       const lk = {};
       const out = g.map((row, y) => row.map((ch, x) => {
-        if (!isMine(ch)) return ch;
+        if (!isMine(ch) && !MEGA_BASE[ch]) return ch;
         lk[noteKey(x, y)] = ch;
         return baseOf(ch);
       }));
       return [out, lk];
     };
     let [template, looks] = strip(rowsToGrid(level.rows));
+    // Megas play as their ordinary block (so every rule still applies) and
+    // `looks` remembers which squares are mega, for their extra power.
+    const megaAt = (x, y) => !!MEGA_BASE[looks[noteKey(x, y)]];
+    // 2 for a mega square: pays double, counts double, lasts twice as long
+    const megaTimes = (x, y) => (megaAt(x, y) ? 2 : 1);
     const hero = Art.baseOf(level.hero) === "player" ? level.hero : pickedHero();
     const notes = cleanNotes(level.rows, level.notes);
     let width = template[0].length;
@@ -2088,13 +2340,21 @@
     // …or ones you walk in already carrying some. Same for pearls and eyes.
     const bag = loadBag();
     const crafts = allRows.some((r) => r.includes("H"));
-    const hasRods = crafts || bag.rods > 0 || allRows.some((r) => /[Zr6]/.test(r));
+    const has = (...chs) => allRows.some((r) => chs.some((c) => r.includes(c)));
+    const hasRods = crafts || bag.rods > 0 || has("Z", "r", "6", megaOf("Z"), megaOf("r"));
     const pearlsEl = el("span", "score", "🔮 0");
-    const hasPearls = crafts || bag.pearls > 0 || allRows.some((r) => r.includes("9"));
+    const hasPearls = crafts || bag.pearls > 0 || has("9", megaOf("9"));
     const eyesEl = el("span", "score", "👁 0");
-    const hasEyes = crafts || bag.eyes > 0 || allRows.some((r) => /[o7R]/.test(r));
-    hud.append(scoreEl, ...(hasRods ? [rodsEl] : []), ...(hasPearls ? [pearlsEl] : []),
-      ...(hasEyes ? [eyesEl] : []), pctEl, attEl);
+    const hasEyes = crafts || bag.eyes > 0 || has("o", "7", "R", megaOf("o"));
+    // megacoins earned in this level; they join the wallet when you finish
+    const megaEl = el("span", "score", "Ⓜ 0");
+    const hasMega = has("@", megaOf("@"));
+    const keysEl = el("span", "score", "🔑 0");
+    const hasKeys = has(KEY, "\u0185");
+    const shieldEl = el("span", "score", "🛡 " + bag.shields);
+    const bossMax = bag.sword ? SWORDS[bag.sword].hits : BOSS_HP;
+    hud.append(scoreEl, ...(hasMega ? [megaEl] : []), ...(hasRods ? [rodsEl] : []), ...(hasPearls ? [pearlsEl] : []),
+      ...(hasEyes ? [eyesEl] : []), ...(hasKeys ? [keysEl] : []), ...(bag.shields ? [shieldEl] : []), pctEl, attEl);
     panel.appendChild(hud);
 
     if (chain && chain.count > 1) {
@@ -2128,7 +2388,8 @@
     const rightBtn = el("button", "move-btn", "▶");
     const jumpBtn = el("button", "green", "JUMP");
     jumpBtn.id = "jump-btn";
-    padRow.append(leftBtn, jumpBtn, rightBtn);
+    const boostBtn = el("button", "boost-btn", "⚡ Boost");
+    padRow.append(leftBtn, jumpBtn, boostBtn, rightBtn);
     panel.appendChild(padRow);
     panel.appendChild(el("p", "hint",
       "Tap the screen, press SPACE or ▲ to jump. Hold to keep jumping. " +
@@ -2139,10 +2400,10 @@
     const VIEW_COLS = canvas.width / TS;
 
     let grid, player, score, attempts = 0, state, camX, effect, effectT,
-      rot, coyote, buffer, particles, deadT, time = 0, holding = false,
+      rot, coyote, buffer, particles, deadT, time = 0, holding = false, keys = 0, doorT = {},
       checkpoint = null, flying = false, deathKind = "boom",
       movers = [], shooters = [], bullets = [], spawners = [], blazes = [], fireballs = [],
-      rods = 0, pearls = 0, eyes = 0, framesLeft = 0, told = {}, watchers = [], mobs = [], runT = 0, warp = null,
+      rods = 0, pearls = 0, eyes = 0, megas = 0, shieldT = 0, framesLeft = 0, told = {}, watchers = [], mobs = [], runT = 0, warp = null,
       free = false, moveL = false, moveR = false, stopT = 0, talk = null, talkAt = 0, poofed = false,
       inBoss = false, boss = null, introSeen = false, cutT = 0, downT = 0, knock = 0, plats = [];
 
@@ -2150,6 +2411,7 @@
       rodsEl.textContent = "🪄 " + rods;
       pearlsEl.textContent = "🔮 " + pearls;
       eyesEl.textContent = "👁 " + eyes;
+      keysEl.textContent = "🔑 " + keys;
     };
 
     // toasts for things you stand in for many frames: once per attempt
@@ -2162,6 +2424,29 @@
     const setFree = (on) => {
       free = on;
       leftBtn.style.display = rightBtn.style.display = on ? "" : "none";
+    };
+
+    // Mega wings come with a Boost: a short burst at Lightning speed, then a
+    // wait while it recharges. The button fills up as it charges.
+    let boostOn = false, boostCD = 0, boostShown = "";
+    const setBoost = (on) => {
+      boostOn = on;
+      boostCD = 0;
+      boostBtn.style.display = on ? "" : "none";
+    };
+    const boost = () => {
+      if (!boostOn || boostCD > 0 || state !== "run") return;
+      effect = "fast";
+      effectT = BOOST_TIME;
+      boostCD = BOOST_RECHARGE;
+    };
+    const showBoost = () => {
+      const pct = boostCD > 0 ? Math.round((1 - boostCD / BOOST_RECHARGE) * 100) : 100;
+      const key = boostOn + ":" + pct;
+      if (key === boostShown) return;
+      boostShown = key;
+      boostBtn.disabled = pct < 100;
+      boostBtn.style.setProperty("--charge", pct + "%");
     };
 
     // fromStart: R / Play again. Otherwise (after dying) respawn at the last
@@ -2191,6 +2476,7 @@
       for (let y = 0; y < H; y++) {
         for (let x = 0; x < width; x++) {
           if (grid[y][x] === FLOWED) grid[y][x] = AIR;
+          else if (isLogged(grid[y][x])) grid[y][x] = grid[y][x][1];
           const ch = template[y][x];
           // Boss platforms start out missing; the climb stage puts them in
           if (ch === "J") { grid[y][x] = AIR; plats.push([x, y]); }
@@ -2222,6 +2508,11 @@
       // Without a save point you start with what's in the bag. What you pick
       // up only goes into the bag for keeps when you finish the level.
       ({ rods, pearls, eyes } = checkpoint || bag);
+      megas = checkpoint ? checkpoint.megas : 0;
+      // keys only work in the level you find them in
+      keys = checkpoint ? checkpoint.keys || 0 : 0;
+      megaEl.textContent = "Ⓜ " + megas;
+      shieldT = 0;
       showItems();
       framesLeft = grid.reduce((n, row) => n + row.filter((ch) => ch === "R").length, 0);
       told = {};
@@ -2234,6 +2525,7 @@
       effect = null;
       effectT = 0;
       flying = false;
+      setBoost(false);
       rot = 0;
       coyote = 0;
       buffer = 0;
@@ -2256,7 +2548,7 @@
       [template, looks] = strip(arenaGrid(level.arena, arenaBgOf(level)));
       width = ARENA_W;
       spawn = findSpawn(template);
-      checkpoint = { x: spawn.x, y: spawn.y, score, rods, pearls, eyes, grid: template.map((r) => r.slice()) };
+      checkpoint = { x: spawn.x, y: spawn.y, score, megas, rods, pearls, eyes, keys, grid: template.map((r) => r.slice()) };
       inBoss = true;
       attempts--; // stepping through the portal isn't a new attempt
       reset();
@@ -2264,7 +2556,7 @@
 
     const startBoss = () => {
       setFree(true);
-      boss = { hp: BOSS_HP, stage: -1, t: 0, spawnT: 0, hurtT: 0, x: BOSS_X, rain: [], gone: false };
+      boss = { hp: bossMax, stage: -1, t: 0, spawnT: 0, hurtT: 0, x: BOSS_X, rain: [], gone: false };
       if (introSeen) nextStage();
       else { state = "cut"; cutT = 0; }
     };
@@ -2337,7 +2629,7 @@
 
       for (const r of b.rain) {
         r.y += RAIN_SPEED * dt;
-        if (touches(r.x, r.y, r.x + 1, r.y + 1)) { die(); return true; }
+        if (touches(r.x, r.y, r.x + 1, r.y + 1)) { die("boom", true); return true; }
         if (r.y >= H - 2) {
           r.dead = true;
           sparkle(r.x + 0.5, H - 1.2, ["#ffd54a", "#ff8a3d", "#e04a2f", "#8c8c8c"]);
@@ -2375,7 +2667,7 @@
       }
       // the spike arm hanging at its side
       if (touches(b.x + 0.1, BOSS_TOP + 12 * BOSS_PX, b.x + 0.9, BOSS_TOP + 28 * BOSS_PX)) {
-        die("poof");
+        die("poof", true);
         return true;
       }
 
@@ -2383,7 +2675,9 @@
       if (b.t <= 0) nextStage();
       b.spawnT -= dt;
       if (b.spawnT <= 0) {
-        const anger = BOSS_HP - b.hp; // it speeds up each time it's hit
+        // It speeds up each time it's hit. Measured from the bare-handed
+        // five, so a sword's shorter fight still reaches its fastest.
+        const anger = Math.round((1 - b.hp / bossMax) * (BOSS_HP - 1));
         if (b.stage === 0) {
           b.spawnT = [0.3, 0.25, 0.2][anger] || 0.2;
           // nearly half are aimed right at you, so you have to keep moving
@@ -2417,8 +2711,31 @@
       }
     };
 
+    // Open any shut door you've reached (from either side). A door's letter
+    // is in its bottom square; the square above is door too.
+    const openDoors = () => {
+      const y0 = Math.floor(player.y), y1 = Math.floor(player.y + PLAYER_H - 0.01);
+      for (let x = Math.floor(player.x - 3); x <= Math.floor(player.x + PLAYER_W + 3); x++) {
+        if (x < 0 || x >= width) continue;
+        for (let y = y0; y <= Math.min(H - 1, y1 + 1); y++) {
+          const ch = grid[y][x];
+          if (!isDoor(ch) || y - 1 > y1 || y < y0) continue;
+          const gap = x >= player.x + PLAYER_W ? x - (player.x + PLAYER_W) : player.x - (x + 1);
+          if (gap > TILES[ch].reach) continue;
+          if (TILES[ch].locked) {
+            if (keys < 1) { tellOnce("lock", "This door is locked. Find a 🔑 key!"); continue; }
+            keys--;
+            showItems();
+          }
+          grid[y][x] = "/" + ch;
+          doorT[noteKey(x, y)] = time;
+        }
+      }
+    };
+
     const solidAt = (x, y) =>
-      x >= 0 && x < width && y >= 0 && y < H && isSolid(grid[y][x]);
+      x >= 0 && x < width && y >= 0 && y < H &&
+      (isSolid(grid[y][x]) || (y + 1 < H && isDoor(grid[y + 1][x])));
 
     // A fresh press while touching a Blink teleports instead of jumping.
     // Holding jump doesn't count, so you don't chain through every Blink.
@@ -2492,8 +2809,26 @@
 
     // Each kind of death looks different: TNT and walls go boom, lava and fire
     // set you alight, a spike makes you tip over and puff away, a watcher deletes.
-    const die = (kind = "boom") => {
+    // A shield from the shop turns one mob hit (blaze, fireball, end mob, the boss) into
+    // a couple of seconds where mobs can't hurt you. Only mobs: saving you
+    // from lava or a pit would need somewhere safe to put you, and not every
+    // safe-looking square is one you can still beat the level from. It is
+    // used up for good straight away, even if you then quit the level.
+    const shielded = () => {
+      if (shieldT > 0) return true;
+      if (bag.shields < 1) return false;
+      bag.shields--;
+      saveBag(Object.assign(loadBag(), { shields: bag.shields }));
+      shieldEl.textContent = "🛡 " + bag.shields;
+      shieldT = SHIELD_TIME;
+      toast("🛡 Your shield saved you!");
+      sparkle(player.x + PLAYER_W / 2, player.y + PLAYER_H / 2, ["#3f7fd6", "#9cc4ff", "#ffffff"]);
+      return true;
+    };
+
+    const die = (kind = "boom", byMob = false) => {
       if (state !== "run") return;
+      if (byMob && shielded()) return;
       state = "dead";
       deathKind = kind;
       deadT = 0;
@@ -2501,6 +2836,9 @@
       if (kind === "burn") {
         for (let i = 0; i < 14; i++) ember();
       } else if (kind !== "poof") {
+        if (kind === "megaboom") {
+          explode(player.x + PLAYER_W / 2, player.y + PLAYER_H / 2, ["#f08bff", "#c22fd0", "#ffd54a", "#ffffff"]);
+        }
         explode(player.x + PLAYER_W / 2, player.y + PLAYER_H / 2,
           kind === "delete" ? ["#b46bff", "#2a1240", "#f4f0ff", "#7a2fd0"]
             : ["#ffd54a", "#ff8a3d", "#e04a2f", "#8c8c8c"]);
@@ -2512,9 +2850,10 @@
       if (state !== "run") return;
       state = "win";
       setBest(bestKey(level), score);
-      bag.rods = rods;
-      bag.pearls = pearls;
-      bag.eyes = eyes;
+      // re-read first: a shield used on the way has already been saved
+      Object.assign(bag, loadBag(), { rods, pearls, eyes });
+      bag.coins += score;
+      bag.mega += megas;
       saveBag(bag);
       jumpBtn.disabled = true;
       explode(player.x + PLAYER_W / 2, player.y + PLAYER_H / 2,
@@ -2527,6 +2866,8 @@
       box.innerHTML =
         `<div class="big">${more || !chain ? "Level Complete!" : "You Finished!"}</div>` +
         `<div>Score: ${score} · Best: ${getBest(bestKey(level))}</div>` +
+        `<div>+${score} coins${megas ? ` · +${megas} megacoins` : ""} · ` +
+        `you now have ${bag.coins} coins${bag.mega ? ` and ${bag.mega} megacoins` : ""}</div>` +
         (hasRods || hasPearls || hasEyes
           ? `<div>In your inventory: ${rods} 🪄 · ${pearls} 🔮 · ${eyes} 👁</div>` : "") +
         (chain && chain.count > 1
@@ -2626,8 +2967,10 @@
         // Grow one block into empty air; anything else (ground, an item,
         // the edge of the level) stops the flow for good.
         const next = m.tip + m.dir;
-        if (next < 0 || next >= H || grid[next][m.x] !== AIR) { m.done = true; continue; }
-        grid[next][m.x] = FLOWED;
+        const there = next >= 0 && next < H ? grid[next][m.x] : null;
+        const soak = there !== null && LOGGABLE.includes(baseOf(there));
+        if (there !== AIR && !soak) { m.done = true; continue; }
+        grid[next][m.x] = soak ? FLOWED + there : FLOWED;
         m.tip = next;
       }
 
@@ -2655,7 +2998,7 @@
         const cx = Math.floor(b.x), cy = Math.floor(b.y);
         if ((cx !== b.fromX || cy !== b.fromY) && solidAt(cx, cy)) b.life = 0;
         if (b.life > 0 && touches(b.x - 0.2, b.y - 0.2, b.x + 0.2, b.y + 0.2)) {
-          die();
+          die("boom", !!b.straight); // the boss's stars count as a mob hit, a Shooter block's don't
           return true;
         }
       }
@@ -2694,7 +3037,7 @@
             gotRod(bz.x, bz.y);
             continue;
           }
-          die("burn");
+          die("burn", true);
           return true;
         }
         if (!onScreen(bz.x)) continue;
@@ -2713,7 +3056,7 @@
         fb.life -= dt;
         if (solidAt(Math.floor(fb.x), Math.floor(fb.y))) fb.life = 0;
         if (fb.life > 0 && touches(fb.x - 0.2, fb.y - 0.2, fb.x + 0.2, fb.y + 0.2)) {
-          die("burn");
+          die("burn", true);
           return true;
         }
       }
@@ -2790,7 +3133,7 @@
         }
         // a sleeping end watcher doesn't notice you brushing past; a corrupted one does
         if (m.kind === "V" && !m.awake) continue;
-        die("delete");
+        die("delete", true);
         return true;
       }
       mobs = mobs.filter((m) => !m.gone);
@@ -2834,10 +3177,13 @@
       if (state === "bossdown") { updateBossDown(dt); return; }
       if (state !== "run") return;
 
+      if (boostCD > 0) boostCD -= dt;
+      openDoors();
       if (effect) {
         effectT -= dt;
         if (effectT <= 0) effect = null;
       }
+      if (shieldT > 0) shieldT -= dt;
 
       const speed = effect === "fast" ? SPEED_FAST : effect === "slow" ? SPEED_SLOW : SPEED_BASE;
 
@@ -2863,10 +3209,10 @@
       }
       if (hitRow >= 0) {
         const overlap = player.y + PLAYER_H - hitRow;
-        if (grid[hitRow][rightCol] === "m") {
+        if (grid[hitRow][rightCol] === "m" || grid[hitRow][rightCol] === "0") {
           // Slime launches you off any side, not just the top.
           player.x = oldX;
-          player.vy = -BOUNCE_V;
+          player.vy = grid[hitRow][rightCol] === "0" ? -MEGA_BOUNCE_V : -BOUNCE_V;
           player.onGround = false;
           rot = 0;
         } else if (player.vy >= 0 && overlap < 0.35) {
@@ -2917,8 +3263,8 @@
         for (let x = cx0; x <= cx1; x++) {
           if (solidAt(x, footRow)) {
             player.y = footRow - PLAYER_H;
-            if (grid[footRow][x] === "m") {
-              player.vy = -BOUNCE_V;
+            if (grid[footRow][x] === "m" || grid[footRow][x] === "0") {
+              player.vy = grid[footRow][x] === "0" ? -MEGA_BOUNCE_V : -BOUNCE_V;
               rot = 0;
             } else {
               player.vy = 0;
@@ -2954,11 +3300,31 @@
       const ix1 = Math.floor(player.x + PLAYER_W - inset);
       const iy0 = Math.floor(player.y + inset);
       const iy1 = Math.floor(player.y + PLAYER_H - inset);
+      // mega TNT doesn't wait to be touched: getting near is enough
+      for (let y = Math.floor(player.y - MEGA_BLAST); y <= Math.floor(player.y + PLAYER_H + MEGA_BLAST); y++) {
+        for (let x = Math.floor(player.x - MEGA_BLAST); x <= Math.floor(player.x + PLAYER_W + MEGA_BLAST); x++) {
+          if (x < 0 || x >= width || y < 0 || y >= H || state !== "run") continue;
+          const near = grid[y][x];
+          // and the same for mega End TNT, mega lava and mega fire. Ask what the
+          // mega square started as: lava that later flowed into a square where
+          // a mega item was picked up is ordinary lava.
+          const was = MEGA_BASE[looks[noteKey(x, y)]];
+          if (near === "8" || (near === "T" && was === "T")) {
+            die("megaboom");
+            return;
+          }
+          if (near === was && "LUDF".includes(near)) {
+            die("burn");
+            return;
+          }
+        }
+      }
       for (let y = iy0; y <= iy1; y++) {
         for (let x = ix0; x <= ix1; x++) {
           if (x < 0 || x >= width || y < 0 || y >= H) continue;
           const ch = grid[y][x];
           if (ch === "t" || ch === "T") { die(); return; }
+          if (ch === "8") { die("megaboom"); return; }
           if (isHiddenTnt(ch)) { die(); return; }
           if (ch === "A") { die("poof"); return; }
           // The three invisible blocks work once each, then clear themselves
@@ -2978,7 +3344,7 @@
             grid[y][x] = AIR;
             setFree(true);
           }
-          if (ch === "L" || ch === "F" || ch === "U" || ch === "D" || ch === FLOWED) {
+          if (ch === "F" || isLava(ch)) {
             die("burn");
             return;
           }
@@ -2986,34 +3352,46 @@
             // Wings come off here, so each stretch between save points
             // has to earn its own pair.
             flying = false;
+            setBoost(false);
             setFree(false); // like wings, free moving ends at a save point
             grid[y][x] = "checkpointOn";
-            checkpoint = { x, y, score, rods, pearls, eyes, grid: grid.map((r) => r.slice()) };
+            checkpoint = { x, y, score, megas, rods, pearls, eyes, keys, grid: grid.map((r) => r.slice()) };
             toast("Checkpoint!");
           }
-          if (ch === "d") {
+          if (COIN_VALUE[ch]) {
             grid[y][x] = AIR;
-            score += 10;
+            score += COIN_VALUE[ch] * megaTimes(x, y);
             scoreEl.textContent = "💎 " + score;
+          } else if (ch === "@") {
+            grid[y][x] = AIR;
+            megas += MEGATITE_PAYS * megaTimes(x, y);
+            megaEl.textContent = "Ⓜ " + megas;
+            sparkle(x + 0.5, y + 0.5, ["#f08bff", "#c22fd0", "#ffd54a"]);
           } else if (ch === "b") {
             effect = "fast";
-            effectT = EFFECT_TIME;
+            effectT = EFFECT_TIME * megaTimes(x, y);
           } else if (ch === "w") {
             effect = "slow";
-            effectT = EFFECT_TIME;
+            effectT = EFFECT_TIME * megaTimes(x, y);
           } else if (ch === "r") {
             grid[y][x] = AIR;
+            rods += megaTimes(x, y) - 1;
             gotRod(x + 0.5, y + 0.5);
           } else if (ch === "o") {
             grid[y][x] = AIR;
-            eyes++;
+            eyes += megaTimes(x, y);
             showItems();
             sparkle(x + 0.5, y + 0.5, ["#7be0c2", "#c8fff0"]);
           } else if (ch === "9") {
             grid[y][x] = AIR;
-            pearls++;
+            pearls += megaTimes(x, y);
             showItems();
             sparkle(x + 0.5, y + 0.5, ["#1c6b60", "#8ff0dc"]);
+          } else if (ch === KEY) {
+            grid[y][x] = AIR;
+            keys++;
+            showItems();
+            sparkle(x + 0.5, y + 0.5, ["#ffd54a", "#a87a12", "#ffffff"]);
           } else if (ch === "H") {
             const made = Math.min(rods, pearls);
             if (made) {
@@ -3040,6 +3418,7 @@
           } else if (ch === "f") {
             grid[y][x] = AIR;
             flying = true;
+            if (megaAt(x, y)) setBoost(true);
           } else if (ch === "E") {
             win();
             return;
@@ -3060,7 +3439,10 @@
       if (updateHazards(dt)) return;
       if (boss && updateBoss(dt)) return;
 
-      if (player.y > H + 1) { die(); return; }
+      if (player.y > H + 1) {
+        die();
+        return;
+      }
       if (player.x > width) { win(); return; }
 
       camX = clamp(player.x - VIEW_COLS * 0.32, 0, Math.max(0, width - VIEW_COLS));
@@ -3146,9 +3528,9 @@
       ctx.font = "bold 18px ui-monospace, monospace";
       ctx.textAlign = "right";
       ctx.fillStyle = "#ffffff";
-      const bx = canvas.width / 2 - 90;
+      const bx = canvas.width / 2 - bossMax * 32;
       ctx.fillText("TNT MECH", bx - 10, 14);
-      for (let i = 0; i < BOSS_HP; i++) {
+      for (let i = 0; i < bossMax; i++) {
         ctx.fillStyle = "#1c1c1c";
         ctx.fillRect(bx + i * 64, 12, 60, 20);
         ctx.fillStyle = i < b.hp ? "#e04a2f" : "#4a4a4a";
@@ -3194,13 +3576,45 @@
 
     const render = () => {
       drawBackground();
+      showBoost();
 
       const startX = Math.max(0, Math.floor(camX) - 1);
       const endX = Math.min(width - 1, Math.ceil(camX + VIEW_COLS) + 1);
       for (let x = startX; x <= endX; x++) {
         for (let y = 0; y < H; y++) {
           const ch = grid[y][x];
-          if (ch !== AIR && ch !== "P" && !isHidden(ch)) {
+          if (isDoor(ch)) {
+            Art.drawSprite(ctx, ch, (x - camX) * TS, (y - 1) * TS, TS, TS * 2);
+          } else if (isOpenDoor(ch)) {
+            const t = clamp((time - (doorT[noteKey(x, y)] || 0)) / DOOR_SWING, 0, 1);
+            const px = (x - camX) * TS, top = (y - 1) * TS;
+            ctx.save();
+            if (ch[1] === "\u0184") {
+              // the Mechanical door splits in half: the top slides up and the
+              // bottom slides down, each into its own square, leaving a sliver
+              const shift = TS * 0.85 * t;
+              const sp = Art.SPRITES[ch[1]];
+              const half = (sp.height || sp.naturalHeight) / 2, sw = sp.width || sp.naturalWidth;
+              ctx.imageSmoothingEnabled = false;
+              for (const [cy, src, dy] of [[top, 0, -shift], [top + TS, half, shift]]) {
+                ctx.save();
+                ctx.beginPath();
+                ctx.rect(px, cy, TS, TS);
+                ctx.clip();
+                ctx.drawImage(sp, 0, src, sw, half, px, cy + dy, TS, TS);
+                ctx.restore();
+              }
+            } else {
+              // the others swing open on their left hinge: squeeze to a thin edge
+              ctx.globalAlpha = 1 - 0.25 * t;
+              Art.drawSprite(ctx, ch[1], px, top, TS * (1 - 0.82 * t), TS * 2);
+            }
+            ctx.restore();
+          } else if (isLogged(ch)) {
+            drawTile(ctx, "L", (x - camX) * TS, y * TS, TS, time, false);
+            const own = looks[noteKey(x, y)];
+            drawTile(ctx, own && baseOf(own) === ch[1] ? own : ch[1], (x - camX) * TS, y * TS, TS, time, false);
+          } else if (ch !== AIR && ch !== "P" && !isHidden(ch)) {
             let key = ch === FLOWED ? "L" : overOf(ch) || ch;
             if (ch === "W" && !eyeOpen({ x, ph: (x * 0.37) % WATCH_CYCLE })) key = "watcherClosed";
             // still the block it started as (not blown up, switched on or grown over)? use its own look
@@ -3223,7 +3637,9 @@
       for (const m of movers) {
         if (!m.active || m.done) continue;
         const next = m.tip + m.dir;
-        if (next < 0 || next >= H || grid[next][m.x] !== AIR) continue;
+        const there = next >= 0 && next < H ? grid[next][m.x] : null;
+        const plant = there !== null && LOGGABLE.includes(baseOf(there));
+        if (there !== AIR && !plant) continue;
         const h = TS * m.t;
         const y = m.dir < 0 ? (next + 1) * TS - h : next * TS;
         ctx.save();
@@ -3232,6 +3648,11 @@
         ctx.clip();
         drawTile(ctx, "L", (m.x - camX) * TS, next * TS, TS, time, false);
         ctx.restore();
+        // lava oozing into a plant's square goes behind it, so draw the plant again on top
+        if (plant) {
+          const own = looks[noteKey(m.x, next)];
+          drawTile(ctx, own && baseOf(own) === there ? own : there, (m.x - camX) * TS, next * TS, TS, time, false);
+        }
       }
       for (const b of bullets) {
         const bs = TS * 0.55;
@@ -3310,6 +3731,18 @@
           const pw = PLAYER_W * TS * k, ph = PLAYER_H * TS * k;
           drawPlayer(ctx, (player.x + PLAYER_W / 2 - camX) * TS - pw / 2,
             (player.y + PLAYER_H / 2) * TS - ph / 2, pw, ph, rot, hero);
+          // sword in hand for the boss fight
+          if (inBoss && bag.sword) {
+            drawTile(ctx, SWORDS[bag.sword].key, (player.x + PLAYER_W * 0.55 - camX) * TS,
+              (player.y - 0.05) * TS, TS * 0.75, 0, false);
+          }
+          // the shield's bubble, blinking as it runs out
+          if (shieldT > 0 && (shieldT > 0.6 || Math.floor(time * 12) % 2)) {
+            ctx.strokeStyle = "#9cc4ff";
+            ctx.lineWidth = 4;
+            ctx.strokeRect((player.x - 0.15 - camX) * TS, (player.y - 0.15) * TS,
+              (PLAYER_W + 0.3) * TS, (PLAYER_H + 0.3) * TS);
+          }
         }
       }
 
@@ -3358,17 +3791,17 @@
       if (state === "dead") {
         ctx.fillStyle = "rgba(0,0,0,0.35)";
         ctx.fillRect(0, 0, canvas.width, canvas.height);
-        if (deathKind === "boom") {
+        if (deathKind === "boom" || deathKind === "megaboom") {
           drawExplosion(ctx,
             (player.x + PLAYER_W / 2 - camX) * TS,
             (player.y + PLAYER_H / 2) * TS,
-            TS * 3.2, deadT);
+            TS * (deathKind === "megaboom" ? 6.5 : 3.2), deadT);
         }
         ctx.fillStyle = "#ff6b6b";
         ctx.font = "bold 46px ui-monospace, monospace";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        ctx.fillText({ burn: "BURNED!", delete: "DELETED!", poof: "POOF!" }[deathKind] || "BOOM!",
+        ctx.fillText({ burn: "BURNED!", delete: "DELETED!", poof: "POOF!", megaboom: "MEGA BOOM!" }[deathKind] || "BOOM!",
           canvas.width / 2, canvas.height / 2);
       }
     };
@@ -3410,6 +3843,8 @@
         moveR = true;
       } else if (e.key === "r" || e.key === "R") {
         reset(true);
+      } else if (e.key === "Shift") {
+        boost();
       }
     };
     const onKeyUp = (e) => {
@@ -3434,6 +3869,7 @@
     jumpBtn.addEventListener("pointerdown", press);
     jumpBtn.addEventListener("pointerup", release);
     jumpBtn.addEventListener("pointercancel", release);
+    boostBtn.addEventListener("pointerdown", (e) => { e.preventDefault(); boost(); });
 
     reset();
     loop(performance.now());

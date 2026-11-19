@@ -50,8 +50,10 @@ Block rules:
 | Inventory | Blaze rods, ender pearls and eyes of ender carry over from level to level and between visits (shown on the menu). What you pick up is only kept when you finish the level |
 | Slime | Bounces you high — from the top or the side |
 | TNT | Instant game over |
-| Diamond | +10 points |
+| Diamond / Gold / Emerald | Worth 10 / 15 / 20 coins. Coins are the level's score, and join your wallet when you finish the level |
+| Megatite | Worth 30 megacoins, the second kind of money |
 | Lightning bolt | Super speed for 3 seconds |
+| Fake lightning | Looks exactly like Lightning, but does nothing |
 | Wither rose | Slows you down for 3 seconds |
 | Hidden TNT | Invisible in play (faded in the editor) and explodes on touch. Paint it onto a diamond, bolt, rose, bush or wings to trap that item. |
 | Save point | Reach it and later deaths restart you here, with the diamonds you had. Takes your wings off. |
@@ -62,8 +64,11 @@ Block rules:
 | End portal | Finishes the level |
 | More blocks (your own) | Extra looks for existing blocks. In the Art Studio, **＋ New block** asks for a name and something to start from (any block, the player, or one of your own); the new block starts as a copy and **acts exactly like what it was started from**, so a blue slime still bounces and an ice spike still poofs you. The Level Maker keeps them all behind one **More blocks** button, which opens a tray; each shows what it acts like in small print. A look started from the player is picked per level with **Player look**. They live with your art in the browser and travel in art codes and art files, not level codes: a level opened without that art shows them as stone. To make them permanent, add the downloaded art to `blockdash-artpack.js` like any other art; shipped ones can be repainted or reset but not deleted |
 | Boss platform | Boss arena only. Solid only while the boss's climb stage is on. The Level Maker's **💥 Boss arena** button switches from the level to its one-screen arena, where you can place these and most other blocks. While the arena is showing, the Background buttons set the arena's own background, separate from the level's |
-| Boss portal | Use it instead of the End portal. Walking in swaps the level for a one-screen arena: a dragon flies in and is blown up, and the TNT Mech walks out of the smoke (jump skips the intro). You move freely with ◀ ▶. The boss cycles three 9-second attacks: TNT rains down (red marks show where), platforms appear so you can climb up and stomp its head, then its shooter arm fires stars straight at where you are. Three stomps wins the level; it gets faster after each one. Its spike arm is deadly, and dying restarts the fight, not the level |
+| Boss portal | Use it instead of the End portal. Walking in swaps the level for a one-screen arena: a dragon flies in and is blown up, and the TNT Mech walks out of the smoke (jump skips the intro). You move freely with ◀ ▶. The boss cycles three 9-second attacks: TNT rains down (red marks show where), platforms appear so you can climb up and stomp its head, then its shooter arm fires stars straight at where you are. Five stomps wins the level (fewer with a sword from the Shop); it gets faster after each one. Its spike arm is deadly, and dying restarts the fight, not the level |
 | Bush | Decoration only |
+| Mega TNT / Mega slime / Mega bush | Mega blocks. Mega TNT goes off when you come within a block of it; Mega slime bounces you much higher; Mega bush is a bush in bloom. Each must be bought in the Shop (30 megacoins) before it can be placed in the Level Maker. Anyone can play a level that uses them |
+| Doors | Two blocks tall. Normal, Nether, End and Mushroom doors swing open as you reach them; the Mechanical door opens from a couple of blocks away; the Upgraded door needs a Key (found in the same level) |
+| Shop | On the menu's Inventory panel. Coin shop: Stone / Iron / Diamond sword (10 / 20 / 40 coins) cut the boss from 5 stomps to 4 / 3 / 2, and a Shield (50 coins) saves you once from a mob hit (blazes, fireballs, end mobs, the boss), then is used up. Megacoin shop: mega blocks (30 megacoins each). Every ordinary block has a glowing mega version; some have a power: gems pay double, rods/pearls/eyes count double, lightning and wither rose last twice as long, mega lava, fire and End TNT get you from a block away, and mega wings add a ⚡ Boost (button or Shift). 1 megacoin converts to 2 coins and back |
 | Start | Where you spawn |
 
 ### Two ways levels get made

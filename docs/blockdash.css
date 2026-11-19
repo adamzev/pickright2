@@ -342,6 +342,21 @@ button.tool-btn.sel {
   font-weight: 700;
   touch-action: none;
 }
+/* Mega wings' Boost: fills with gold as it recharges */
+.boost-btn {
+  flex: 0 0 22%;
+  padding: 22px 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+  touch-action: none;
+  color: #2b1d00;
+  border-color: #b8860b;
+  background: linear-gradient(to right, #ffd54a var(--charge, 100%), #5a4a20 var(--charge, 100%));
+}
+.boost-btn:disabled {
+  opacity: 1;
+  color: #f4e7c0;
+}
 
 .overlay-msg {
   text-align: center;
@@ -405,3 +420,13 @@ button.tool-btn.sel {
 }
 .bag-recipe { margin-top: 10px; align-items: center; }
 .bag-recipe .bag-slot { transform: scale(0.8); margin: -5px; }
+
+/* one thing for sale in the shop */
+.shop-item {
+  align-items: center;
+  padding: 8px;
+  margin-top: 8px;
+  background: #1b1b22;
+  border: 3px solid #4a4a5a;
+}
+.shop-item canvas { image-rendering: pixelated; flex: none; }

@@ -654,6 +654,252 @@ window.BDArt = (() => {
     }
   });
 
+  // ---- doors: two blocks tall, drawn from the kids' door sheets ----
+  const DW = S, DH = S * 2;
+  const doorFrame = (c, edge) => {
+    rect(c, 0, 0, DW, 1, edge);
+    rect(c, 0, DH - 1, DW, 1, edge);
+    rect(c, 0, 0, 1, DH, edge);
+    rect(c, DW - 1, 0, 1, DH, edge);
+  };
+  const windows4 = (c, glass, rim, top) => {
+    for (const [x, y] of [[3, top], [9, top], [3, top + 6], [9, top + 6]]) {
+      rect(c, x - 1, y - 1, 6, 6, rim);
+      rect(c, x, y, 4, 4, glass);
+      rect(c, x, y, 1, 1, "#ffffff");
+    }
+  };
+  // plain wooden door with four windows
+  const doorNormal = mk(DW, DH, (c) => {
+    noiseFill(c, 71, ["#8f6034", "#9c6b3a", "#a87543"], DW, DH);
+    for (let x = 4; x < DW; x += 4) rect(c, x, 0, 1, DH, "#7a5029");
+    windows4(c, "#a8d8f0", "#6b4423", 4);
+    rect(c, 12, 19, 2, 2, "#e8c34a");
+    doorFrame(c, "#5a3a1c");
+  });
+  // crimson door with cracks running across it
+  const doorNether = mk(DW, DH, (c) => {
+    noiseFill(c, 72, ["#5e1a28", "#6b1f2e", "#7a2636"], DW, DH);
+    for (let i = 0; i < 4; i++) {
+      for (let y = 0; y < DH; y++) {
+        const x = Math.round(i * 5 - 4 + y * 0.45 + Math.sin(y * 0.9 + i) * 0.8);
+        if (x >= 0 && x < DW) rect(c, x, y, 1, 1, "#2e0a12");
+      }
+    }
+    windows4(c, "#e8742a", "#3a0d16", 5);
+    doorFrame(c, "#2e0a12");
+  });
+  // end-stone door: a purple gem in the middle with lines running out of it
+  const doorEnd = mk(DW, DH, (c) => {
+    noiseFill(c, 73, ["#dcd79a", "#e8e4a8", "#f0edc0"], DW, DH);
+    const cx = 8, cy = 13;
+    for (const [dx, dy] of [[-8, -13], [8, -13], [-8, 4], [8, 18], [-3, 18], [3, 18]]) {
+      for (let t = 0; t <= 1; t += 0.04) rect(c, Math.round(cx + dx * t), Math.round(cy + dy * t), 1, 1, "#a8a070");
+    }
+    spans(c, [[9, 7, 8], [10, 6, 9], [11, 5, 10], [12, 4, 11], [13, 4, 11], [14, 5, 10], [15, 6, 9], [16, 7, 8]], "#8a4fbf");
+    spans(c, [[11, 6, 7], [12, 5, 6]], "#c79bf0");
+    doorFrame(c, "#a8a070");
+  });
+  // mushroom door: a big window, with a little mushroom growing off the top
+  const doorMushroom = mk(DW, DH, (c) => {
+    noiseFill(c, 74, ["#b8a888", "#c8b89a", "#d4c6aa"], DW, DH);
+    rect(c, 2, 6, 12, 10, "#7a6a50");
+    rect(c, 3, 7, 10, 8, "#a8d8f0");
+    for (let i = 0; i < 4; i++) rect(c, 9 + i - 2, 8 + i, 1, 1, "#ffffff");
+    rect(c, 12, 18, 2, 2, "#5a4a30");
+    doorFrame(c, "#7a6a50");
+    // the mushroom sits on the top edge
+    rect(c, 12, 2, 1, 2, "#efe6d0");
+    spans(c, [[0, 11, 13], [1, 10, 14]], "#c8352a");
+    rect(c, 11, 0, 1, 1, "#ffffff");
+    rect(c, 13, 1, 1, 1, "#ffffff");
+  });
+  // metal door made of plates that slide away when it opens
+  const doorMech = mk(DW, DH, (c) => {
+    rect(c, 0, 0, DW, DH, "#5c6068");
+    const plates = [[1, 1, 6, 30], [8, 1, 7, 6], [8, 8, 7, 6], [8, 16, 7, 6], [8, 24, 7, 7]];
+    for (const [x, y, w, h] of plates) {
+      rect(c, x, y, w, h, "#9aa0a8");
+      rect(c, x, y, w, 1, "#c4c9d0");
+      rect(c, x, y + h - 1, w, 1, "#6c7078");
+      rect(c, x + 1, y + 1, 1, 1, "#4a4e56");
+      rect(c, x + w - 2, y + h - 2, 1, 1, "#4a4e56");
+    }
+    doorFrame(c, "#3a3d44");
+  });
+  // the upgraded door: striped iron with a lock in the middle. Needs a key.
+  const doorLocked = mk(DW, DH, (c) => {
+    noiseFill(c, 75, ["#a8aeb8", "#b8bec8", "#c4cad4"], DW, DH);
+    for (let i = -4; i < 10; i++) {
+      for (let y = 0; y < DH; y++) {
+        const x = Math.round(i * 4 + y * 0.6);
+        if (x >= 0 && x < DW) rect(c, x, y, 2, 1, "#2a2c32");
+      }
+    }
+    rect(c, 0, 12, DW, 1, "#2a2c32");
+    rect(c, 0, 16, DW, 1, "#2a2c32");
+    rect(c, 4, 10, 8, 9, "#2a2c32");
+    rect(c, 5, 11, 6, 7, "#e8c34a");
+    rect(c, 7, 13, 2, 2, "#2a2c32");
+    rect(c, 7, 15, 2, 2, "#2a2c32");
+    doorFrame(c, "#2a2c32");
+  });
+  const keyItem = paintMap([
+    "................",
+    "................",
+    "....yyyy........",
+    "...yYYYYy.......",
+    "..yY....Yy......",
+    "..yY....Yy......",
+    "..yY....Yy......",
+    "...yYYYYyyyyyyy.",
+    "....yyyyYYYYYYy.",
+    "..........yYy.y.",
+    "..........yYy.y.",
+    "...........y....",
+    "................",
+    "................",
+    "................",
+    "................",
+  ], { y: "#a87a12", Y: "#ffd54a" });
+
+  // ---- money: emerald, gold and megatite pickups, and the shop's goods ----
+
+  const emerald = mk(S, S, (c) => {
+    const gem = [[2, 6, 9], [3, 5, 10], [4, 4, 11], [5, 4, 11], [6, 4, 11], [7, 4, 11], [8, 4, 11],
+      [9, 4, 11], [10, 4, 11], [11, 4, 11], [12, 5, 10], [13, 6, 9]];
+    spans(c, gem, "#1fae4b");
+    for (const [y, x0, x1] of gem) {
+      rect(c, x0, y, 1, 1, "#0f6e2c");
+      rect(c, x1, y, 1, 1, "#0f6e2c");
+    }
+    rect(c, 6, 2, 4, 1, "#0f6e2c");
+    rect(c, 6, 13, 4, 1, "#0f6e2c");
+    rect(c, 6, 4, 4, 8, "#3fd66e");
+    rect(c, 6, 4, 2, 3, "#b4ffc9");
+    rect(c, 9, 10, 1, 2, "#168a3a");
+  });
+
+  const goldBar = mk(S, S, (c) => {
+    spans(c, [[5, 4, 13], [6, 3, 13], [7, 2, 13], [8, 2, 13], [9, 2, 12], [10, 2, 11]], "#f0b61f");
+    spans(c, [[5, 4, 13], [6, 3, 4]], "#ffe98a");
+    spans(c, [[10, 2, 11], [9, 12, 12], [8, 13, 13]], "#b8780f");
+    rect(c, 5, 7, 5, 1, "#ffd54a");
+    rect(c, 12, 4, 1, 1, "#ffffff");
+  });
+
+  // Megatite: a made-up ore. A chunky magenta-and-gold crystal with a star in it.
+  const megatite = mk(S, S, (c) => {
+    const gem = [[1, 7, 8], [2, 6, 9], [3, 5, 10], [4, 3, 12], [5, 2, 13], [6, 2, 13], [7, 3, 12],
+      [8, 3, 12], [9, 4, 11], [10, 4, 11], [11, 5, 10], [12, 6, 9], [13, 7, 8]];
+    spans(c, gem, "#c22fd0");
+    for (const [y, x0, x1] of gem) {
+      rect(c, x0, y, 1, 1, "#6b1478");
+      rect(c, x1, y, 1, 1, "#6b1478");
+    }
+    spans(c, [[3, 6, 8], [4, 5, 8], [5, 4, 7], [6, 4, 6]], "#f08bff");
+    rect(c, 7, 6, 2, 4, "#ffd54a");
+    rect(c, 6, 7, 4, 2, "#ffd54a");
+    rect(c, 7, 7, 2, 2, "#ffffff");
+    spans(c, [[10, 6, 10], [11, 6, 9]], "#8f1f9c");
+  });
+
+  // Mega blocks: bought in the megacoin shop. Same idea as the normal block,
+  // dressed up in megatite purple and gold.
+  const megaTnt = mk(S, S, (c) => {
+    noiseFill(c, 23, ["#b8860f", "#d9a520", "#f0c040"]);
+    for (let y = 2; y < 14; y++) {
+      for (let x = 0; x < S; x++) {
+        const stripe = x % 4 === 0 || x % 4 === 3;
+        c.fillStyle = stripe ? "#6b1478" : "#a021b0";
+        c.fillRect(x, y, 1, 1);
+      }
+    }
+    rect(c, 0, 5, S, 6, "#1c1c1c");
+    // a skull on the label, so nobody mistakes it for the small kind
+    rect(c, 5, 5, 6, 4, "#ffffff");
+    rect(c, 6, 9, 4, 2, "#ffffff");
+    rect(c, 6, 6, 1, 2, "#1c1c1c");
+    rect(c, 9, 6, 1, 2, "#1c1c1c");
+    rect(c, 7, 10, 1, 1, "#1c1c1c");
+    rect(c, 9, 10, 1, 1, "#1c1c1c");
+    rect(c, 1, 7, 2, 2, "#ffd54a");
+    rect(c, 13, 7, 2, 2, "#ffd54a");
+  });
+
+  const megaSlime = mk(S, S, (c) => {
+    rect(c, 0, 0, S, S, "#7a1f8a");
+    rect(c, 1, 1, 14, 14, "#c44fd6");
+    rect(c, 3, 3, 10, 10, "#e58bf2");
+    rect(c, 4, 4, 8, 8, "#c44fd6");
+    rect(c, 5, 6, 2, 2, "#3d0c47");
+    rect(c, 9, 6, 2, 2, "#3d0c47");
+    rect(c, 6, 10, 4, 1, "#3d0c47");
+    rect(c, 5, 11, 1, 1, "#3d0c47");
+    rect(c, 10, 11, 1, 1, "#3d0c47");
+    rect(c, 2, 2, 3, 1, "#ffe98a");
+    rect(c, 2, 3, 1, 2, "#ffe98a");
+    rect(c, 12, 12, 2, 2, "#ffd54a");
+  });
+
+  const megaBush = mk(S, S, (c) => {
+    c.drawImage(bush, 0, 0);
+    // in bloom: pink and gold flowers with white hearts
+    [[4, 7, "#ff7ad1"], [9, 5, "#ffd54a"], [11, 10, "#ff7ad1"], [5, 11, "#ffd54a"], [8, 9, "#c58bff"]]
+      .forEach(([x, y, col]) => {
+        rect(c, x - 1, y, 3, 1, col);
+        rect(c, x, y - 1, 1, 3, col);
+        rect(c, x, y, 1, 1, "#ffffff");
+      });
+  });
+
+  // Swords point up and to the right; only the blade colour changes.
+  const swordOf = (blade, edge) => mk(S, S, (c) => {
+    for (let i = 0; i < 9; i++) {
+      rect(c, 5 + i, 9 - i, 2, 2, blade);
+      rect(c, 6 + i, 9 - i, 1, 1, edge);
+    }
+    rect(c, 13, 1, 2, 2, edge);
+    rect(c, 3, 8, 2, 2, "#5a3a1a"); // guard
+    rect(c, 5, 10, 2, 2, "#5a3a1a");
+    rect(c, 4, 9, 2, 2, "#8a5a2b");
+    rect(c, 2, 12, 2, 2, "#5a3a1a"); // grip
+    rect(c, 3, 11, 1, 1, "#5a3a1a");
+    rect(c, 1, 13, 2, 2, "#ffd54a");
+  });
+  const swordStone = swordOf("#8c8c8c", "#c9c9c9");
+  const swordIron = swordOf("#d9dde3", "#ffffff");
+  const swordDiamond = swordOf("#3ad0c8", "#b6fffa");
+
+  const shield = mk(S, S, (c) => {
+    spans(c, [[2, 3, 12], [3, 2, 13], [4, 2, 13], [5, 2, 13], [6, 2, 13], [7, 2, 13], [8, 3, 12],
+      [9, 3, 12], [10, 4, 11], [11, 5, 10], [12, 6, 9], [13, 7, 8]], "#5a3a1a");
+    spans(c, [[3, 3, 12], [4, 3, 12], [5, 3, 12], [6, 3, 12], [7, 3, 12], [8, 4, 11],
+      [9, 4, 11], [10, 5, 10], [11, 6, 9], [12, 7, 8]], "#3f7fd6");
+    rect(c, 7, 3, 2, 10, "#d9dde3");
+    rect(c, 3, 6, 10, 2, "#d9dde3");
+    rect(c, 4, 4, 2, 1, "#9cc4ff");
+  });
+
+  const coinOf = (rim, face, shine, mark) => mk(S, S, (c) => {
+    spans(c, [[2, 5, 10], [3, 4, 11], [4, 3, 12], [5, 2, 13], [6, 2, 13], [7, 2, 13], [8, 2, 13],
+      [9, 2, 13], [10, 2, 13], [11, 3, 12], [12, 4, 11], [13, 5, 10]], rim);
+    spans(c, [[3, 5, 10], [4, 4, 11], [5, 3, 12], [6, 3, 12], [7, 3, 12], [8, 3, 12],
+      [9, 3, 12], [10, 3, 12], [11, 4, 11], [12, 5, 10]], face);
+    rect(c, 5, 4, 3, 1, shine);
+    rect(c, 4, 5, 1, 2, shine);
+    mark(c);
+  });
+  const coin = coinOf("#b8780f", "#f0b61f", "#ffe98a", (c) => rect(c, 7, 5, 2, 6, "#b8780f"));
+  const megacoin = coinOf("#6b1478", "#c22fd0", "#f08bff", (c) => {
+    // an M
+    rect(c, 5, 5, 1, 6, "#ffd54a");
+    rect(c, 10, 5, 1, 6, "#ffd54a");
+    rect(c, 6, 6, 1, 1, "#ffd54a");
+    rect(c, 9, 6, 1, 1, "#ffd54a");
+    rect(c, 7, 7, 2, 1, "#ffd54a");
+  });
+
   const cloud = mk(S, S, (c) => {
     spans(c, [[4, 5, 10], [5, 3, 12], [6, 2, 13], [7, 1, 14], [8, 1, 14], [9, 2, 13]], "#dbe9f7");
     spans(c, [[5, 5, 9], [6, 3, 11], [7, 2, 12]], "#ffffff");
@@ -958,6 +1204,26 @@ window.BDArt = (() => {
     boss: boss,
     dragon: dragon,
     B: bush,
+    $: emerald,
+    "+": goldBar,
+    "@": megatite,
+    "%": bolt, // fake lightning: the same picture on purpose
+    8: megaTnt,
+    0: megaSlime,
+    "&": megaBush,
+    "\u0180": doorNormal,
+    "\u0181": doorNether,
+    "\u0182": doorEnd,
+    "\u0183": doorMushroom,
+    "\u0184": doorMech,
+    "\u0185": doorLocked,
+    "\u0186": keyItem,
+    swordStone: swordStone,
+    swordIron: swordIron,
+    swordDiamond: swordDiamond,
+    shield: shield,
+    coin: coin,
+    megacoin: megacoin,
     P: spawnMark,
     cloud: cloud,
     player: player,
@@ -1018,6 +1284,16 @@ window.BDArt = (() => {
     { key: "boss", label: "TNT Mech boss" },
     { key: "dragon", label: "Dragon" },
     { key: "B", label: "Bush" },
+    { key: "$", label: "Emerald" },
+    { key: "+", label: "Gold" },
+    { key: "@", label: "Megatite" },
+    { key: "8", label: "Mega TNT" },
+    { key: "0", label: "Mega slime" },
+    { key: "&", label: "Mega bush" },
+    { key: "swordStone", label: "Stone sword" },
+    { key: "swordIron", label: "Iron sword" },
+    { key: "swordDiamond", label: "Diamond sword" },
+    { key: "shield", label: "Shield" },
     { key: "P", label: "Start" },
     { key: "cloud", label: "Cloud" },
     { key: "explosion1", label: "Boom 1" },
@@ -1025,6 +1301,45 @@ window.BDArt = (() => {
   ];
 
   // The built-in look, kept aside so "reset" can always get back to it.
+  // Mega versions of ordinary blocks: block -> its mega's letter. A square
+  // holds one letter, so each mega needs its own. These come from Latin
+  // Extended-A, well clear of the letters handed out for the player's own
+  // blocks (LEGACY_SLOTS and the private-use range). Never reuse or reorder
+  // them: saved levels store these letters. Mega TNT (8), Mega slime (0) and
+  // Mega bush (&) came first, with their own hand-drawn pictures.
+  const MEGA = {
+    g: "\u0100", s: "\u0101", p: "\u0102", n: "\u0103", k: "\u0104", e: "\u0105",
+    A: "\u0106", "%": "\u0107", I: "\u0108", S: "\u0109", Z: "\u010a", W: "\u010b",
+    Y: "\u010c", U: "\u010d", D: "\u010e", d: "\u010f", "+": "\u0110", $: "\u0111",
+    "@": "\u0112", r: "\u0113", 9: "\u0114", o: "\u0115", T: "\u0116", b: "\u0117",
+    w: "\u0118", L: "\u0119", F: "\u011a", f: "\u011b",
+  };
+  const MEGA_BASE = {};
+  for (const [b, m] of Object.entries(MEGA)) MEGA_BASE[m] = b;
+
+  // A mega's picture is a picture of its own, so it can be repainted in the
+  // Art Studio separately (whether or not the mega has been bought). Until it
+  // is, it's whatever its ordinary block looks like right now (repaints
+  // included) with a megatite-pink border: see syncDerived.
+  const megaLook = (base) => {
+    const w = base.width || base.naturalWidth, h = base.height || base.naturalHeight;
+    return mk(w, h, (c) => {
+      c.drawImage(base, 0, 0, w, h);
+      rect(c, 0, 0, w, 1, "#f08bff");
+      rect(c, 0, h - 1, w, 1, "#f08bff");
+      rect(c, 0, 0, 1, h, "#f08bff");
+      rect(c, w - 1, 0, 1, h, "#f08bff");
+      rect(c, 1, 1, 1, 1, "#fff4ff");
+      rect(c, w - 2, h - 2, 1, 1, "#fff4ff");
+    });
+  };
+  for (const [b, m] of Object.entries(MEGA)) {
+    SPRITES[m] = megaLook(SPRITES[b]);
+    const info = SPRITE_INFO.find((x) => x.key === b);
+    const label = { "%": "fake lightning", w: "wither rose" }[b] || (info ? info.label : b).toLowerCase();
+    SPRITE_INFO.push({ key: m, label: "Mega " + label });
+  }
+
   const ORIGINALS = Object.assign({}, SPRITES);
 
   const registerSprite = (key, source) => {
@@ -1211,15 +1526,18 @@ window.BDArt = (() => {
     }
     const keys = Object.keys(good);
     if (persist && keys.length) writeStore(Object.assign(readStore(), good));
-    syncHidden();
+    syncDerived();
     return keys;
   };
 
-  // Hidden TNT is a faded copy of whatever TNT looks like right now, so a
-  // repainted TNT carries over — unless Hidden TNT was repainted on its own.
-  const syncHidden = () => {
-    if ("h" in (window.BDArtPack || {}) || "h" in readStore()) return;
-    SPRITES.h = ghostOf(SPRITES.t);
+  // Some pictures follow another one: Hidden TNT is a faded copy of whatever
+  // TNT looks like right now, and each mega is its ordinary block plus a pink
+  // border. A repaint of the original carries over, unless the follower was
+  // repainted on its own.
+  const syncDerived = () => {
+    const own = Object.assign({}, window.BDArtPack || {}, readStore());
+    if (!("h" in own)) SPRITES.h = ghostOf(SPRITES.t);
+    for (const [b, m] of Object.entries(MEGA)) if (!(m in own)) SPRITES[m] = megaLook(SPRITES[b]);
   };
 
   const setPixels = (key, data) => applyPack({ [key]: data }, true).length > 0;
@@ -1230,7 +1548,7 @@ window.BDArt = (() => {
     const store = readStore();
     delete store[key];
     writeStore(store);
-    syncHidden();
+    syncDerived();
   };
 
   const resetAllSprites = () => {
@@ -1240,7 +1558,7 @@ window.BDArt = (() => {
     const kept = {};
     for (const k of Object.keys(CUSTOM)) if (store[k] && !CUSTOM[k].shipped) kept[k] = store[k];
     writeStore(kept);
-    syncHidden();
+    syncDerived();
   };
 
   const customArt = () => readStore();
@@ -1262,27 +1580,52 @@ window.BDArt = (() => {
   };
 
   // covered = something solid sits directly above, so grass shows as plain dirt
+
+  // On top of a mega's own picture: a sparkle that moves round the corners,
+  // like the rays in the kids' drawing.
+  const drawMegaGlow = (ctx, x, y, size, time) => {
+    const pulse = 0.5 + 0.5 * Math.sin(time * 4 + x * 0.05);
+    ctx.save();
+    // a little four-point sparkle that moves round the corners
+    const c = Math.floor(time * 1.5 + x * 0.01) % 4;
+    const sx = x + (c === 1 || c === 2 ? size * 0.78 : size * 0.22);
+    const sy = y + (c >= 2 ? size * 0.78 : size * 0.22);
+    const r = size * (0.08 + 0.06 * pulse);
+    ctx.globalAlpha = 0.9;
+    ctx.fillStyle = "#fff4ff";
+    ctx.fillRect(sx - r, sy - size * 0.02, r * 2, size * 0.04);
+    ctx.fillRect(sx - size * 0.02, sy - r, size * 0.04, r * 2);
+    ctx.restore();
+  };
+
   const drawTile = (ctx, key, x, y, size, time, covered) => {
+    drawTileBody(ctx, key, x, y, size, time, covered);
+    if (MEGA_BASE[key]) drawMegaGlow(ctx, x, y, size, time);
+  };
+
+  const drawTileBody = (ctx, key, x, y, size, time, covered) => {
     if (key === "g" && covered) return blit(ctx, SPRITES.dirt, x, y, size, size);
-    // one of the player's own blocks wobbles, bobs or glows like the block it acts as
-    const ch = CUSTOM[key] ? CUSTOM[key].base : key;
-    const sp = SPRITES[key] || (isMine(key) ? SPRITES.s : null);
+    // one of the player's own blocks (or a mega) wobbles, bobs or glows like
+    // the block it acts as, using its own picture
+    const ch = MEGA_BASE[key] || (CUSTOM[key] ? CUSTOM[key].base : key);
+    // fake lightning borrows the real bolt's picture, repaints included
+    const sp = SPRITES[key === "%" ? "b" : key] || (isMine(key) ? SPRITES.s : null);
     if (!sp) return;
     const sw = sp.width || sp.naturalWidth, sh = sp.height || sp.naturalHeight;
     if (sh > sw) {
       const w = size * sw / sh;
       return blit(ctx, sp, x + (size - w) / 2, y, w, size);
     }
-    if (ch === "m") {
+    if (ch === "m" || ch === "0") {
       // slime squishes gently
       const wob = (Math.sin(time * 4 + x * 0.03) * 0.04 + 0.04) * size;
       return blit(ctx, sp, x, y + wob, size, size - wob);
     }
-    if (ch === "d" || ch === "r" || ch === "o" || ch === "9") {
+    if (ch === "d" || ch === "r" || ch === "o" || ch === "9" || ch === "$" || ch === "+" || ch === "@") {
       const bob = Math.sin(time * 3 + x * 0.05) * size * 0.08;
       return blit(ctx, sp, x, y + bob, size, size);
     }
-    if (ch === "b") {
+    if (ch === "b" || ch === "%") {
       const pulse = 0.55 + 0.45 * Math.sin(time * 8);
       ctx.save();
       ctx.globalAlpha = 0.25 * pulse;
@@ -1646,6 +1989,8 @@ window.BDArt = (() => {
   };
 
   return {
+    MEGA,
+    MEGA_BASE,
     drawTile,
     drawPlayer,
     drawExplosion,
