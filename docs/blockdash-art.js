@@ -1153,7 +1153,84 @@ window.BDArt = (() => {
   // ---------- sprite registry ----------
   // Every drawable is looked up here, so any of it can be swapped for a PNG.
 
+  // ---- pets: they follow the player around. All face right. ----
+  const petCat = paintMap([
+    "...........o...o",
+    "...........ooooo",
+    "...........oeoeo",
+    "...........ooooo",
+    "o.........oowpwo",
+    "o..ooooooooooww.",
+    ".oooddoodooooo..",
+    "..oooooooooooo..",
+    "...oooooooooo...",
+    "...o.o....o.o...",
+    "...o.o....o.o...",
+    "...w.w....w.w...",
+  ], { o: "#e8913a", d: "#b8621e", w: "#fff3e0", e: "#2a2a2a", p: "#ff9fb0" });
+  const petDog = paintMap([
+    "..........bbbb..",
+    ".........bbbbbb.",
+    ".........dbbebbb",
+    ".........dbbbbbn",
+    "b........dbbbwww",
+    ".b.......bbbbt..",
+    "..bbbbbbbbbbb...",
+    "..bbbwbbbbbbb...",
+    "..bbbbbbbbbbb...",
+    "..bb.bb..bb.bb..",
+    "..bb.bb..bb.bb..",
+    "..dd.dd..dd.dd..",
+  ], { b: "#9a6a3a", d: "#6b4423", w: "#f2e6d0", e: "#1a1a1a", n: "#111111", t: "#d04050" });
+  const petFrog = paintMap([
+    "..www....www..",
+    "..wew....wew..",
+    ".gggggggggggg.",
+    "gggggggggggggg",
+    "ggdggggggggdgg",
+    "gg.dddddddd.gg",
+    "gggyyyyyyyyggg",
+    ".ggyyyyyyyygg.",
+    "gg.gg....gg.gg",
+    "dd.dd....dd.dd",
+  ], { g: "#4caf50", d: "#2e7d32", y: "#c5e1a5", e: "#111111", w: "#ffffff" });
+  const petParrot = paintMap([
+    "......rrr...",
+    ".....rrrrr..",
+    ".....rrwkr..",
+    ".....rrrrkk.",
+    ".....rrrrk..",
+    "....rrrrr...",
+    "...yyrrrr...",
+    "..bbyyrrr...",
+    ".bbbyyrrr...",
+    ".bbbbyrr....",
+    "..bbb.rr....",
+    "......o.o...",
+    ".....bb.....",
+    "....bb......",
+  ], { r: "#e53935", y: "#fdd835", b: "#1e88e5", k: "#333333", w: "#ffffff", o: "#ff9800" });
+  const petDragon = paintMap([
+    "...........d.d..",
+    "..ff.......pppp.",
+    ".fff.......ppepp",
+    ".ffff.....pppppp",
+    "..fff.....ppyy..",
+    "...ffpppppppy...",
+    "....pppppppyy...",
+    "p..ppppppppy....",
+    ".pppppyyyyyy....",
+    "..pppppppppp....",
+    "....pp....pp....",
+    "....dd....dd....",
+  ], { p: "#8e44ad", d: "#5b2c6f", y: "#f4d03f", e: "#111111", f: "#c39bd3" });
+
   const SPRITES = {
+    petCat: petCat,
+    petDog: petDog,
+    petFrog: petFrog,
+    petParrot: petParrot,
+    petDragon: petDragon,
     g: grass,
     dirt: dirt,
     s: stone,
@@ -1298,6 +1375,11 @@ window.BDArt = (() => {
     { key: "cloud", label: "Cloud" },
     { key: "explosion1", label: "Boom 1" },
     { key: "explosion2", label: "Boom 2" },
+    { key: "petCat", label: "Cat pet" },
+    { key: "petDog", label: "Dog pet" },
+    { key: "petFrog", label: "Frog pet" },
+    { key: "petParrot", label: "Parrot pet" },
+    { key: "petDragon", label: "Baby dragon pet" },
   ];
 
   // The built-in look, kept aside so "reset" can always get back to it.

@@ -105,7 +105,7 @@
     return b && TILES[b] && !TILES[b].over ? b : "s";
   };
   const tileOf = (ch) => TILES[baseOf(ch)];
-  const typeName = (base) => (base === "player" ? "Player" : TILES[base] && !isMine(base) ? TILES[base].name : "Stone");
+  const typeName = (base) => (base === "player" ? "Player" : /^pet[A-Z]/.test(base) ? "Pet" : TILES[base] && !isMine(base) ? TILES[base].name : "Stone");
   const MINE = "*"; // the one palette button that stands for all of them
   const MEGA_PICK = "~"; // likewise, the palette button that opens the mega blocks
 
@@ -300,6 +300,56 @@
     } catch (e) { /* ignore */ }
   };
 
+  // ---------- ghosts ----------
+  // Your best run on each level, replayed as a see-through blue copy of you.
+  // Kept apart from the levels, and only the newest few, so ghosts never
+  // crowd out level saves in the browser's storage.
+  const GHOST_KEY = "blockdash_ghosts_v1";
+  const GHOST_ON_KEY = "blockdash_ghost_on";
+  const GHOST_EVERY = 6; // record a spot every 6 game steps (20 a second)
+  const GHOST_MAX = 4000; // spots: about 3 minutes
+  const GHOST_KEEP = 30; // levels
+  const GHOST_BONUS = 10; // coins for beating it
+
+  // keyed by the level's blocks too, so an edited level starts a fresh ghost
+  const ghostKey = (lvl) => {
+    const str = lvl.name + "|" + lvl.rows.join("/");
+    let h = 0;
+    for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) | 0;
+    return (h >>> 0).toString(36);
+  };
+  const loadGhosts = () => {
+    try { return JSON.parse(localStorage.getItem(GHOST_KEY) || "{}") || {}; } catch (e) { return {}; }
+  };
+  const saveGhost = (key, g) => {
+    const all = loadGhosts();
+    all[key] = g;
+    Object.keys(all).sort((a, b) => (all[b].at || 0) - (all[a].at || 0))
+      .slice(GHOST_KEEP).forEach((k) => delete all[k]);
+    try { localStorage.setItem(GHOST_KEY, JSON.stringify(all)); } catch (e) { /* no room: keep the old one */ }
+  };
+  const ghostOn = () => {
+    try { return localStorage.getItem(GHOST_ON_KEY) !== "0"; } catch (e) { return true; }
+  };
+  // Does run a beat the saved best b? Finishing beats not finishing, then
+  // faster wins; otherwise reaching the boss, then getting further.
+  const beats = (a, b) => {
+    if (a.done !== b.done) return a.done;
+    if (a.done) return a.t < b.t;
+    if (a.boss !== b.boss) return a.boss;
+    return a.far > b.far + 1;
+  };
+
+  // "Leave my sword at home": fight the boss bare-handed even though you own
+  // a sword. Kept outside the bag, because loadBag only keeps the bag's own fields.
+  const SWORD_HOME_KEY = "blockdash_sword_home";
+  const swordAtHome = () => {
+    try { return localStorage.getItem(SWORD_HOME_KEY) === "1"; } catch (e) { return false; }
+  };
+  const setSwordAtHome = (on) => {
+    try { localStorage.setItem(SWORD_HOME_KEY, on ? "1" : "0"); } catch (e) { /* ignore */ }
+  };
+
   // The bag: blaze rods, ender pearls and eyes of ender you're carrying.
   // Unlike diamonds it is kept from level to level and between visits.
   const loadBag = () => {
@@ -316,6 +366,7 @@
 
   const saveBag = (bag) => {
     try { localStorage.setItem(BAG_KEY, JSON.stringify(bag)); } catch (e) { /* ignore */ }
+    window.BDBadges.coins(bag.coins);
   };
 
   // ---------- grid helpers ----------
@@ -439,6 +490,9 @@
     return out;
   };
 
+  // a level's own song, or null to play whatever the player picked
+  const musicOf = (o) => (o && window.BDMusic.SONGS[o.music] ? o.music : null);
+
   // the boss arena can have its own background; without one it matches the level
   const arenaBgOf = (o) =>
     (window.BDArt.BACKGROUNDS.some((b) => b.key === o.arenaBg) ? o.arenaBg : bgOf(o));
@@ -451,6 +505,7 @@
     if (arenaBgOf(l) !== bgOf(l)) o.arenaBg = l.arenaBg;
     // kept even when this browser has no art for it; it just plays as the usual player
     if (isMine(l.hero)) o.hero = l.hero;
+    if (musicOf(l)) o.music = l.music;
     return o;
   };
 
@@ -467,6 +522,7 @@
       bg: bgOf(o),
       ...(arenaBgOf(o) !== bgOf(o) ? { arenaBg: o.arenaBg } : {}),
       ...(isMine(o.hero) ? { hero: o.hero } : {}),
+      ...(musicOf(o) ? { music: o.music } : {}),
       notes: cleanNotes(clean, o.notes),
       // only levels whose arena was drawn by hand carry one
       ...(Array.isArray(o.arena) && o.arena.length ? { arena: gridToRows(arenaGrid(o.arena)) } : {}),
@@ -525,7 +581,7 @@
   // ---------- share codes ----------
 
   const encodeLevel = (lvl) => {
-    const json = JSON.stringify({ n: lvl.name, r: lvl.rows, b: bgOf(lvl), x: cleanNotes(lvl.rows, lvl.notes), a: lvl.arena, ab: lvl.arenaBg, h: lvl.hero });
+    const json = JSON.stringify({ n: lvl.name, r: lvl.rows, b: bgOf(lvl), x: cleanNotes(lvl.rows, lvl.notes), a: lvl.arena, ab: lvl.arenaBg, h: lvl.hero, m: musicOf(lvl) || undefined });
     const bytes = new TextEncoder().encode(json);
     let s = "";
     for (const b of bytes) s += String.fromCharCode(b);
@@ -537,7 +593,7 @@
     const bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0));
     const o = JSON.parse(new TextDecoder().decode(bytes));
     if (!o || !Array.isArray(o.r) || !o.r.length) throw new Error("bad code");
-    return { name: String(o.n || "Imported level"), rows: o.r.map(String), bg: o.b, notes: o.x, arena: o.a, arenaBg: o.ab, hero: o.h };
+    return { name: String(o.n || "Imported level"), rows: o.r.map(String), bg: o.b, notes: o.x, arena: o.a, arenaBg: o.ab, hero: o.h, music: o.m };
   };
 
   // Art codes are much bigger than level codes, so each drawing is stored as
@@ -629,6 +685,85 @@
     return window.BDArt.baseOf(k) === "player" ? k : null;
   };
 
+  // ---------- pets ----------
+  // A pet just follows you around for fun. Bought in the shop; one at a time.
+  // Pets drawn in the Art Studio start from one of these and sound like it.
+  const PET_KEY = "blockdash_pets_v1";
+  const PET_COST = 50;
+  const PETS = [
+    ["petCat", "Cat", "cat"], ["petDog", "Dog", "dog"], ["petFrog", "Frog", "frog"],
+    ["petParrot", "Parrot", "parrot"], ["petDragon", "Baby dragon", "dragon"],
+  ];
+  const PET_SOUND = Object.fromEntries(PETS.map(([k, , snd]) => [k, snd]));
+  const FLYING_PETS = ["petParrot", "petDragon"];
+  const CAT_LOOK = "\ue934"; // the shipped black-cat player look
+  const petBaseOf = (k) => (PET_SOUND[k] ? k : PET_SOUND[Art.baseOf(k)] ? Art.baseOf(k) : null);
+  const allPets = () => PETS.map(([key, label]) => ({ key, label }))
+    .concat(Art.customBlocks().filter((b) => PET_SOUND[b.base]).map((b) => ({ key: b.key, label: b.label })));
+  const loadPets = () => {
+    let p = {};
+    try { p = JSON.parse(localStorage.getItem(PET_KEY) || "{}") || {}; } catch (e) { /* no pets yet */ }
+    // a drawn pet whose art isn't in this browser is kept, just not shown
+    const owned = Array.isArray(p.owned) ? p.owned.filter((k) => typeof k === "string") : [];
+    return { owned, pick: owned.includes(p.pick) && petBaseOf(p.pick) ? p.pick : null };
+  };
+  const savePets = (p) => {
+    try { localStorage.setItem(PET_KEY, JSON.stringify(p)); } catch (e) { /* ignore */ }
+    if (PETS.every(([k]) => p.owned.includes(k))) window.BDBadges.earn("pets");
+  };
+
+  const petPanel = () => {
+    const pets = loadPets();
+    const panel = el("div", "panel");
+    panel.appendChild(el("h2", null, "🐾 Pick your pet"));
+    const mine = allPets().filter((pt) => pets.owned.includes(pt.key));
+    if (!mine.length) {
+      panel.appendChild(el("p", "hint", `No pets yet. Buy one in the 🛒 Shop for ${PET_COST} coins!`));
+      return panel;
+    }
+    const row = el("div", "row");
+    [{ key: null, label: "None" }].concat(mine).forEach(({ key, label }) => {
+      const item = el("div", "pal-item" + (key === pets.pick ? " sel" : ""));
+      item.style.minWidth = "76px";
+      const thumb = key ? spriteThumb(key, 48, 48) : el("canvas");
+      if (!key) { thumb.width = thumb.height = 48; }
+      item.append(thumb, el("div", "lbl", label));
+      item.onclick = () => {
+        savePets(Object.assign(pets, { pick: key }));
+        if (key) window.BDMusic.sfx(PET_SOUND[petBaseOf(key)]);
+        showMenu();
+      };
+      row.appendChild(item);
+    });
+    panel.appendChild(row);
+    return panel;
+  };
+
+  // ---------- badges screen ----------
+  const showBadges = () => {
+    clear();
+    const B = window.BDBadges;
+    const head = el("div", "row");
+    head.appendChild(el("h1", null, `🏅 Badges ${B.count()}/${B.LIST.length}`));
+    head.appendChild(el("div", "spacer"));
+    const back = el("button", "small", "← Back");
+    back.onclick = () => showMenu();
+    head.appendChild(back);
+    root.appendChild(head);
+    const panel = el("div", "panel");
+    const grid = el("div", "badge-grid");
+    for (const b of B.LIST) {
+      const got = B.has(b.id);
+      const hide = b.secret && !got;
+      const card = el("div", "badge-card " + (got ? "got" : "locked"));
+      card.append(el("div", "icon", hide ? "❓" : b.icon), el("div", "name", hide ? "Secret" : b.name),
+        el("div", "how", hide ? "Keep playing to find it!" : b.how));
+      grid.appendChild(card);
+    }
+    panel.appendChild(grid);
+    root.appendChild(panel);
+  };
+
   const heroPanel = () => {
     const panel = el("div", "panel");
     panel.appendChild(el("h2", null, "Pick your player"));
@@ -682,6 +817,13 @@
     money.append(slot("coin", bag.coins), slot("megacoin", bag.mega));
     if (bag.sword) money.append(slot(SWORDS[bag.sword].key));
     if (bag.shields) money.append(slot("shield", bag.shields));
+    if (bag.sword) {
+      const home = swordAtHome();
+      const swordBtn = el("button", "small" + (home ? "" : " green"), home ? "⚔️ Sword: left at home" : "⚔️ Sword: taking it");
+      swordBtn.title = "Leave your sword at home to fight the boss with bare hands";
+      swordBtn.onclick = () => { setSwordAtHome(!home); showMenu(); };
+      money.append(swordBtn);
+    }
     const shop = el("button", "green small", "🛒 Shop");
     shop.onclick = () => showShop();
     money.append(el("div", "spacer"), shop);
@@ -698,6 +840,46 @@
     return panel;
   };
 
+  // ---------- the music screen ----------
+
+  const showMusic = () => {
+    clear();
+    const M = window.BDMusic;
+    const head = el("div", "row");
+    head.appendChild(el("h1", null, "🎵 Music"));
+    head.appendChild(el("div", "spacer"));
+    const back = el("button", "small", "← Back");
+    back.onclick = () => showMenu();
+    head.appendChild(back);
+    root.appendChild(head);
+
+    const songs = el("div", "panel");
+    songs.appendChild(el("h2", null, "Pick a song"));
+    const list = stack();
+    for (const [k, song] of Object.entries(M.SONGS)) {
+      const row = el("div", "row tight");
+      const pick = el("button", k === M.song ? "green" : "", `${song.icon} ${song.name}${k === M.song ? " ✓" : ""}`);
+      pick.style.minWidth = "170px";
+      pick.onclick = () => { M.setSong(k); showMusic(); };
+      row.append(pick, el("span", "hint", song.what));
+      list.appendChild(row);
+    }
+    songs.appendChild(list);
+    songs.appendChild(el("p", "hint", "Your song keeps playing until you pick another one."));
+    root.appendChild(songs);
+
+    const vol = el("div", "panel");
+    vol.appendChild(el("h2", null, "Volume"));
+    const row = el("div", "row tight");
+    for (const [k, label] of [["quiet", "🔈 Quiet"], ["mid", "🔉 Medium"], ["loud", "🔊 Loud"]]) {
+      const b = el("button", k === M.vol ? "green" : "", label);
+      b.onclick = () => { M.setVolume(k); showMusic(); };
+      row.appendChild(b);
+    }
+    vol.appendChild(row);
+    root.appendChild(vol);
+  };
+
   // ---------- the shop ----------
 
   const showShop = () => {
@@ -712,6 +894,7 @@
     root.appendChild(head);
 
     const thumb = (key) => {
+      if (petBaseOf(key)) return spriteThumb(key, 48, 48); // pets aren't square
       const c = el("canvas");
       c.width = c.height = 48;
       drawTile(c.getContext("2d"), key, 0, 0, 48, 0, false);
@@ -778,6 +961,30 @@
       SHIELD_COST, "coins", "", () => spend({ coins: bag.coins - SHIELD_COST, shields: bag.shields + 1 })));
     root.appendChild(coinShop);
 
+    const pets = loadPets();
+    const petShop = el("div", "panel");
+    petShop.appendChild(el("h2", null, "🐾 Pet shop"));
+    petShop.appendChild(el("p", "hint",
+      "A pet follows you through every level and makes its sound when you grab a diamond. Pick it on the title screen."));
+    for (const pt of allPets()) {
+      const owned = pets.owned.includes(pt.key);
+      const row = item(pt.key, pt.label, owned ? "Yours!" : "Follows you around", PET_COST, "coins",
+        owned ? "Owned ✓" : "", () => {
+          saveBag(Object.assign(bag, { coins: bag.coins - PET_COST }));
+          pets.owned.push(pt.key);
+          if (!pets.pick) pets.pick = pt.key;
+          savePets(pets);
+          window.BDMusic.sfx(PET_SOUND[petBaseOf(pt.key)]);
+          showShop();
+        });
+      petShop.appendChild(row);
+    }
+    const draw = el("button", "small", "🎨 Draw your own pet");
+    draw.onclick = () => showArtStudio(null, () => showShop());
+    petShop.append(draw, el("p", "hint",
+      "In the Art Studio, make a New block and start it from one of the pets. Then buy it here."));
+    root.appendChild(petShop);
+
     const megaShop = el("div", "panel");
     megaShop.appendChild(el("h2", null, "Megacoin shop"));
     megaShop.appendChild(el("p", "hint",
@@ -791,12 +998,18 @@
   };
 
   const showMenu = () => {
+    window.BDMusic.level(null);
+    // pets and coins from before badges existed still count
+    window.BDBadges.coins(loadBag().coins);
+    if (PETS.every(([k]) => loadPets().owned.includes(k))) window.BDBadges.earn("pets");
     clear();
     const levels = loadLevels();
     const builtin = builtinLevels();
 
     const head = el("div", "row");
-    head.appendChild(el("h1", null, editMode ? "Block Dash Level Maker" : "Block Dash"));
+    const title = el("h1", null, editMode ? "Block Dash Level Maker" : "Block Dash");
+    title.onclick = () => window.BDBadges.titleClick();
+    head.appendChild(title);
     head.appendChild(el("div", "spacer"));
     const other = el("a", "btn small", editMode ? "▶ Play the game" : "✏ Level Maker");
     other.href = editMode ? "blockdash.html" : "blockdash.html?edit";
@@ -806,6 +1019,13 @@
       artBtn.onclick = () => showArtStudio();
       head.appendChild(artBtn);
     }
+    const music = el("button", "small", "🎵 Music");
+    music.onclick = () => showMusic();
+    head.appendChild(music);
+    const badges = el("button", "small", `🏅 ${window.BDBadges.count()}/${window.BDBadges.LIST.length}`);
+    badges.title = "Badges";
+    badges.onclick = () => showBadges();
+    head.appendChild(badges);
     const home = el("a", "btn small", "← Pick Right");
     home.href = "index.html";
     head.appendChild(home);
@@ -827,7 +1047,7 @@
         const play = el("button", "green small", i ? "▶ Play" : "▶ Start");
         play.onclick = () => playSeries(builtin, i, 0, () => showMenu());
         const copy = el("button", "small", "✏ Copy & edit");
-        copy.onclick = () => showEditor({ name: lvl.name + " copy", rows: lvl.rows, bg: lvl.bg, notes: lvl.notes, arena: lvl.arena, arenaBg: lvl.arenaBg, hero: lvl.hero }, -1);
+        copy.onclick = () => showEditor({ name: lvl.name + " copy", rows: lvl.rows, bg: lvl.bg, notes: lvl.notes, arena: lvl.arena, arenaBg: lvl.arenaBg, hero: lvl.hero, music: lvl.music }, -1);
         list.appendChild(levelCard(lvl, editMode ? [play, copy] : [play], i + 1));
       });
       bp.appendChild(list);
@@ -837,12 +1057,12 @@
           "across the whole run."));
       }
       root.appendChild(bp);
-      if (!editMode) root.append(heroPanel(), bagPanel());
+      if (!editMode) root.append(heroPanel(), petPanel(), bagPanel());
     }
     if (!editMode) return;
 
     // ---- levels saved in this browser ----
-    root.append(heroPanel(), bagPanel());
+    root.append(heroPanel(), petPanel(), bagPanel());
     const panel = el("div", "panel");
     panel.appendChild(el("h2", null, "My levels"));
 
@@ -1252,11 +1472,12 @@
       const base = from === "blank" ? "s" : mineBy[from] ? mineBy[from].base : from;
       actsLike.innerHTML = base === "player"
         ? "It will be a new <b>player look</b>. Pick it with Player look in the Level Maker."
+        : PET_SOUND[base] ? "It will be a new <b>pet</b>. Buy it in the 🐾 Pet shop."
         : `It will act like <b>${typeName(base)}</b>.`;
     };
     // not megas: a homemade block acts like its starting block, and the
     // rules only know megas by their own letters
-    Art.SPRITE_INFO.filter((s) => s.key === "player" || s.key === "dirt" ||
+    Art.SPRITE_INFO.filter((s) => s.key === "player" || s.key === "dirt" || PET_SOUND[s.key] ||
       (TILES[s.key] && !TILES[s.key].over && !MEGA_BASE[s.key]))
       .map((s) => [s.key, s.label])
       .concat(mine.map((b) => [b.key, b.label]), [["blank", "Blank"]])
@@ -1687,7 +1908,7 @@
       undoStack = [];
       const own = mineBy[k];
       title.textContent = `${pickItems[k].label} — ${img.w} × ${img.h}` +
-        (own ? (own.base === "player" ? " — a player look" : ` — acts like ${typeName(own.base)}`) : "");
+        (own ? (own.base === "player" ? " — a player look" : PET_SOUND[own.base] ? " — a pet" : ` — acts like ${typeName(own.base)}`) : "");
       resetBtn.style.display = own && !own.shipped ? "none" : "";
       deleteBtn.style.display = own && !own.shipped ? "" : "none";
       render();
@@ -1728,6 +1949,8 @@
     // over until the arena is given one of its own
     let arenaBg = existing && arenaBgOf(existing) !== bg ? existing.arenaBg : null;
     let hero = existing && isMine(existing.hero) ? existing.hero : null;
+    let music = musicOf(existing);
+    window.BDMusic.level(music); // so you hear the level's song while building it
     const shownBg = () => (editing === "arena" ? arenaBg || bg : bg);
     let other = arenaGrid(existing && existing.arena, arenaBg || bg);
     let arenaDrawn = !!(existing && existing.arena); // until it's opened, the level uses the default arena
@@ -1764,16 +1987,17 @@
     const autosave = () => {
       const all = loadLevels();
       const lvl = levelData({ name: (name || "").trim() || "Untitled", rows: gridToRows(levelG()), bg, notes,
-        arena: arenaRows(), arenaBg, hero });
+        arena: arenaRows(), arenaBg, hero, music });
       if (slot >= 0 && slot < all.length) all[slot] = lvl;
       else { all.push(lvl); slot = all.length - 1; }
       savedLabel.textContent = saveLevels(all) ? "✓ Saved" : "⚠ Not saved";
+      window.BDBadges.earn("builder");
     };
     nameInput.oninput = () => { name = nameInput.value; autosave(); };
     const testBtn = el("button", "", "▶ Test");
     testBtn.onclick = () => {
       const lvl = { name: (nameInput.value || "Untitled").trim(), rows: gridToRows(levelG()), bg,
-        notes: cleanNotes(levelG(), notes), arena: arenaRows(), arenaBg, hero };
+        notes: cleanNotes(levelG(), notes), arena: arenaRows(), arenaBg, hero, music };
       showPlay(lvl, () => showEditor(lvl, slot), true);
     };
     nameRow.append(nameInput, testBtn, savedLabel);
@@ -1822,6 +2046,25 @@
     heroRow.appendChild(heroNew);
     namePanel.appendChild(heroRow);
 
+    // the level's own song; "Player's choice" plays whatever the player picked
+    const musicRow = el("div", "row");
+    musicRow.style.marginTop = "8px";
+    musicRow.appendChild(el("span", "hint", "Music:"));
+    const musicBtns = [[null, "Player's choice"]]
+      .concat(Object.entries(window.BDMusic.SONGS).map(([k, sg]) => [k, `${sg.icon} ${sg.name}`]))
+      .map(([k, label]) => {
+        const btn = el("button", "small" + (k === music ? " green" : ""), label);
+        btn.onclick = () => {
+          music = k;
+          musicBtns.forEach(([mk, b]) => b.classList.toggle("green", mk === music));
+          window.BDMusic.level(music);
+          autosave();
+        };
+        musicRow.appendChild(btn);
+        return [k, btn];
+      });
+    namePanel.appendChild(musicRow);
+
     // level <-> boss arena
     const editRow = el("div", "row");
     editRow.style.marginTop = "8px";
@@ -1858,7 +2101,7 @@
     // the same size however many they make; a tray under it picks which one.
     const hiddenNow = () => (editing === "arena" ? LEVEL_ONLY : ARENA_ONLY);
     // player looks aren't blocks; they're picked with Player look above
-    const myBlocks = Art.customBlocks().filter((b) => b.base !== "player")
+    const myBlocks = Art.customBlocks().filter((b) => b.base !== "player" && !PET_SOUND[b.base])
       .map((b) => ({ key: b.key, label: b.label, base: baseOf(b.key) }));
     let myLast = myBlocks.length ? myBlocks[0].key : null;
     let trayOpen = false;
@@ -2294,6 +2537,7 @@
   // Absent when a level is played on its own (from the editor's Test button).
   const showPlay = (level, onExit, fromEditor, chain) => {
     clear();
+    window.BDMusic.level(musicOf(level));
 
     // These three describe the level being played. A Boss portal swaps them
     // for the boss arena; `home` is how a full restart gets the level back.
@@ -2316,6 +2560,9 @@
     // 2 for a mega square: pays double, counts double, lasts twice as long
     const megaTimes = (x, y) => (megaAt(x, y) ? 2 : 1);
     const hero = Art.baseOf(level.hero) === "player" ? level.hero : pickedHero();
+    const pet = loadPets().pick;
+    const petBase = pet && petBaseOf(pet);
+    window.BDBadges.nightCheck();
     const notes = cleanNotes(level.rows, level.notes);
     let width = template[0].length;
     let spawn = findSpawn(template);
@@ -2326,7 +2573,19 @@
     header.appendChild(el("div", "spacer"));
     const quit = el("button", "small", fromEditor ? "← Editor" : "← Levels");
     quit.onclick = () => { stop(); onExit(); };
-    header.appendChild(quit);
+    let showGhost = ghostOn();
+    const ghostBtn = el("button", "small", "");
+    const showGhostBtn = () => { ghostBtn.textContent = showGhost ? "👻 Ghost: on" : "👻 Ghost: off"; };
+    showGhostBtn();
+    // pointerdown + preventDefault so the button never takes focus, or the
+    // Space bar (jump) would switch the ghost on and off
+    ghostBtn.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      showGhost = !showGhost;
+      try { localStorage.setItem(GHOST_ON_KEY, showGhost ? "1" : "0"); } catch (err) { /* ignore */ }
+      showGhostBtn();
+    });
+    header.append(ghostBtn, quit);
     root.appendChild(header);
 
     const panel = el("div", "panel");
@@ -2352,7 +2611,8 @@
     const keysEl = el("span", "score", "🔑 0");
     const hasKeys = has(KEY, "\u0185");
     const shieldEl = el("span", "score", "🛡 " + bag.shields);
-    const bossMax = bag.sword ? SWORDS[bag.sword].hits : BOSS_HP;
+    const sword = swordAtHome() ? 0 : bag.sword;
+    const bossMax = sword ? SWORDS[sword].hits : BOSS_HP;
     hud.append(scoreEl, ...(hasMega ? [megaEl] : []), ...(hasRods ? [rodsEl] : []), ...(hasPearls ? [pearlsEl] : []),
       ...(hasEyes ? [eyesEl] : []), ...(hasKeys ? [keysEl] : []), ...(bag.shields ? [shieldEl] : []), pctEl, attEl);
     panel.appendChild(hud);
@@ -2449,10 +2709,65 @@
       boostBtn.style.setProperty("--charge", pct + "%");
     };
 
+    // ----- runs, for the ghost -----
+    // A run starts at the level's start and lasts through save-point respawns
+    // and the boss fight. It's replayed by game step, so pauses replay too.
+    const gKey = ghostKey(level);
+    let best = loadGhosts()[gKey] || null;
+    let run = null, runStep = 0, lifeStep = 0;
+    const PET_LAG = 18; // steps the pet trails behind you
+    const trail = [];
+
+    const startRun = () => {
+      run = { path: [], far: 0, boss: false, deaths: 0 };
+      runStep = 0;
+    };
+    // True when the run beat the saved ghost. The very first run just
+    // becomes the ghost: there's nothing to beat yet.
+    const endRun = (finished) => {
+      if (!run || run.ended) return false;
+      run.ended = true;
+      const r = { path: run.path, far: run.far, boss: run.boss, done: finished, t: runStep, at: Date.now() };
+      const old = best;
+      if (old && !beats(r, old)) return false;
+      if (!old && r.path.length < 6) return false;
+      best = r;
+      saveGhost(gKey, r);
+      if (!old) return false;
+      window.BDBadges.add("ghostWins");
+      if (r.done && old.done && old.t - r.t < 0.5 / STEP) window.BDBadges.earn("photo");
+      return true;
+    };
+    const ghostBonus = () => {
+      const b = loadBag();
+      saveBag(Object.assign(b, { coins: b.coins + GHOST_BONUS }));
+      toast(`👻 NEW BEST! You beat your ghost! +${GHOST_BONUS} coins`);
+    };
+    const afterStep = () => {
+      runStep++;
+      lifeStep++;
+      if (state === "run" && !warp) {
+        trail.push(player.x, player.y);
+        if (trail.length > PET_LAG * 2) trail.splice(0, 2);
+      }
+      if (!run || run.ended) return;
+      if (inBoss) { run.boss = true; return; } // the arena isn't part of the level's map
+      if (state === "run") run.far = Math.max(run.far, player.x);
+      if (runStep % GHOST_EVERY === 0 && run.path.length < GHOST_MAX * 3) {
+        run.path.push(+player.x.toFixed(2), +player.y.toFixed(2), +rot.toFixed(1));
+      }
+    };
+
     // fromStart: R / Play again. Otherwise (after dying) respawn at the last
     // checkpoint with the level as it was when you got there, so diamonds
     // grabbed before it stay grabbed.
     const reset = (fromStart) => {
+      if (fromStart || !checkpoint) {
+        if (run && endRun(false)) ghostBonus();
+        startRun();
+      }
+      lifeStep = 0;
+      trail.length = 0;
       if (fromStart) {
         checkpoint = null;
         inBoss = false;
@@ -2538,6 +2853,7 @@
       knock = 0;
       boss = null;
       if (inBoss) startBoss();
+      if (hero === CAT_LOOK && petBase === "petCat" && window.BDMusic.playing === "meow") window.BDBadges.earn("cat");
     };
 
     // ----- the TNT Mech boss fight -----
@@ -2832,6 +3148,9 @@
       state = "dead";
       deathKind = kind;
       deadT = 0;
+      window.BDBadges.add("deaths");
+      if (run) run.deaths++;
+      if (lifeStep < 1 / STEP && !checkpoint) window.BDBadges.earn("oops");
       poofed = false;
       if (kind === "burn") {
         for (let i = 0; i < 14; i++) ember();
@@ -2846,13 +3165,25 @@
       jumpBtn.disabled = true;
     };
 
+    const boom = (kind) => {
+      if (state === "run") window.BDBadges.add("tnt");
+      die(kind);
+    };
+
     const win = () => {
       if (state !== "run") return;
+      const beatGhost = endRun(true);
+      const M = window.BDMusic, B = window.BDBadges;
+      B.cleared(bestKey(level), builtinLevels().map(bestKey));
+      if (inBoss) { B.earn("boss"); if (!sword) B.earn("bare"); }
+      if (run && !run.deaths) B.earn("perfect");
+      if (!M.playing) B.earn("silent");
+      if (petBase === "petDog" && M.playing === "woof") B.earn("goodboy");
       state = "win";
       setBest(bestKey(level), score);
       // re-read first: a shield used on the way has already been saved
       Object.assign(bag, loadBag(), { rods, pearls, eyes });
-      bag.coins += score;
+      bag.coins += score + (beatGhost ? GHOST_BONUS : 0);
       bag.mega += megas;
       saveBag(bag);
       jumpBtn.disabled = true;
@@ -2865,6 +3196,7 @@
       const box = el("div", "overlay-msg");
       box.innerHTML =
         `<div class="big">${more || !chain ? "Level Complete!" : "You Finished!"}</div>` +
+        (beatGhost ? `<div class="big" style="font-size:1.1rem">👻 NEW BEST! You beat your ghost! +${GHOST_BONUS} coins</div>` : "") +
         `<div>Score: ${score} · Best: ${getBest(bestKey(level))}</div>` +
         `<div>+${score} coins${megas ? ` · +${megas} megacoins` : ""} · ` +
         `you now have ${bag.coins} coins${bag.mega ? ` and ${bag.mega} megacoins` : ""}</div>` +
@@ -3310,7 +3642,7 @@
           // a mega item was picked up is ordinary lava.
           const was = MEGA_BASE[looks[noteKey(x, y)]];
           if (near === "8" || (near === "T" && was === "T")) {
-            die("megaboom");
+            boom("megaboom");
             return;
           }
           if (near === was && "LUDF".includes(near)) {
@@ -3323,9 +3655,9 @@
         for (let x = ix0; x <= ix1; x++) {
           if (x < 0 || x >= width || y < 0 || y >= H) continue;
           const ch = grid[y][x];
-          if (ch === "t" || ch === "T") { die(); return; }
-          if (ch === "8") { die("megaboom"); return; }
-          if (isHiddenTnt(ch)) { die(); return; }
+          if (ch === "t" || ch === "T") { boom(); return; }
+          if (ch === "8") { boom("megaboom"); return; }
+          if (isHiddenTnt(ch)) { boom(); return; }
           if (ch === "A") { die("poof"); return; }
           // The three invisible blocks work once each, then clear themselves
           // (they come back when the level resets).
@@ -3362,6 +3694,8 @@
             grid[y][x] = AIR;
             score += COIN_VALUE[ch] * megaTimes(x, y);
             scoreEl.textContent = "💎 " + score;
+            if (ch === "d") window.BDBadges.add("diamonds", megaTimes(x, y));
+            if (petBase) window.BDMusic.sfx(PET_SOUND[petBase]);
           } else if (ch === "@") {
             grid[y][x] = AIR;
             megas += MEGATITE_PAYS * megaTimes(x, y);
@@ -3455,6 +3789,49 @@
     // --- rendering ---
     const drawBackground = () =>
       Art.drawBackground(ctx, inBoss ? arenaBgOf(level) : bgOf(level), canvas.width, canvas.height, camX * TS, TS, time, effect);
+
+    // The ghost: you, tinted glowing blue on a scratch canvas, see-through.
+    const ghostCv = el("canvas");
+    const drawGhost = () => {
+      if (!showGhost || inBoss || !best || !best.path) return;
+      const p = best.path, n = p.length / 3;
+      const f = runStep / GHOST_EVERY - 1;
+      if (n < 2 || f >= n - 1) return; // the ghost's run is over
+      const i = Math.max(0, Math.floor(f)), k = clamp(f - i, 0, 1);
+      const gx = p[i * 3] + (p[i * 3 + 3] - p[i * 3]) * k;
+      const gy = p[i * 3 + 1] + (p[i * 3 + 4] - p[i * 3 + 1]) * k;
+      const pw = PLAYER_W * TS, ph = PLAYER_H * TS;
+      ghostCv.width = Math.ceil(pw);
+      ghostCv.height = Math.ceil(ph);
+      const g = ghostCv.getContext("2d");
+      drawPlayer(g, 0, 0, ghostCv.width, ghostCv.height, 0, hero);
+      g.globalCompositeOperation = "source-atop";
+      g.fillStyle = "rgba(90, 180, 255, 0.75)";
+      g.fillRect(0, 0, ghostCv.width, ghostCv.height);
+      ctx.save();
+      ctx.globalAlpha = 0.55;
+      ctx.shadowColor = "#7fd0ff";
+      ctx.shadowBlur = 16;
+      ctx.translate((gx + PLAYER_W / 2 - camX) * TS, (gy + PLAYER_H / 2) * TS);
+      ctx.rotate(p[i * 3 + 2]);
+      ctx.drawImage(ghostCv, -pw / 2, -ph / 2);
+      ctx.restore();
+    };
+
+    // The pet runs where you were a moment ago, so it jumps when you jump.
+    const drawPet = () => {
+      const sp = pet && Art.SPRITES[pet];
+      if (!sp || trail.length < 2) return;
+      const sw = sp.width || sp.naturalWidth, sh = sp.height || sp.naturalHeight;
+      const h = TS * 0.6, w = (h * sw) / sh;
+      const fly = FLYING_PETS.includes(petBase);
+      const lift = fly ? TS * (0.55 + 0.08 * Math.sin(time * 6)) : 0;
+      ctx.save();
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(sp, (trail[0] + PLAYER_W / 2 - camX) * TS - w / 2 - TS * 0.3,
+        (trail[1] + PLAYER_H) * TS - h - lift, w, h);
+      ctx.restore();
+    };
 
     // The player flashing red as they tip over, the way a beaten mob does.
     // Tinted on a scratch canvas so only the player's own pixels turn red.
@@ -3725,6 +4102,8 @@
           drawHurtPlayer(cx, cy, pw, ph, (deadT / POOF_AFTER) * Math.PI / 2);
         }
       }
+      drawGhost();
+      drawPet();
       if (state !== "dead") {
         const k = warp ? clamp((warp.t / WARP_TIME - 0.7) / 0.3, 0, 1) : 1;
         if (k > 0) {
@@ -3732,8 +4111,8 @@
           drawPlayer(ctx, (player.x + PLAYER_W / 2 - camX) * TS - pw / 2,
             (player.y + PLAYER_H / 2) * TS - ph / 2, pw, ph, rot, hero);
           // sword in hand for the boss fight
-          if (inBoss && bag.sword) {
-            drawTile(ctx, SWORDS[bag.sword].key, (player.x + PLAYER_W * 0.55 - camX) * TS,
+          if (inBoss && sword) {
+            drawTile(ctx, SWORDS[sword].key, (player.x + PLAYER_W * 0.55 - camX) * TS,
               (player.y - 0.05) * TS, TS * 0.75, 0, false);
           }
           // the shield's bubble, blinking as it runs out
@@ -3820,14 +4199,18 @@
       if (dt > 0.1) dt = 0.1;
       acc += dt;
       let guard = 0;
-      while (acc >= STEP && guard++ < 30) { update(STEP); acc -= STEP; }
+      while (acc >= STEP && guard++ < 30) { update(STEP); afterStep(); acc -= STEP; }
       render();
+      window.BDMusic.boss(inBoss && state !== "win");
       raf = requestAnimationFrame(loop);
     };
 
     const stop = () => {
       running = false;
       cancelAnimationFrame(raf);
+      if (run && endRun(false)) ghostBonus();
+      window.BDMusic.boss(false);
+      window.BDMusic.level(null);
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keyup", onKeyUp);
     };

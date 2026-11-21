@@ -430,3 +430,41 @@ button.tool-btn.sel {
   border: 3px solid #4a4a5a;
 }
 .shop-item canvas { image-rendering: pixelated; flex: none; }
+
+/* ---------- badges ---------- */
+.badge-pop {
+  position: fixed;
+  left: 50%;
+  top: 24px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #2e2e3a;
+  border: 3px solid var(--gold);
+  color: var(--fg);
+  padding: 10px 18px;
+  z-index: 60;
+  pointer-events: none;
+  box-shadow: 0 6px 0 #0008;
+  animation: badge-in 0.3s ease-out;
+  transition: opacity 0.4s;
+}
+.badge-pop.out { opacity: 0; }
+.badge-pop-icon { font-size: 2.2rem; }
+.badge-pop-title { font-size: 0.7rem; color: var(--gold); letter-spacing: 1px; text-transform: uppercase; }
+.badge-pop-name { font-size: 1rem; font-weight: bold; }
+@keyframes badge-in { from { transform: translate(-50%, -40px); opacity: 0; } }
+
+.badge-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.badge-card {
+  background: var(--panel-hi);
+  border: 3px solid var(--border);
+  padding: 10px;
+  text-align: center;
+}
+.badge-card.got { border-color: var(--gold); }
+.badge-card.locked { opacity: 0.45; filter: grayscale(1); }
+.badge-card .icon { font-size: 2rem; }
+.badge-card .name { font-weight: bold; margin: 4px 0; font-size: 0.85rem; }
+.badge-card .how { font-size: 0.7rem; color: var(--dim); }
