@@ -27,6 +27,11 @@
     champion: { name: "Champion", icon: "👑", what: "For a true Badge Master.", secret: true },
     off: { name: "No music", icon: "🔇", what: "Quiet. Boss fights stay quiet too." },
   };
+  // every song gets a mega version, listed once it's unlocked in the shop
+  for (const [k, sg] of Object.entries(SONGS)) {
+    if (k === "off") continue;
+    SONGS["mega_" + k] = { name: "Mega " + sg.name, icon: "✨", what: "The epic remix of " + sg.name + ".", mega: true, base: k };
+  }
   const VOLUMES = { quiet: 0.25, mid: 0.55, loud: 1 };
 
   let settings = { song: "calm", vol: "mid" };
@@ -41,6 +46,10 @@
 
   let ctx = null, master, echo, pulse, noise;
   let inBoss = false, levelSong = null, playing = null, bus = null, step = 0, nextT = 0, timer = 0;
+  // Mega versions: a separate remix of each song, unlocked in the shop.
+  // While one plays: section is which part of the remix we're in, shift
+  // is the key change, and songDrums is off so the remix's own drums play.
+  let upgraded = [], shift = 0, section = null, muffle = null, songDrums = true;
 
   const freq = (m) => 440 * Math.pow(2, (m - 69) / 12);
 
@@ -75,10 +84,14 @@
   // ----- instruments -----
 
   const tone = (t, m, dur, o) => {
+    if (section && !o.extra && remixNote(t, m, dur, o)) return;
+    m += shift;
+    if (o.slide != null) o = Object.assign({}, o, { slide: o.slide + shift });
     const osc = ctx.createOscillator();
     if (o.wave === "pulse") osc.setPeriodicWave(pulse);
     else osc.type = o.wave;
     osc.frequency.setValueAtTime(freq(m), t);
+    if (o.detune) osc.detune.value = o.detune;
     // slide: glide to another note over the note's length (bloops, sirens)
     if (o.slide != null) osc.frequency.exponentialRampToValueAtTime(freq(o.slide), t + (o.decay || dur));
     const g = ctx.createGain();
@@ -118,9 +131,10 @@
     src.start(t, Math.random() * 0.5);
     src.stop(t + dur + 0.02);
   };
-  const hat = (t, gain = 0.12) => hiss(t, 0.04, gain, "highpass", 7000);
-  const snare = (t, gain = 0.3) => hiss(t, 0.14, gain, "bandpass", 1800);
+  const hat = (t, gain = 0.12) => songDrums && hiss(t, 0.04, gain, "highpass", 7000);
+  const snare = (t, gain = 0.3) => songDrums && hiss(t, 0.14, gain, "bandpass", 1800);
   const kick = (t, gain = 0.9) => {
+    if (!songDrums) return;
     const osc = ctx.createOscillator();
     const g = ctx.createGain();
     osc.frequency.setValueAtTime(150, t);
@@ -190,6 +204,7 @@
   };
 
   const clap = (t, gain = 0.3) => {
+    if (!songDrums) return;
     for (const at of [0, 0.012, 0.024]) hiss(t + at, at < 0.02 ? 0.015 : 0.16, gain, "bandpass", 1400);
   };
 
@@ -711,11 +726,101 @@
     return levelSong || settings.song;
   };
 
+  // ----- mega versions -----
+  // A remix, not just extra layers: the song's own tune and bass notes are
+  // caught and played on new instruments over new drums. One time through
+  // the remix is 7 times through the song:
+  //   intro · DROP ×2 · breakdown · build-up · DROP 2 (key change) ×2
+  const PARTS = ["intro", "drop", "drop", "break", "build", "drop2", "drop2"];
+  const MEGA_SPEED = 1.12;
+  const LOOP = { calm: 128, end: 128, rain: 128, pirate: 48 }; // steps per time through; most are 64
+  const loopOf = (k) => LOOP[k] || 64;
+  let root = null, padRoot = null, megaD = 0.1;
+
+  // the song's own drums are swapped for these
+  const drum = (fn) => { songDrums = true; fn(); songDrums = false; };
+
+  // Returns true when the remix plays this note its own way instead.
+  const remixNote = (t, m, dur, o) => {
+    const len = dur || o.decay || 0.2;
+    const drop = section === "drop" || section === "drop2";
+    if (m < 52 && o.gain >= 0.2) {
+      // a bass note: remember it for the rolling bass, and in the quiet
+      // parts give it a choir chord instead
+      root = 36 + (((m - 36) % 12) + 12) % 12;
+      if (!drop && root !== padRoot) {
+        padRoot = root;
+        tone(t, root - 12, megaD * 16, { wave: "sine", gain: 0.25, attack: 0.2, release: 0.6, extra: true });
+        for (const up of [24, 31, 36, 40]) {
+          tone(t, root + up, megaD * 16, { wave: "triangle", gain: 0.028, attack: 0.5, release: 0.8, lowpass: 1800, extra: true });
+        }
+      }
+      return true;
+    }
+    if (m >= 60 && o.gain >= 0.09 && o.wave !== "sine") {
+      // a tune note
+      if (drop) {
+        for (const dt of [-12, 0, 12]) { // supersaw: three saws a little out of tune
+          tone(t, m, len, { wave: "sawtooth", gain: o.gain * 0.45, lowpass: 2600, detune: dt, attack: 0.01, extra: true });
+        }
+        if (section === "drop2") tone(t, m + 7, len, { wave: "sawtooth", gain: o.gain * 0.25, lowpass: 2000, extra: true }); // harmony
+      } else if (section === "intro") {
+        tone(t, m, len, { wave: "triangle", gain: o.gain * 0.9, extra: true });
+      } else {
+        tone(t, m + 12, 0, { wave: "sine", gain: o.gain * 0.8, decay: 0.6, echo: true, extra: true }); // plinks
+      }
+      return true;
+    }
+    return false;
+  };
+
+  const megaStep = (base, s, t, d) => {
+    const L = loopOf(base), part = Math.floor(s / L) % 7, i = s % L;
+    section = PARTS[part];
+    shift = part >= 5 ? 2 : 0;
+    megaD = d;
+    if (i === 0) {
+      muffle.frequency.cancelScheduledValues(t);
+      if (section === "intro" || section === "build") {
+        muffle.frequency.setValueAtTime(section === "intro" ? 300 : 700, t);
+        muffle.frequency.exponentialRampToValueAtTime(18000, t + L * d);
+      } else muffle.frequency.setValueAtTime(18000, t);
+      if (part === 1 || part === 5) drum(() => hiss(t, 2, 0.2, "highpass", 4000)); // crash into each drop
+      padRoot = null;
+    }
+    if (section === "drop" || section === "drop2") {
+      drum(() => {
+        if (i % 4 === 0) kick(t, 1);
+        if (i % 8 === 4) clap(t, 0.3);
+        hat(t, i % 2 ? 0.05 : 0.025);
+        if (i % 4 === 2) hiss(t, 0.1, 0.08, "highpass", 6000);
+      });
+      if (root != null) {
+        tone(t, root + (i % 2 ? 12 : 0), d * 0.9, { wave: "sawtooth", gain: 0.2, lowpass: 650, extra: true });
+        if (section === "drop2" && i % 2 === 0) {
+          tone(t, root + 36 + [0, 7, 12, 7][(i / 2) % 4], 0, { wave: "sine", gain: 0.06, decay: 0.25, echo: true, extra: true });
+        }
+      }
+    } else if (section === "build") {
+      // a snare roll that keeps getting faster
+      const every = Math.max(1, 4 - Math.floor((4 * i) / L));
+      if (i % every === 0) drum(() => snare(t, 0.08 + (0.25 * i) / L));
+      if (i % 4 === 0) drum(() => kick(t, 0.5));
+    }
+    songDrums = false;
+    PLAY[base].step(s, t, d);
+    songDrums = true;
+    section = null;
+    shift = 0;
+  };
+
   const tick = () => {
     if (!playing || !ctx) return;
-    const song = PLAY[playing], d = 60 / song.bpm / 4;
+    const info = SONGS[playing], base = info.base || playing, song = PLAY[base];
+    const d = 60 / (song.bpm * (info.mega ? MEGA_SPEED : 1)) / 4;
     while (nextT < ctx.currentTime + 0.15) {
-      song.step(step, nextT, d);
+      if (info.mega) megaStep(base, step, nextT, d);
+      else song.step(step, nextT, d);
       step++;
       nextT += d;
     }
@@ -735,10 +840,14 @@
     playing = want;
     clearInterval(timer);
     if (!want) return;
-    if (window.BDBadges) window.BDBadges.heard(want, Object.keys(SONGS).filter((k) => k !== "off" && !SONGS[k].secret));
+    if (window.BDBadges) window.BDBadges.heard(want, Object.keys(SONGS).filter((k) => k !== "off" && !SONGS[k].secret && !SONGS[k].mega));
     bus = ctx.createGain();
-    bus.connect(master);
+    muffle = ctx.createBiquadFilter();
+    muffle.type = "lowpass";
+    muffle.frequency.value = 18000;
+    bus.connect(muffle).connect(master);
     step = 0;
+    root = padRoot = null;
     nextT = ctx.currentTime + 0.1;
     timer = setInterval(tick, 25);
     tick();
@@ -763,6 +872,20 @@
     get song() { return settings.song; },
     get vol() { return settings.vol; },
     get playing() { return playing; },
+    // the songs that have their mega upgrade; a change restarts the song
+    // which songs have their mega version unlocked (bought in the shop)
+    setUpgrades(list) {
+      upgraded = Array.isArray(list) ? list.filter((k) => PLAY[k]) : [];
+    },
+    isUpgraded: (k) => upgraded.includes(k),
+    // can this song be picked right now? (secret and mega ones need unlocking)
+    available(k) {
+      const sg = SONGS[k];
+      if (!sg) return false;
+      const base = sg.base || k;
+      if (SONGS[base].secret && !(window.BDBadges && window.BDBadges.has("master"))) return false;
+      return !sg.mega || upgraded.includes(base);
+    },
     get running() { return !!ctx && ctx.state; },
     setSong(k) {
       if (!SONGS[k]) return;

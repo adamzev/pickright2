@@ -361,6 +361,8 @@
       coins: n(b.coins), mega: n(b.mega), shields: n(b.shields),
       sword: Math.min(n(b.sword), SWORDS.length - 1),
       unlocked: Array.isArray(b.unlocked) ? b.unlocked.filter((k) => TILES[k] && TILES[k].mega) : [],
+      // songs with their mega upgrade
+      songs: Array.isArray(b.songs) ? b.songs.filter((k) => window.BDMusic.SONGS[k] && k !== "off") : [],
       // mega backgrounds bought in the shop
       bgs: Array.isArray(b.bgs) ? b.bgs.filter((k) => window.BDArt.BACKGROUNDS.some((x) => x.mega && x.key === k)) : [],
     };
@@ -369,6 +371,7 @@
   const saveBag = (bag) => {
     try { localStorage.setItem(BAG_KEY, JSON.stringify(bag)); } catch (e) { /* ignore */ }
     window.BDBadges.coins(bag.coins);
+    window.BDMusic.setUpgrades(bag.songs);
   };
 
   // ---------- grid helpers ----------
@@ -750,6 +753,91 @@
     setTimeout(() => toast(`🏆 SURPRISE! A golden crown 👑, a secret song in 🎵 Music, and +${MASTER_COINS} coins!`), 3200);
   });
 
+  // ---------- feedback ----------
+  // Saved in this browser only, for whoever looks after the game to read.
+  const FEEDBACK_KEY = "blockdash_feedback_v1";
+  const loadFeedback = () => {
+    try {
+      const f = JSON.parse(localStorage.getItem(FEEDBACK_KEY) || "[]");
+      return Array.isArray(f) ? f.filter((x) => x && typeof x.text === "string") : [];
+    } catch (e) { return []; }
+  };
+  const saveFeedback = (list) => {
+    try { localStorage.setItem(FEEDBACK_KEY, JSON.stringify(list)); return true; } catch (e) { return false; }
+  };
+
+  const FEEDBACK_KINDS = [["idea", "💡 Idea"], ["broken", "🐛 Something's broken"], ["love", "❤️ I love this"]];
+  const kindIcon = (k) => ({ idea: "💡", broken: "🐛", love: "❤️" }[k] || "💬");
+
+  const showFeedback = (justSent) => {
+    clear();
+    const head = el("div", "row");
+    head.appendChild(el("h1", null, "📬 Feedback"));
+    head.appendChild(el("div", "spacer"));
+    const back = el("button", "small", "← Back");
+    back.onclick = () => showMenu();
+    head.appendChild(back);
+    root.appendChild(head);
+
+    const panel = el("div", "panel");
+    panel.appendChild(el("h2", null, "What's your idea or problem?"));
+    let kind = "idea";
+    const kinds = el("div", "row tight");
+    kinds.style.marginBottom = "8px";
+    const kindBtns = FEEDBACK_KINDS.map(([k, label]) => {
+      const b = el("button", "small" + (k === kind ? " green" : ""), label);
+      b.onclick = () => { kind = k; kindBtns.forEach((x, i) => x.classList.toggle("green", FEEDBACK_KINDS[i][0] === k)); };
+      kinds.appendChild(b);
+      return b;
+    });
+    panel.appendChild(kinds);
+    const ta = el("textarea");
+    ta.rows = 4;
+    ta.maxLength = 1000;
+    ta.placeholder = "Type it here…";
+    ta.style.width = "100%";
+    panel.appendChild(ta);
+    const row = el("div", "row");
+    row.style.marginTop = "8px";
+    const send = el("button", "green", "📨 Send");
+    send.onclick = () => {
+      const text = ta.value.trim();
+      if (!text) { toast("Type something first!"); return; }
+      const list = loadFeedback();
+      list.unshift({ kind, text, at: Date.now() });
+      if (!saveFeedback(list)) { toast("Could not save (storage full?)"); return; }
+      showFeedback(true);
+    };
+    row.append(send, el("span", "hint", justSent ? "✓ Thanks! All feedback is considered." : "All feedback is considered."));
+    panel.appendChild(row);
+    root.appendChild(panel);
+
+    const list = loadFeedback();
+    if (!list.length) return;
+    const sent = el("div", "panel");
+    sent.appendChild(el("h2", null, `Feedback so far (${list.length})`));
+    list.forEach((f, i) => {
+      const item = el("div", "row tight shop-item");
+      const words = el("div");
+      words.style.flex = "1";
+      const when = new Date(f.at).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+      words.append(el("div", "hint", `${kindIcon(f.kind)} ${when}`), el("div"));
+      words.lastChild.textContent = f.text; // text, never HTML: anyone can type here
+      const del = el("button", "small", "🗑");
+      del.title = "Delete";
+      del.onclick = () => {
+        if (!confirm("Delete this feedback?")) return;
+        const all = loadFeedback();
+        all.splice(i, 1);
+        saveFeedback(all);
+        showFeedback();
+      };
+      item.append(words, del);
+      sent.appendChild(item);
+    });
+    root.appendChild(sent);
+  };
+
   // ---------- badges screen ----------
   const showBadges = () => {
     clear();
@@ -867,17 +955,22 @@
     const songs = el("div", "panel");
     songs.appendChild(el("h2", null, "Pick a song"));
     const list = stack();
-    for (const [k, song] of Object.entries(M.SONGS)) {
-      if (song.secret && !window.BDBadges.has("master")) continue;
+    // each song, followed by its mega version once that's unlocked
+    const order = Object.keys(M.SONGS).filter((k) => !M.SONGS[k].mega)
+      .flatMap((k) => [k, "mega_" + k]).filter((k) => M.available(k));
+    for (const k of order) {
+      const song = M.SONGS[k];
       const row = el("div", "row tight");
-      const pick = el("button", k === M.song ? "green" : "", `${song.icon} ${song.name}${k === M.song ? " ✓" : ""}`);
+      const pick = el("button", k === M.song ? "green" : "",
+        `${song.icon} ${song.name}${k === M.song ? " ✓" : ""}`);
       pick.style.minWidth = "170px";
       pick.onclick = () => { M.setSong(k); showMusic(); };
       row.append(pick, el("span", "hint", song.what));
       list.appendChild(row);
     }
     songs.appendChild(list);
-    songs.appendChild(el("p", "hint", "Your song keeps playing until you pick another one."));
+    songs.appendChild(el("p", "hint", "Your song keeps playing until you pick another one. " +
+      "Unlock ✨ Mega versions in the 🛒 Shop."));
     root.appendChild(songs);
 
     const vol = el("div", "panel");
@@ -915,6 +1008,7 @@
     root.appendChild(head);
 
     const thumb = (key) => {
+      if (key === null) { const c = el("canvas"); c.width = c.height = 1; return c; } // songs: no picture
       if (petBaseOf(key)) return spriteThumb(key, 48, 48); // pets aren't square
       if (Art.BACKGROUNDS.some((b) => b.key === key)) {
         const c = el("canvas");
@@ -1034,6 +1128,21 @@
         () => spend({ mega: bag.mega - MEGA_COST, bgs: bag.bgs.concat(b.key) })));
     });
     root.appendChild(bgShop);
+
+    const songShop = el("div", "panel");
+    songShop.appendChild(el("h2", null, "✨ Mega songs"));
+    songShop.appendChild(el("p", "hint",
+      "Unlock an epic remix of a song: faster, with dance drums, a big synth lead, a breakdown, a build-up " +
+      "and a key change. It's a new song in 🎵 Music; the normal one stays too."));
+    Object.entries(window.BDMusic.SONGS)
+      .filter(([k, sg]) => k !== "off" && !sg.mega && window.BDMusic.available(k))
+      .forEach(([k, sg]) => {
+        const row = item(null, `✨ Mega ${sg.name}`, `The epic remix of ${sg.icon} ${sg.name}`, MEGA_COST, "megacoins",
+          bag.songs.includes(k) ? "Unlocked ✓" : "",
+          () => spend({ mega: bag.mega - MEGA_COST, songs: bag.songs.concat(k) }));
+        songShop.appendChild(row);
+      });
+    root.appendChild(songShop);
   };
 
   const showMenu = () => {
@@ -1066,6 +1175,9 @@
     badges.title = "Badges";
     badges.onclick = () => showBadges();
     head.appendChild(badges);
+    const fb = el("button", "small", "📬 Feedback");
+    fb.onclick = () => showFeedback();
+    head.appendChild(fb);
     const home = el("a", "btn small", "← Pick Right");
     home.href = "index.html";
     head.appendChild(home);
@@ -2102,7 +2214,7 @@
     musicRow.appendChild(el("span", "hint", "Music:"));
     const musicBtns = [[null, "Player's choice"]]
       .concat(Object.entries(window.BDMusic.SONGS)
-        .filter(([k, sg]) => !sg.secret || window.BDBadges.has("master") || k === music)
+        .filter(([k]) => window.BDMusic.available(k) || k === music)
         .map(([k, sg]) => [k, `${sg.icon} ${sg.name}`]))
       .map(([k, label]) => {
         const btn = el("button", "small" + (k === music ? " green" : ""), label);
@@ -4331,5 +4443,6 @@
   };
 
   // ---------- go ----------
+  window.BDMusic.setUpgrades(loadBag().songs);
   showMenu();
 })();

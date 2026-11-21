@@ -104,6 +104,7 @@ window.BLOCKDASH_LEVELS = [
   },
   {
     "name": "THE END?",
+    "bg": "deepCave",
     "rows": [
       "pppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp",
       "ppppppppppppppppppppppppppp.ppp.pppp..pp..pp.ppppppppp..pp...ppp..pp",
