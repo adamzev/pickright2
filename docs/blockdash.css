@@ -468,3 +468,31 @@ button.tool-btn.sel {
 .badge-card .icon { font-size: 2rem; }
 .badge-card .name { font-weight: bold; margin: 4px 0; font-size: 0.85rem; }
 .badge-card .how { font-size: 0.7rem; color: var(--dim); }
+
+/* Badge Master's reward: stays until OK */
+.reward-shade {
+  position: fixed;
+  inset: 0;
+  background: #000a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 70;
+  padding: 16px;
+}
+.reward-box {
+  background: var(--panel);
+  border: 4px solid var(--gold);
+  padding: 22px 26px;
+  text-align: center;
+  max-width: 420px;
+  box-shadow: 0 8px 0 #0008;
+  animation: reward-in 0.3s ease-out;
+}
+@keyframes reward-in { from { transform: scale(0.6); opacity: 0; } }
+.reward-big { font-size: 1.6rem; color: var(--gold); font-weight: bold; letter-spacing: 1px; }
+.reward-list { text-align: left; margin: 12px 0 16px; line-height: 1.9; }
+
+/* the secret level's card flickers pink and blue */
+.glitch-card { border-color: #ff2bd6; animation: glitch-flicker 1.2s steps(2) infinite; }
+@keyframes glitch-flicker { 50% { border-color: #21e6ff; } }

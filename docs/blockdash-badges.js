@@ -21,6 +21,8 @@
     { id: "rich", icon: "💰", name: "Rich", how: "Have 10,000 coins at once" },
     { id: "perfect", icon: "✨", name: "Perfect", how: "Finish a level without dying once" },
     { id: "master", icon: "🏆", name: "Badge Master", how: "Get every other badge, for a surprise reward!" },
+    // extra: a bonus on top; it doesn't count toward Badge Master or the total
+    { id: "glitch", icon: "🌀", name: "Glitch Slayer", how: "Beat The Glitch, the secret boss", secret: true, extra: true },
     { id: "cat", icon: "🐱", name: "Crazy Cat Person", how: "Cat player, cat pet and the Meow song, all at once", secret: true },
     { id: "goodboy", icon: "🐶", name: "Good Boy", how: "Finish a level with the dog pet and the Woof song", secret: true },
     { id: "oops", icon: "😵", name: "Oops", how: "Die within 1 second of starting a level", secret: true },
@@ -84,7 +86,7 @@
   // also run on the title screen, for badges earned before Badge Master existed
   const checkMaster = () => {
     load();
-    if (!data.got.master && LIST.every((b) => b.id === "master" || data.got[b.id])) earn("master");
+    if (!data.got.master && LIST.every((b) => b.id === "master" || b.extra || data.got[b.id])) earn("master");
   };
 
   const add = (stat, n = 1) => {
@@ -100,7 +102,8 @@
   window.BDBadges = {
     LIST,
     has: (id) => { load(); return !!data.got[id]; },
-    count: () => { load(); return LIST.filter((b) => data.got[b.id]).length; },
+    count: () => { load(); return LIST.filter((b) => !b.extra && data.got[b.id]).length; },
+    total: LIST.filter((b) => !b.extra).length,
     earn,
     add,
     checkMaster,

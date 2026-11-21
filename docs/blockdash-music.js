@@ -25,11 +25,13 @@
     final: { name: "Final Boss", icon: "🏁", what: "Even scarier than Boss Fight." },
     // secret: only listed once you're a Badge Master
     champion: { name: "Champion", icon: "👑", what: "For a true Badge Master.", secret: true },
+    // hidden: only ever plays in The Glitch's fight, never listed
+    glitch: { name: "Glitch", icon: "🌀", what: "", hidden: true },
     off: { name: "No music", icon: "🔇", what: "Quiet. Boss fights stay quiet too." },
   };
   // every song gets a mega version, listed once it's unlocked in the shop
   for (const [k, sg] of Object.entries(SONGS)) {
-    if (k === "off") continue;
+    if (k === "off" || sg.hidden) continue;
     SONGS["mega_" + k] = { name: "Mega " + sg.name, icon: "✨", what: "The epic remix of " + sg.name + ".", mega: true, base: k };
   }
   const VOLUMES = { quiet: 0.25, mid: 0.55, loud: 1 };
@@ -670,6 +672,21 @@
     },
   });
 
+  // The Glitch's fight: Final Boss, skipping, stuttering and going out of tune
+  PLAY.glitch = {
+    bpm: 172,
+    step(s, t, d) {
+      const r = Math.random();
+      const src = r < 0.12 ? Math.max(0, s - 1 - (s % 2)) : s; // a stutter replays a step
+      const was = shift;
+      if (r > 0.93) shift = Math.floor(Math.random() * 12) - 6;
+      PLAY.final.step(src, t, d);
+      shift = was;
+      if (Math.random() < 0.08) hiss(t, d * 0.8, 0.12, "bandpass", 300 + Math.random() * 4000);
+      if (Math.random() < 0.05) tone(t, 30 + Math.floor(Math.random() * 80), d, { wave: "square", gain: 0.05 });
+    },
+  };
+
   // ----- sound effects (pets) -----
   // They get their own output, because the song's `bus` is missing when
   // music is off and swapped out whenever the song changes.
@@ -682,7 +699,14 @@
     tone(t, 50, 0.45, { wave: "sawtooth", gain: 0.25, lowpass: 900, slide: 43 });
     hiss(t, 0.35, 0.15, "lowpass", 900);
   };
+  // a pile of random computer blips
+  const blips = (t) => {
+    for (let i = 0; i < 4; i++) {
+      tone(t + i * 0.045, 70 + Math.floor(Math.random() * 30), 0.035, { wave: "square", gain: 0.12 });
+    }
+  };
   const SFX = {
+    glitch: blips,
     cat: (t) => meow(t, 77, 0.35, 0.3),
     dog: (t) => bark(t, 64, 0.35),
     frog: (t) => ribbit(t, 57, 0.3),
@@ -721,7 +745,7 @@
 
   const wanted = () => {
     if (settings.song === "off") return null;
-    if (inBoss) return "boss";
+    if (inBoss) return inBoss;
     if (levelSong === "off") return null;
     return levelSong || settings.song;
   };
@@ -840,7 +864,7 @@
     playing = want;
     clearInterval(timer);
     if (!want) return;
-    if (window.BDBadges) window.BDBadges.heard(want, Object.keys(SONGS).filter((k) => k !== "off" && !SONGS[k].secret && !SONGS[k].mega));
+    if (window.BDBadges) window.BDBadges.heard(want, Object.keys(SONGS).filter((k) => k !== "off" && !SONGS[k].secret && !SONGS[k].mega && !SONGS[k].hidden));
     bus = ctx.createGain();
     muffle = ctx.createBiquadFilter();
     muffle.type = "lowpass";
@@ -881,7 +905,7 @@
     // can this song be picked right now? (secret and mega ones need unlocking)
     available(k) {
       const sg = SONGS[k];
-      if (!sg) return false;
+      if (!sg || sg.hidden) return false;
       const base = sg.base || k;
       if (SONGS[base].secret && !(window.BDBadges && window.BDBadges.has("master"))) return false;
       return !sg.mega || upgraded.includes(base);
@@ -920,9 +944,10 @@
       bus = sfxBus;
       try { SFX[kind](ctx.currentTime + 0.01); } finally { bus = songBus; }
     },
-    // the game calls this every frame; it only acts when the fight starts or ends
+    // the game calls this every frame; it only acts when the fight starts or
+    // ends. on: false, true (the boss song) or which song the fight plays.
     boss(on) {
-      on = !!on;
+      on = on === true ? "boss" : on || false;
       if (on === inBoss) return;
       inBoss = on;
       update();

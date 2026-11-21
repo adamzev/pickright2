@@ -155,6 +155,13 @@
   const BOSS_BODY = BOSS_X + 5 * BOSS_PX; // left edge of the head-and-torso column
   const BOSS_PLATS = [[4, 9], [5, 9], [6, 9], [8, 7], [9, 7], [10, 7], [12, 5], [13, 5], [14, 5]];
   const RAIN_SPEED = 10; // blocks per second for falling TNT
+  // The Glitch (the secret boss): a 2x2 block of broken pixels. Each spot
+  // is [left, top], with its top in jumping reach (about 2.4 blocks) of the
+  // floor or a platform, so it can always be stomped.
+  const GLITCH_SIZE = 2;
+  const GLITCH_SPOTS = [[17, 9], [11, 9], [8.5, 4.8], [16.5, 3.5], [4.5, 6.8]];
+  const GLITCH_SOLID = 6; // seconds it stays stompable
+  const GLITCH_COLORS = ["#ff2bd6", "#21e6ff", "#111111", "#ffffff", "#7b2bff"];
   const BOSS_SHOT_SPEED = 7; // its stars fly straight, so this can beat the Shooter's 5.5
   const CUT_END = 5; // seconds the intro runs for
   const POOF_AFTER = 0.25; // a spiked player tips over this long, then puffs away
@@ -700,10 +707,11 @@
     ["petParrot", "Parrot", "parrot"], ["petDragon", "Baby dragon", "dragon"],
   ];
   const PET_SOUND = Object.fromEntries(PETS.map(([k, , snd]) => [k, snd]));
-  const FLYING_PETS = ["petParrot", "petDragon"];
+  PET_SOUND.petGlitch = "glitch"; // The Glitch's reward: not in the shop, not needed for Pet Lover
+  const FLYING_PETS = ["petParrot", "petDragon", "petGlitch"];
   const CAT_LOOK = "\ue934"; // the shipped black-cat player look
   const petBaseOf = (k) => (PET_SOUND[k] ? k : PET_SOUND[Art.baseOf(k)] ? Art.baseOf(k) : null);
-  const allPets = () => PETS.map(([key, label]) => ({ key, label }))
+  const allPets = () => PETS.map(([key, label]) => ({ key, label })).concat([{ key: "petGlitch", label: "Glitch" }])
     .concat(Art.customBlocks().filter((b) => PET_SOUND[b.base]).map((b) => ({ key: b.key, label: b.label })));
   const loadPets = () => {
     let p = {};
@@ -750,7 +758,14 @@
     if (e.detail !== "master") return;
     const b = loadBag();
     saveBag(Object.assign(b, { coins: b.coins + MASTER_COINS }));
-    setTimeout(() => toast(`🏆 SURPRISE! A golden crown 👑, a secret song in 🎵 Music, and +${MASTER_COINS} coins!`), 3200);
+    // a big message that stays until OK, so the surprise can't be missed;
+    // shown after the "Badge unlocked!" pop-up has had its moment
+    setTimeout(() => rewardBox("🏆 BADGE MASTER!", "You got every badge! Your surprise:", [
+      "👑 A golden crown on your player",
+      "🎵 A secret song, Champion, in Music",
+      `💰 +${MASTER_COINS} coins`,
+      "👾 A secret 6th level on the title screen…",
+    ]), 3200);
   });
 
   // ---------- feedback ----------
@@ -843,7 +858,7 @@
     clear();
     const B = window.BDBadges;
     const head = el("div", "row");
-    head.appendChild(el("h1", null, `🏅 Badges ${B.count()}/${B.LIST.length}`));
+    head.appendChild(el("h1", null, `🏅 Badges ${B.count()}/${B.total}${B.has("glitch") ? " + 🌀" : ""}`));
     head.appendChild(el("div", "spacer"));
     const back = el("button", "small", "← Back");
     back.onclick = () => showMenu();
@@ -862,6 +877,55 @@
     panel.appendChild(grid);
     root.appendChild(panel);
   };
+
+  // ---------- The Glitch: the secret boss ----------
+  // A secret 6th level for Badge Masters, ending in The Glitch's arena.
+  const GLITCH_LOOK_KEY = "blockdash_glitch_look";
+  const glitchLookOn = () => {
+    try { return window.BDBadges.has("glitch") && localStorage.getItem(GLITCH_LOOK_KEY) !== "0"; } catch (e) { return false; }
+  };
+  const GLITCH_LEVEL = (() => {
+    const W = 40;
+    const rows = Array.from({ length: H }, () => Array(W).fill(AIR));
+    for (let x = 0; x < W; x++) if (x !== 14 && x !== 15 && x !== 26 && x !== 27) rows[H - 1][x] = "e";
+    rows[H - 2][2] = "P";
+    rows[H - 2][9] = "A";
+    for (const x of [20, 21, 22]) rows[7][x] = "e";
+    rows[6][21] = "d";
+    for (const y of [8, 9, 10]) rows[y][36] = "G";
+    return { name: "???", rows: rows.map((r) => r.join("")), bg: "megaEnd", arenaBg: "end", glitch: true };
+  })();
+  const GLITCH_COINS = 5000, GLITCH_MEGA = 500;
+
+  // the reward box that waits for OK (Badge Master's surprise uses it too)
+  const rewardBox = (title, intro, lines) => {
+    const shade = el("div", "reward-shade");
+    const box = el("div", "reward-box");
+    box.append(el("div", "reward-big", title), el("p", null, intro));
+    const list = el("div", "reward-list");
+    for (const line of lines) list.appendChild(el("div", null, line));
+    const ok = el("button", "green", "OK");
+    ok.onclick = () => shade.remove();
+    box.append(list, ok);
+    shade.appendChild(box);
+    document.body.appendChild(shade);
+  };
+
+  // first win against The Glitch: its drops
+  window.addEventListener("bd-badge", (e) => {
+    if (e.detail !== "glitch") return;
+    const b = loadBag();
+    saveBag(Object.assign(b, { coins: b.coins + GLITCH_COINS, mega: b.mega + GLITCH_MEGA }));
+    const pets = loadPets();
+    if (!pets.owned.includes("petGlitch")) pets.owned.push("petGlitch");
+    savePets(pets);
+    setTimeout(() => rewardBox("🌀 GLITCH DEFEATED!", "You beat the secret boss! It dropped:", [
+      "🌀 A glitchy look for your player (switch it on and off on the title screen)",
+      "👾 A Glitch pet",
+      `💰 +${GLITCH_COINS} coins and +${GLITCH_MEGA} megacoins`,
+      "🌀 The Glitch Slayer badge",
+    ]), 3200);
+  });
 
   const heroPanel = () => {
     const panel = el("div", "panel");
@@ -884,6 +948,16 @@
         row.appendChild(item);
       });
     panel.appendChild(row);
+    if (window.BDBadges.has("glitch")) {
+      const on = glitchLookOn();
+      const fx = el("button", "small" + (on ? " green" : ""), on ? "🌀 Glitch effect: on" : "🌀 Glitch effect: off");
+      fx.style.marginTop = "8px";
+      fx.onclick = () => {
+        try { localStorage.setItem(GLITCH_LOOK_KEY, on ? "0" : "1"); } catch (e) { /* ignore */ }
+        showMenu();
+      };
+      panel.appendChild(fx);
+    }
     return panel;
   };
 
@@ -1088,7 +1162,7 @@
     petShop.appendChild(el("h2", null, "🐾 Pet shop"));
     petShop.appendChild(el("p", "hint",
       "A pet follows you through every level and makes its sound when you grab a diamond. Pick it on the title screen."));
-    for (const pt of allPets()) {
+    for (const pt of allPets().filter((p) => p.key !== "petGlitch")) {
       const owned = pets.owned.includes(pt.key);
       const row = item(pt.key, pt.label, owned ? "Yours!" : "Follows you around", PET_COST, "coins",
         owned ? "Owned ✓" : "", () => {
@@ -1171,7 +1245,7 @@
     const music = el("button", "small", "🎵 Music");
     music.onclick = () => showMusic();
     head.appendChild(music);
-    const badges = el("button", "small", `🏅 ${window.BDBadges.count()}/${window.BDBadges.LIST.length}`);
+    const badges = el("button", "small", `🏅 ${window.BDBadges.count()}/${window.BDBadges.total}${window.BDBadges.has("glitch") ? " 🌀" : ""}`);
     badges.title = "Badges";
     badges.onclick = () => showBadges();
     head.appendChild(badges);
@@ -1202,6 +1276,13 @@
         copy.onclick = () => showEditor({ name: lvl.name + " copy", rows: lvl.rows, bg: lvl.bg, notes: lvl.notes, arena: lvl.arena, arenaBg: lvl.arenaBg, hero: lvl.hero, music: lvl.music }, -1);
         list.appendChild(levelCard(lvl, editMode ? [play, copy] : [play], i + 1));
       });
+      if (window.BDBadges.has("master")) {
+        const play = el("button", "green small", "▶ Play");
+        play.onclick = () => showPlay(GLITCH_LEVEL, () => showMenu());
+        const card = levelCard(GLITCH_LEVEL, [play], "?");
+        card.classList.add("glitch-card");
+        list.appendChild(card);
+      }
       bp.appendChild(list);
       if (builtin.length > 1) {
         bp.appendChild(el("p", "hint",
@@ -2829,7 +2910,8 @@
       movers = [], shooters = [], bullets = [], spawners = [], blazes = [], fireballs = [],
       rods = 0, pearls = 0, eyes = 0, megas = 0, shieldT = 0, framesLeft = 0, told = {}, watchers = [], mobs = [], runT = 0, warp = null,
       free = false, moveL = false, moveR = false, stopT = 0, talk = null, talkAt = 0, poofed = false,
-      inBoss = false, boss = null, introSeen = false, cutT = 0, downT = 0, knock = 0, plats = [];
+      inBoss = false, boss = null, introSeen = false, cutT = 0, downT = 0, knock = 0, plats = [],
+      flipT = 0; // The Glitch's control flip: ◀ ▶ swapped while this runs
 
     const showItems = () => {
       rodsEl.textContent = "🪄 " + rods;
@@ -2926,6 +3008,8 @@
     // checkpoint with the level as it was when you got there, so diamonds
     // grabbed before it stay grabbed.
     const reset = (fromStart) => {
+      flipT = 0;
+      canvas.style.transform = ""; // The Glitch's screen shake
       if (fromStart || !checkpoint) {
         if (run && endRun(false)) ghostBonus();
         startRun();
@@ -3035,6 +3119,7 @@
     };
 
     const startBoss = () => {
+      if (level.glitch) { startGlitch(); return; }
       setFree(true);
       boss = { hp: bossMax, stage: -1, t: 0, spawnT: 0, hurtT: 0, x: BOSS_X, rain: [], gone: false };
       if (introSeen) nextStage();
@@ -3102,8 +3187,169 @@
       if (cutT >= CUT_END) endCut();
     };
 
+    // ----- The Glitch -----
+    // Fix the glitched blocks (stand on them) to make it solid, then stomp it.
+    // Meanwhile it throws one glitchy attack after another.
+
+    const startGlitch = () => {
+      setFree(true);
+      setPlats(true); // its platforms are always there (except when they flicker)
+      const [x, top] = GLITCH_SPOTS[0];
+      boss = {
+        glitch: true, hp: bossMax, x, top, mode: "phase", solidT: 0, broken: [], rain: [], clones: [], hist: [],
+        atkT: 3, hurtT: 0, introT: 2.5, fakeT: 0, shakeT: 0, cloneT: 0, rainT: 0, dropT: 0, rewindFx: 0,
+        banner: "", bannerT: 0, last: "", gone: false,
+      };
+      breakBlocks();
+    };
+
+    // glitch three squares of floor or platform for the player to fix
+    const breakBlocks = () => {
+      const g = boss, cells = [];
+      for (let x = 1; x < ARENA_W - 1; x++) if (solidAt(x, H - 1)) cells.push([x, H - 1]);
+      if (g.fakeT <= 0) for (const [x, y] of plats) cells.push([x, y]);
+      const under = Math.floor(player.x + PLAYER_W / 2);
+      const pick = cells.filter(([x]) => Math.abs(x - under) > 1).sort(() => Math.random() - 0.5).slice(0, 3);
+      g.broken = pick.map(([x, y]) => ({ x, y, fixed: false }));
+    };
+
+    const glitchMove = () => {
+      const g = boss;
+      const spots = GLITCH_SPOTS.filter(([x, top]) => x !== g.x || top !== g.top);
+      [g.x, g.top] = spots[Math.floor(Math.random() * spots.length)];
+      sparkle(g.x + 1, g.top + 1, GLITCH_COLORS);
+    };
+
+    const glitchAttack = () => {
+      const g = boss;
+      const anger = Math.round((1 - g.hp / bossMax) * (BOSS_HP - 1));
+      g.atkT = [5, 4.5, 4, 3.5, 3][anger] || 3;
+      const pool = ["rain", "fake", "screen", "clone", "rewind", "flip"].filter((a) => a !== g.last);
+      const a = pool[Math.floor(Math.random() * pool.length)];
+      g.last = a;
+      g.banner = { rain: "🔴 PIXEL RAIN", fake: "👻 FAKE BLOCKS", screen: "📺 SCREEN GLITCH",
+        clone: "🪞 CLONES", rewind: "⏪ REWIND", flip: "🔀 CONTROLS FLIPPED" }[a];
+      g.bannerT = 1.4;
+      if (a === "rain") { g.rainT = 3; g.dropT = 0; }
+      else if (a === "fake") g.fakeT = 3.5;
+      else if (a === "screen") g.shakeT = 1.6;
+      else if (a === "flip") flipT = 3;
+      else if (a === "clone") {
+        g.cloneT = 5;
+        g.clones = GLITCH_SPOTS.filter(([x, top]) => x !== g.x || top !== g.top)
+          .sort(() => Math.random() - 0.5).slice(0, 2).map(([x, top]) => ({ x, top }));
+      } else if (a === "rewind" && g.hist.length >= 2) {
+        // back to where you were about two seconds ago
+        player.x = g.hist[0];
+        player.y = g.hist[1];
+        player.vy = 0;
+        g.hist = [];
+        g.rewindFx = 0.6;
+      }
+    };
+
+    const glitchStomp = (top) => {
+      player.y = top - PLAYER_H;
+      player.vy = -JUMP_V;
+    };
+
+    // Returns true if the player died or the fight ended this step.
+    const updateGlitch = (dt) => {
+      const g = boss;
+      for (const k of ["introT", "hurtT", "bannerT", "rewindFx"]) if (g[k] > 0) g[k] -= dt;
+      if (flipT > 0) flipT -= dt;
+      g.hist.push(player.x, player.y);
+      if (g.hist.length > 2 / STEP * 2) g.hist.splice(0, 2);
+
+      if (g.shakeT > 0) {
+        g.shakeT -= dt;
+        canvas.style.transform = g.shakeT > 0
+          ? `translate(${(Math.random() - 0.5) * 12}px, ${(Math.random() - 0.5) * 8}px)` : "";
+      }
+      if (g.fakeT > 0) {
+        g.fakeT -= dt;
+        setPlats(g.fakeT <= 0 || Math.floor(g.fakeT * 2.5) % 2 === 0); // always ends with them back
+      }
+      if (g.cloneT > 0) { g.cloneT -= dt; if (g.cloneT <= 0) g.clones = []; }
+
+      // pixel rain zigzags down
+      for (const r of g.rain) {
+        r.y += RAIN_SPEED * 0.75 * dt;
+        r.x = r.x0 + Math.sin(r.y * 2.2) * 1.1;
+        if (touches(r.x + 0.2, r.y + 0.2, r.x + 0.8, r.y + 0.8)) { die("boom", true); return true; }
+        if (r.y >= H - 1.6) r.dead = true;
+      }
+      g.rain = g.rain.filter((r) => !r.dead);
+      if (g.rainT > 0) {
+        g.rainT -= dt;
+        g.dropT -= dt;
+        if (g.dropT <= 0) {
+          g.dropT = 0.22;
+          const x = Math.random() < 0.4 ? player.x : Math.random() * (ARENA_W - 2);
+          g.rain.push({ x0: clamp(x, 1.2, ARENA_W - 2.2), x: 0, y: -1 });
+        }
+      }
+
+      const feet = player.y + PLAYER_H;
+      const onTop = (x, top) => player.vy > 0 && player.x + PLAYER_W > x && player.x < x + GLITCH_SIZE &&
+        feet > top - 0.05 && feet < top + 0.6;
+      if (g.mode === "phase") {
+        if (player.onGround) {
+          const fy = Math.floor(feet + 0.05);
+          for (const c of g.broken) {
+            if (!c.fixed && c.y === fy && player.x + PLAYER_W > c.x && player.x < c.x + 1) {
+              c.fixed = true;
+              sparkle(c.x + 0.5, c.y, ["#8ff09a", "#ffffff", "#21e6ff"]);
+            }
+          }
+        }
+        if (g.broken.every((c) => c.fixed)) {
+          g.mode = "solid";
+          g.solidT = GLITCH_SOLID;
+        }
+      } else {
+        g.solidT -= dt;
+        for (const c of g.clones) {
+          if (onTop(c.x, c.top)) { glitchStomp(c.top); c.gone = true; toast("FAKE! That was a clone 🪞"); }
+        }
+        g.clones = g.clones.filter((c) => !c.gone);
+        if (g.hurtT <= 0 && onTop(g.x, g.top)) {
+          glitchStomp(g.top);
+          g.hp--;
+          g.hurtT = 1;
+          explode(g.x + 1, g.top + 0.5, GLITCH_COLORS);
+          if (g.hp <= 0) {
+            state = "bossdown";
+            downT = 0;
+            g.rain = [];
+            g.clones = [];
+            g.broken = [];
+            g.fakeT = 0;
+            setPlats(true);
+            flipT = 0;
+            canvas.style.transform = "";
+            return true;
+          }
+          g.mode = "phase";
+          glitchMove();
+          breakBlocks();
+        } else if (g.solidT <= 0) {
+          g.mode = "phase";
+          glitchMove();
+          breakBlocks();
+        }
+      }
+
+      if (g.introT <= 0) {
+        g.atkT -= dt;
+        if (g.atkT <= 0) glitchAttack();
+      }
+      return false;
+    };
+
     // Returns true if the player died or the fight ended this step.
     const updateBoss = (dt) => {
+      if (boss.glitch) return updateGlitch(dt);
       const b = boss;
       if (b.hurtT > 0) b.hurtT -= dt;
 
@@ -3179,6 +3425,18 @@
     const updateBossDown = (dt) => {
       const before = downT;
       downT += dt;
+      if (boss.glitch) {
+        // it breaks up into loose pixels
+        if (Math.floor(before / 0.1) !== Math.floor(downT / 0.1)) {
+          sparkle(boss.x + Math.random() * GLITCH_SIZE, boss.top + Math.random() * GLITCH_SIZE, GLITCH_COLORS);
+        }
+        if (downT >= 1.8) {
+          boss.gone = true;
+          state = "run";
+          win();
+        }
+        return;
+      }
       if (Math.floor(before / 0.15) !== Math.floor(downT / 0.15)) {
         explode(boss.x + Math.random() * 4.8, BOSS_TOP + Math.random() * 6.4,
           ["#ffd54a", "#ff8a3d", "#e04a2f", "#8c8c8c"]);
@@ -3339,7 +3597,9 @@
       const beatGhost = endRun(true);
       const M = window.BDMusic, B = window.BDBadges;
       B.cleared(bestKey(level), builtinLevels().map(bestKey));
-      if (inBoss) { B.earn("boss"); if (!sword) B.earn("bare"); }
+      // first, so its coins are in the bag before the bag is re-read below
+      if (inBoss && level.glitch) B.earn("glitch");
+      if (inBoss && !level.glitch) { B.earn("boss"); if (!sword) B.earn("bare"); }
       if (run && !run.deaths) B.earn("perfect");
       if (!M.playing) B.earn("silent");
       if (petBase === "petDog" && M.playing === "woof") B.earn("goodboy");
@@ -3685,7 +3945,7 @@
 
       // horizontal — always forward, unless a Free move block handed you the controls
       const oldX = player.x;
-      const dir = free ? (moveR ? 1 : 0) - (moveL ? 1 : 0) : 1;
+      const dir = free ? ((moveR ? 1 : 0) - (moveL ? 1 : 0)) * (flipT > 0 ? -1 : 1) : 1;
       if (stopT > 0) stopT -= dt;
       else player.x += dir * speed * dt;
       if (knock) {
@@ -3982,6 +4242,26 @@
       ctx.restore();
     };
 
+    // The Glitch's drop: the player flickers pink and blue
+    const glitchFx = glitchLookOn();
+    const fxCv = el("canvas");
+    const drawGlitchFx = (angle, pw, ph) => {
+      if (Math.random() < 0.5) return;
+      fxCv.width = Math.ceil(pw);
+      fxCv.height = Math.ceil(ph);
+      const f = fxCv.getContext("2d");
+      drawPlayer(f, 0, 0, fxCv.width, fxCv.height, 0, hero);
+      f.globalCompositeOperation = "source-atop";
+      f.fillStyle = Math.random() < 0.5 ? "rgba(255, 43, 214, 0.8)" : "rgba(33, 230, 255, 0.8)";
+      f.fillRect(0, 0, fxCv.width, fxCv.height);
+      ctx.save();
+      ctx.globalAlpha = 0.6;
+      ctx.translate((player.x + PLAYER_W / 2 - camX) * TS + (Math.random() - 0.5) * 8, (player.y + PLAYER_H / 2) * TS);
+      ctx.rotate(angle);
+      ctx.drawImage(fxCv, -pw / 2, -ph / 2);
+      ctx.restore();
+    };
+
     // Badge Master's golden crown, turning with the player
     const crownOn = window.BDBadges.has("master");
     const drawCrown = (angle, pw, ph) => {
@@ -4034,7 +4314,76 @@
       ctx.restore();
     };
 
+    const drawGlitch = () => {
+      const g = boss;
+      if (g.gone) return;
+      const rnd = () => GLITCH_COLORS[(Math.random() * GLITCH_COLORS.length) | 0];
+      // glitched squares: fizzing pixels and a pink outline
+      for (const c of g.broken) {
+        if (c.fixed) continue;
+        for (let i = 0; i < 6; i++) {
+          ctx.fillStyle = rnd();
+          ctx.fillRect((c.x - camX) * TS + Math.random() * TS * 0.75, c.y * TS + Math.random() * TS * 0.8, TS * 0.25, TS * 0.2);
+        }
+        ctx.strokeStyle = "#ff2bd6";
+        ctx.lineWidth = 3;
+        ctx.strokeRect((c.x - camX) * TS + 2, c.y * TS + 2, TS - 4, TS - 4);
+      }
+      const solid = g.mode === "solid";
+      const body = (x, top, real) => {
+        const px = (x - camX) * TS, py = top * TS, size = GLITCH_SIZE * TS, n = 8, cell = size / n;
+        const seed = Math.floor(time * 10);
+        ctx.save();
+        if (state === "bossdown") ctx.globalAlpha = clamp(1.2 - downT / 1.8, 0, 1);
+        else if (!solid) ctx.globalAlpha = 0.45 + 0.2 * Math.sin(time * 13);
+        else if (real && g.hurtT > 0 && Math.sin(time * 40) > 0) ctx.globalAlpha = 0.35;
+        for (let yy = 0; yy < n; yy++) {
+          for (let xx = 0; xx < n; xx++) {
+            const h = (xx * 73 + yy * 151 + seed * 197 + (real ? 0 : 31)) % 97;
+            if (h < 12 && !solid) continue; // holes while it's not solid
+            ctx.fillStyle = GLITCH_COLORS[h % GLITCH_COLORS.length];
+            const jx = h % 7 === 0 ? (Math.random() - 0.5) * cell : 0;
+            ctx.fillRect(px + xx * cell + jx, py + yy * cell, cell + 1, cell + 1);
+          }
+        }
+        const look = clamp(player.x - x, -1, 1) * cell * 0.4;
+        for (const ex of [1.5, 5]) {
+          ctx.fillStyle = "#ffffff";
+          ctx.fillRect(px + ex * cell, py + 2.5 * cell, cell * 1.5, cell * 1.5);
+          ctx.fillStyle = "#000000";
+          ctx.fillRect(px + ex * cell + cell * 0.45 + look, py + 2.95 * cell, cell * 0.6, cell * 0.6);
+        }
+        if (solid) {
+          ctx.strokeStyle = "#ffffff";
+          ctx.lineWidth = 3;
+          ctx.strokeRect(px, py, size, size);
+        }
+        ctx.restore();
+      };
+      body(g.x, g.top, true);
+      for (const c of g.clones) body(c.x, c.top, false);
+      for (const r of g.rain) {
+        ctx.fillStyle = Math.floor(time * 20 + r.x0 * 7) % 2 ? "#ff2bd6" : "#21e6ff";
+        ctx.fillRect((r.x - camX) * TS + TS * 0.2, r.y * TS + TS * 0.2, TS * 0.6, TS * 0.6);
+      }
+      if (g.shakeT > 0) {
+        // coloured static all over the screen
+        ctx.save();
+        ctx.globalAlpha = 0.5;
+        for (let i = 0; i < 40; i++) {
+          ctx.fillStyle = rnd();
+          ctx.fillRect(Math.random() * canvas.width, Math.random() * canvas.height, Math.random() * 140, 2 + Math.random() * 8);
+        }
+        ctx.restore();
+      }
+      if (g.rewindFx > 0) {
+        ctx.fillStyle = `rgba(120, 200, 255, ${Math.min(0.5, g.rewindFx).toFixed(2)})`;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      }
+    };
+
     const drawBoss = () => {
+      if (boss.glitch) { drawGlitch(); return; }
       const b = boss;
       const px = TS * BOSS_PX;
       if (state === "cut" && cutT < 2.6) {
@@ -4067,7 +4416,52 @@
       }
     };
 
+    const drawGlitchHud = () => {
+      const g = boss;
+      if (g.gone) return;
+      ctx.textBaseline = "top";
+      ctx.font = "bold 18px ui-monospace, monospace";
+      ctx.textAlign = "right";
+      ctx.fillStyle = "#ffffff";
+      const bx = canvas.width / 2 - bossMax * 32;
+      ctx.fillText("THE GLITCH", bx - 10, 14);
+      for (let i = 0; i < bossMax; i++) {
+        ctx.fillStyle = "#1c1c1c";
+        ctx.fillRect(bx + i * 64, 12, 60, 20);
+        ctx.fillStyle = i < g.hp ? "#ff2bd6" : "#4a4a4a";
+        ctx.fillRect(bx + i * 64 + 3, 15, 54, 14);
+      }
+      ctx.textAlign = "center";
+      ctx.font = "bold 20px ui-monospace, monospace";
+      if (g.mode === "solid") {
+        ctx.fillStyle = "#ffffff";
+        ctx.fillText(`⚡ IT'S SOLID! STOMP IT! ${Math.max(0, g.solidT).toFixed(1)}`, canvas.width / 2, 44);
+      } else if (state === "run") {
+        ctx.fillStyle = "#8ff09a";
+        const done = g.broken.filter((c) => c.fixed).length;
+        ctx.fillText(`🛠 Stand on the glitched blocks to fix them: ${done}/${g.broken.length}`, canvas.width / 2, 44);
+      }
+      if (flipT > 0) {
+        ctx.fillStyle = "#ffd54a";
+        ctx.fillText("🔀 CONTROLS FLIPPED", canvas.width / 2, 72);
+      }
+      if (g.introT > 0 || g.bannerT > 0) {
+        const intro = g.introT > 0;
+        ctx.font = `bold ${intro ? 60 : 40}px ui-monospace, monospace`;
+        const text = intro ? "THE GLITCH" : g.banner;
+        const y = canvas.height / 2 - 40;
+        // drawn three times, a little apart, like a broken screen
+        ctx.fillStyle = "#21e6ff";
+        ctx.fillText(text, canvas.width / 2 - 3 + (Math.random() - 0.5) * 4, y);
+        ctx.fillStyle = "#ff2bd6";
+        ctx.fillText(text, canvas.width / 2 + 3 + (Math.random() - 0.5) * 4, y);
+        ctx.fillStyle = "#ffffff";
+        ctx.fillText(text, canvas.width / 2, y);
+      }
+    };
+
     const drawBossHud = () => {
+      if (boss.glitch) { drawGlitchHud(); return; }
       const b = boss;
       ctx.textBaseline = "top";
       if (state === "cut") {
@@ -4294,6 +4688,7 @@
           drawPlayer(ctx, (player.x + PLAYER_W / 2 - camX) * TS - pw / 2,
             (player.y + PLAYER_H / 2) * TS - ph / 2, pw, ph, rot, hero);
           if (window.BDBadges.has("master")) drawCrown(rot, pw, ph);
+          if (glitchFx) drawGlitchFx(rot, pw, ph);
           // sword in hand for the boss fight
           if (inBoss && sword) {
             drawTile(ctx, SWORDS[sword].key, (player.x + PLAYER_W * 0.55 - camX) * TS,
@@ -4385,7 +4780,7 @@
       let guard = 0;
       while (acc >= STEP && guard++ < 30) { update(STEP); afterStep(); acc -= STEP; }
       render();
-      window.BDMusic.boss(inBoss && state !== "win");
+      window.BDMusic.boss(inBoss && state !== "win" ? (level.glitch ? "glitch" : true) : false);
       raf = requestAnimationFrame(loop);
     };
 

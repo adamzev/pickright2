@@ -1225,7 +1225,20 @@ window.BDArt = (() => {
     "....dd....dd....",
   ], { p: "#8e44ad", d: "#5b2c6f", y: "#f4d03f", e: "#111111", f: "#c39bd3" });
 
+  // the reward for beating The Glitch: a tiny broken-pixel buddy
+  const petGlitch = paintMap([
+    "..m.cc..k.",
+    ".mmkcccw..",
+    "kmwwmckwwc",
+    "mmwkmckwkc",
+    "cmmmkcccmk",
+    ".kmmcmmck.",
+    "cm.kmcmm.c",
+    ".c..m..k..",
+  ], { m: "#ff2bd6", c: "#21e6ff", k: "#111111", w: "#ffffff" });
+
   const SPRITES = {
+    petGlitch: petGlitch,
     petCat: petCat,
     petDog: petDog,
     petFrog: petFrog,
@@ -1380,6 +1393,7 @@ window.BDArt = (() => {
     { key: "petFrog", label: "Frog pet" },
     { key: "petParrot", label: "Parrot pet" },
     { key: "petDragon", label: "Baby dragon pet" },
+    { key: "petGlitch", label: "Glitch pet" },
   ];
 
   // The built-in look, kept aside so "reset" can always get back to it.
