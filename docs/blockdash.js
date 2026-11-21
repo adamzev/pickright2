@@ -3048,9 +3048,31 @@
 
   // ---------- screen: play ----------
 
+  // blockdash.js's own names that the play files (blockdash-play-*.js) use
+  const BD = {
+    AIR, ARENA_W, arenaBgOf, arenaGrid, Art, baseOf, bestKey, bgOf, BLAZE_DRIFT, BLAZE_MAX,
+    BLAZE_REACH, BLAZE_SHOOT, BOSS_BODY, BOSS_HP, BOSS_PX, BOSS_SHOT_SPEED, BOSS_STAGE,
+    BOSS_TOP, BOSS_X, BOUNCE_V, builtinLevels, BULLET_LIFE, BULLET_SPEED, BULLET_TURN,
+    CHASE_SPEED, clamp, COIN_VALUE, COYOTE, CUT_END, dailyLevelDone, dailyNote, dayKey,
+    DOOR_SWING, drawCone, drawExplosion, drawPlayer, drawTile, EFFECT_TIME, el, ENDER_AHEAD,
+    ENDER_NOTICE, findSpawn, FIREBALL_SPEED, FLOWED, FLY_THRUST, FLY_UP_V, FLYING_PETS,
+    getBest, GHOST_BONUS, GHOST_EVERY, GLIDE_FALL, GLITCH_BLOCKS, GLITCH_COLORS,
+    GLITCH_EVERY, GLITCH_FIX_TIME, GLITCH_HOP, GLITCH_HP, GLITCH_SIZE, GLITCH_SOLID,
+    GLITCH_SPOTS, glitchLookOn, GRAVITY, H, inCone, isDoor, isHidden, isHiddenTnt, isLava,
+    isLogged, isOpenDoor, isSolid, JUMP_BUFFER, JUMP_V, KEY, lapSpeed, LAVA_FALL, LAVA_RISE,
+    loadBag, LOGGABLE, MEGA_BASE, MEGA_BLAST, MEGA_BOUNCE_V, MEGATITE_PAYS, MOB_H, MOB_W,
+    noteKey, overOf, PET_SOUND, PLAYER_H, PLAYER_W, POOF_AFTER, RAIN_SPEED, saveBag, setBest,
+    SHIELD_TIME, SHOOT_EVERY, SPAWN_EVERY, SPEED_BASE, SPEED_FAST, SPEED_SLOW, STILL_PETS,
+    STOP_DEFAULT, SWORDS, TILES, toast, trailOn, WARP_TIME, WATCH_CYCLE, WATCH_OPEN
+  };
+
   // `chain` links a level to the ones after it: { i, count, carried, playNext }.
   // Absent when a level is played on its own (from the editor's Test button).
   const showPlay = (level, onExit, fromEditor, chain) => {
+    // S: this play's changing values, shared with the play files.
+    // P: functions and fixed values shared between them.
+    const S = {};
+    const P = {};
     clear();
     window.BDMusic.level(musicOf(level));
 
@@ -3068,10 +3090,10 @@
       }));
       return [out, lk];
     };
-    let [template, looks] = strip(rowsToGrid(level.rows));
+    [S.template, S.looks] = strip(rowsToGrid(level.rows));
     // Megas play as their ordinary block (so every rule still applies) and
     // `looks` remembers which squares are mega, for their extra power.
-    const megaAt = (x, y) => !!MEGA_BASE[looks[noteKey(x, y)]];
+    const megaAt = (x, y) => !!MEGA_BASE[S.looks[noteKey(x, y)]];
     // 2 for a mega square: pays double, counts double, lasts twice as long
     const megaTimes = (x, y) => (megaAt(x, y) ? 2 : 1);
     const hero = Art.baseOf(level.hero) === "player" ? level.hero : pickedHero();
@@ -3079,25 +3101,25 @@
     const petBase = pet && petBaseOf(pet);
     window.BDBadges.nightCheck();
     const notes = cleanNotes(level.rows, level.notes);
-    let width = template[0].length;
-    let spawn = findSpawn(template);
-    const home = { template, width, spawn, looks };
+    S.width = S.template[0].length;
+    S.spawn = findSpawn(S.template);
+    const home = { template: S.template, width: S.width, spawn: S.spawn, looks: S.looks };
 
     const header = el("div", "row");
     header.appendChild(el("h1", null, level.name || "Level"));
     header.appendChild(el("div", "spacer"));
     const quit = el("button", "small", fromEditor ? "← Editor" : "← Levels");
     quit.onclick = () => { stop(); onExit(); };
-    let showGhost = ghostOn();
+    S.showGhost = ghostOn();
     const ghostBtn = el("button", "small", "");
-    const showGhostBtn = () => { ghostBtn.textContent = showGhost ? "👻 Ghost: on" : "👻 Ghost: off"; };
+    const showGhostBtn = () => { ghostBtn.textContent = S.showGhost ? "👻 Ghost: on" : "👻 Ghost: off"; };
     showGhostBtn();
     // pointerdown + preventDefault so the button never takes focus, or the
     // Space bar (jump) would switch the ghost on and off
     ghostBtn.addEventListener("pointerdown", (e) => {
       e.preventDefault();
-      showGhost = !showGhost;
-      try { localStorage.setItem(GHOST_ON_KEY, showGhost ? "1" : "0"); } catch (err) { /* ignore */ }
+      S.showGhost = !S.showGhost;
+      try { localStorage.setItem(GHOST_ON_KEY, S.showGhost ? "1" : "0"); } catch (err) { /* ignore */ }
       showGhostBtn();
     });
     header.append(ghostBtn, quit);
@@ -3174,53 +3196,59 @@
     const TS = canvas.height / H; // 45px per block
     const VIEW_COLS = canvas.width / TS;
 
-    let grid, player, score, attempts = 0, state, camX, effect, effectT,
-      rot, coyote, buffer, particles, deadT, time = 0, holding = false, keys = 0, doorT = {},
-      checkpoint = null, flying = false, deathKind = "boom",
-      movers = [], shooters = [], bullets = [], spawners = [], blazes = [], fireballs = [],
-      rods = 0, pearls = 0, eyes = 0, megas = 0, shieldT = 0, framesLeft = 0, told = {}, watchers = [], mobs = [], runT = 0, warp = null,
-      free = false, moveL = false, moveR = false, stopT = 0, talk = null, talkAt = 0, poofed = false,
-      inBoss = false, boss = null, introSeen = false, cutT = 0, downT = 0, knock = 0, plats = [],
-      flipT = 0; // The Glitch's control flip: ◀ ▶ swapped while this runs
+    // flipT is The Glitch's control flip: ◀ ▶ are swapped while it runs
+    Object.assign(S, {
+      grid: undefined, player: undefined, score: undefined, attempts: 0, state: undefined,
+      camX: undefined, effect: undefined, effectT: undefined, rot: undefined,
+      coyote: undefined, buffer: undefined, particles: undefined, deadT: undefined, time: 0,
+      holding: false, keys: 0, doorT: {}, checkpoint: null, flying: false, deathKind: "boom",
+      movers: [], shooters: [], bullets: [], spawners: [], blazes: [], fireballs: [],
+      rods: 0, pearls: 0, eyes: 0, megas: 0, shieldT: 0, framesLeft: 0, told: {},
+      watchers: [], mobs: [], runT: 0, warp: null, free: false, moveL: false, moveR: false,
+      stopT: 0, talk: null, talkAt: 0, poofed: false, inBoss: false, boss: null,
+      introSeen: false, cutT: 0, downT: 0, knock: 0, plats: [], flipT: 0,
+    });
 
     const showItems = () => {
-      rodsEl.textContent = "🪄 " + rods;
-      pearlsEl.textContent = "🔮 " + pearls;
-      eyesEl.textContent = "👁 " + eyes;
-      keysEl.textContent = "🔑 " + keys;
+      rodsEl.textContent = "🪄 " + S.rods;
+      pearlsEl.textContent = "🔮 " + S.pearls;
+      eyesEl.textContent = "👁 " + S.eyes;
+      keysEl.textContent = "🔑 " + S.keys;
     };
 
     // toasts for things you stand in for many frames: once per attempt
     const tellOnce = (what, msg) => {
-      if (told[what]) return;
-      told[what] = true;
+      if (S.told[what]) return;
+      S.told[what] = true;
       toast(msg);
     };
 
     const setFree = (on) => {
-      free = on;
+      S.free = on;
       leftBtn.style.display = rightBtn.style.display = on ? "" : "none";
     };
 
     // Mega wings come with a Boost: a short burst at Lightning speed, then a
     // wait while it recharges. The button fills up as it charges.
-    let boostOn = false, boostCD = 0, boostShown = "";
+    Object.assign(S, {
+      boostOn: false, boostCD: 0, boostShown: "",
+    });
     const setBoost = (on) => {
-      boostOn = on;
-      boostCD = 0;
+      S.boostOn = on;
+      S.boostCD = 0;
       boostBtn.style.display = on ? "" : "none";
     };
     const boost = () => {
-      if (!boostOn || boostCD > 0 || state !== "run") return;
-      effect = "fast";
-      effectT = BOOST_TIME;
-      boostCD = BOOST_RECHARGE;
+      if (!S.boostOn || S.boostCD > 0 || S.state !== "run") return;
+      S.effect = "fast";
+      S.effectT = BOOST_TIME;
+      S.boostCD = BOOST_RECHARGE;
     };
     const showBoost = () => {
-      const pct = boostCD > 0 ? Math.round((1 - boostCD / BOOST_RECHARGE) * 100) : 100;
-      const key = boostOn + ":" + pct;
-      if (key === boostShown) return;
-      boostShown = key;
+      const pct = S.boostCD > 0 ? Math.round((1 - S.boostCD / BOOST_RECHARGE) * 100) : 100;
+      const key = S.boostOn + ":" + pct;
+      if (key === S.boostShown) return;
+      S.boostShown = key;
       boostBtn.disabled = pct < 100;
       boostBtn.style.setProperty("--charge", pct + "%");
     };
@@ -3229,25 +3257,27 @@
     // A run starts at the level's start and lasts through save-point respawns
     // and the boss fight. It's replayed by game step, so pauses replay too.
     const gKey = ghostKey(level);
-    let best = loadGhosts()[gKey] || null;
-    let run = null, runStep = 0, lifeStep = 0;
+    S.best = loadGhosts()[gKey] || null;
+    Object.assign(S, {
+      run: null, runStep: 0, lifeStep: 0,
+    });
     const PET_LAG = 18; // steps the pet trails behind you
     const trail = [];
 
     const startRun = () => {
-      run = { path: [], far: 0, boss: false, deaths: 0 };
-      runStep = 0;
+      S.run = { path: [], far: 0, boss: false, deaths: 0 };
+      S.runStep = 0;
     };
     // True when the run beat the saved ghost. The very first run just
     // becomes the ghost: there's nothing to beat yet.
     const endRun = (finished) => {
-      if (!run || run.ended || level.endless) return false;
-      run.ended = true;
-      const r = { path: run.path, far: run.far, boss: run.boss, done: finished, t: runStep, at: Date.now() };
-      const old = best;
+      if (!S.run || S.run.ended || level.endless) return false;
+      S.run.ended = true;
+      const r = { path: S.run.path, far: S.run.far, boss: S.run.boss, done: finished, t: S.runStep, at: Date.now() };
+      const old = S.best;
       if (old && !beats(r, old)) return false;
       if (!old && r.path.length < 6) return false;
-      best = r;
+      S.best = r;
       saveGhost(gKey, r);
       if (!old) return false;
       window.BDBadges.add("ghostWins");
@@ -3264,18 +3294,18 @@
     const endlessOver = () => {
       if (overShown) return;
       overShown = true;
-      const dist = Math.floor(player.x);
+      const dist = Math.floor(S.player.x);
       let best = 0;
       try { best = Number(localStorage.getItem(ENDLESS_BEST_KEY)) || 0; } catch (e) { /* none */ }
       const record = dist > best;
       if (record) { try { localStorage.setItem(ENDLESS_BEST_KEY, String(dist)); } catch (e) { /* ignore */ } }
       const b = loadBag();
-      saveBag(Object.assign(b, { coins: b.coins + score }));
+      saveBag(Object.assign(b, { coins: b.coins + S.score }));
       dailyNote("endless", dist);
       const box = el("div", "overlay-msg");
       box.innerHTML = `<div class="big">${record ? "🏆 NEW RECORD!" : "Game over!"}</div>` +
         `<div>You ran <b>${dist}</b> blocks · best ${Math.max(dist, best)}</div>` +
-        `<div>+${score} coins from diamonds · you now have ${b.coins} coins</div>`;
+        `<div>+${S.score} coins from diamonds · you now have ${b.coins} coins</div>`;
       const row = el("div", "row");
       row.style.justifyContent = "center";
       row.style.marginTop = "10px";
@@ -3291,17 +3321,17 @@
     };
 
     const afterStep = () => {
-      runStep++;
-      lifeStep++;
-      if (state === "run" && !warp) {
-        trail.push(player.x, player.y);
+      S.runStep++;
+      S.lifeStep++;
+      if (S.state === "run" && !S.warp) {
+        trail.push(S.player.x, S.player.y);
         if (trail.length > PET_LAG * 2) trail.splice(0, 2);
       }
-      if (!run || run.ended) return;
-      if (inBoss) { run.boss = true; return; } // the arena isn't part of the level's map
-      if (state === "run") run.far = Math.max(run.far, player.x);
-      if (runStep % GHOST_EVERY === 0 && run.path.length < GHOST_MAX * 3) {
-        run.path.push(+player.x.toFixed(2), +player.y.toFixed(2), +rot.toFixed(1));
+      if (!S.run || S.run.ended) return;
+      if (S.inBoss) { S.run.boss = true; return; } // the arena isn't part of the level's map
+      if (S.state === "run") S.run.far = Math.max(S.run.far, S.player.x);
+      if (S.runStep % GHOST_EVERY === 0 && S.run.path.length < GHOST_MAX * 3) {
+        S.run.path.push(+S.player.x.toFixed(2), +S.player.y.toFixed(2), +S.rot.toFixed(1));
       }
     };
 
@@ -3310,1803 +3340,130 @@
     // grabbed before it stay grabbed.
     const reset = (fromStart) => {
       overShown = false;
-      flipT = 0;
+      S.flipT = 0;
       canvas.style.transform = ""; // The Glitch's screen shake
-      if (fromStart || !checkpoint) {
-        if (run && endRun(false)) ghostBonus();
+      if (fromStart || !S.checkpoint) {
+        if (S.run && endRun(false)) ghostBonus();
         startRun();
       }
-      lifeStep = 0;
+      S.lifeStep = 0;
       trail.length = 0;
       if (fromStart) {
-        checkpoint = null;
-        inBoss = false;
-        introSeen = false;
-        ({ template, width, spawn, looks } = home);
+        S.checkpoint = null;
+        S.inBoss = false;
+        S.introSeen = false;
+        ({ template: S.template, width: S.width, spawn: S.spawn, looks: S.looks } = home);
       }
-      const at = checkpoint || spawn;
-      grid = (checkpoint ? checkpoint.grid : template).map((r) => r.slice());
+      const at = S.checkpoint || S.spawn;
+      S.grid = (S.checkpoint ? S.checkpoint.grid : S.template).map((r) => r.slice());
       // Lava sources and shooters always restart, even after a save point:
       // grown lava is cleared and the sources start growing again.
-      movers = [];
-      shooters = [];
-      bullets = [];
-      spawners = [];
-      blazes = [];
-      fireballs = [];
-      watchers = [];
-      mobs = [];
-      plats = [];
-      runT = 0;
+      S.movers = [];
+      S.shooters = [];
+      S.bullets = [];
+      S.spawners = [];
+      S.blazes = [];
+      S.fireballs = [];
+      S.watchers = [];
+      S.mobs = [];
+      S.plats = [];
+      S.runT = 0;
       for (let y = 0; y < H; y++) {
-        for (let x = 0; x < width; x++) {
-          if (grid[y][x] === FLOWED) grid[y][x] = AIR;
-          else if (isLogged(grid[y][x])) grid[y][x] = grid[y][x][1];
-          const ch = template[y][x];
+        for (let x = 0; x < S.width; x++) {
+          if (S.grid[y][x] === FLOWED) S.grid[y][x] = AIR;
+          else if (isLogged(S.grid[y][x])) S.grid[y][x] = S.grid[y][x][1];
+          const ch = S.template[y][x];
           // Boss platforms start out missing; the climb stage puts them in
-          if (ch === "J") { grid[y][x] = AIR; plats.push([x, y]); }
+          if (ch === "J") { S.grid[y][x] = AIR; S.plats.push([x, y]); }
           if (ch === "U" || ch === "D") {
-            movers.push({ x, tip: y, dir: ch === "U" ? -1 : 1, t: 0, active: false, done: false });
+            S.movers.push({ x, tip: y, dir: ch === "U" ? -1 : 1, t: 0, active: false, done: false });
           } else if (ch === "S") {
-            shooters.push({ x, y, t: 1 });
+            S.shooters.push({ x, y, t: 1 });
           } else if (ch === "Z") {
-            spawners.push({ x, y, t: 0.6, alive: 0 });
+            S.spawners.push({ x, y, t: 0.6, alive: 0 });
           } else if (ch === "W" || ch === "Y") {
-            watchers.push({ x, y, ph: (x * 0.37) % WATCH_CYCLE, stare: ch === "Y" });
+            S.watchers.push({ x, y, ph: (x * 0.37) % WATCH_CYCLE, stare: ch === "Y" });
           }
           // creatures live outside the grid while you play; they restart on every respawn
           if (isMob(ch)) {
-            grid[y][x] = AIR;
-            mobs.push({ kind: ch, look: looks[noteKey(x, y)], x: x + (1 - MOB_W) / 2, y: y + 1 - MOB_H, vy: 0,
+            S.grid[y][x] = AIR;
+            S.mobs.push({ kind: ch, look: S.looks[noteKey(x, y)], x: x + (1 - MOB_W) / 2, y: y + 1 - MOB_H, vy: 0,
               awake: false, glitchT: GLITCH_EVERY, onGround: false });
           }
         }
       }
-      player = {
+      S.player = {
         x: at.x + 0.15,
         y: at.y + (1 - PLAYER_H),
         vy: 0,
         onGround: false,
       };
-      score = checkpoint ? checkpoint.score : 0;
-      scoreEl.textContent = "💎 " + score;
+      S.score = S.checkpoint ? S.checkpoint.score : 0;
+      scoreEl.textContent = "💎 " + S.score;
       // Without a save point you start with what's in the bag. What you pick
       // up only goes into the bag for keeps when you finish the level.
-      ({ rods, pearls, eyes } = checkpoint || bag);
-      megas = checkpoint ? checkpoint.megas : 0;
+      ({ rods: S.rods, pearls: S.pearls, eyes: S.eyes } = S.checkpoint || bag);
+      S.megas = S.checkpoint ? S.checkpoint.megas : 0;
       // keys only work in the level you find them in
-      keys = checkpoint ? checkpoint.keys || 0 : 0;
-      megaEl.textContent = "Ⓜ " + megas;
-      shieldT = 0;
+      S.keys = S.checkpoint ? S.checkpoint.keys || 0 : 0;
+      megaEl.textContent = "Ⓜ " + S.megas;
+      S.shieldT = 0;
       showItems();
-      framesLeft = grid.reduce((n, row) => n + row.filter((ch) => ch === "R").length, 0);
-      told = {};
-      state = "run";
-      warp = null;
+      S.framesLeft = S.grid.reduce((n, row) => n + row.filter((ch) => ch === "R").length, 0);
+      S.told = {};
+      S.state = "run";
+      S.warp = null;
       setFree(false);
-      stopT = 0;
-      talk = null;
-      camX = clamp(player.x - VIEW_COLS * 0.32, 0, Math.max(0, width - VIEW_COLS));
-      effect = null;
-      effectT = 0;
-      flying = false;
+      S.stopT = 0;
+      S.talk = null;
+      S.camX = clamp(S.player.x - VIEW_COLS * 0.32, 0, Math.max(0, S.width - VIEW_COLS));
+      S.effect = null;
+      S.effectT = 0;
+      S.flying = false;
       setBoost(false);
-      rot = 0;
-      coyote = 0;
-      buffer = 0;
-      particles = [];
-      deadT = 0;
-      attempts++;
-      attEl.textContent = "Attempt " + attempts;
+      S.rot = 0;
+      S.coyote = 0;
+      S.buffer = 0;
+      S.particles = [];
+      S.deadT = 0;
+      S.attempts++;
+      attEl.textContent = "Attempt " + S.attempts;
       msgSlot.innerHTML = "";
       jumpBtn.disabled = false;
-      knock = 0;
-      boss = null;
-      if (inBoss) startBoss();
+      S.knock = 0;
+      S.boss = null;
+      if (S.inBoss) startBoss();
       if (hero === CAT_LOOK && petBase === "petCat" && window.BDMusic.playing === "meow") window.BDBadges.earn("cat");
     };
 
-    // ----- the TNT Mech boss fight -----
-
-    // Walking into a Boss portal swaps the level for a one-screen arena. The
-    // arena is set up as a save point, so dying restarts the fight, not the level.
-    const enterBoss = () => {
-      [template, looks] = strip(arenaGrid(level.arena, arenaBgOf(level)));
-      width = ARENA_W;
-      spawn = findSpawn(template);
-      checkpoint = { x: spawn.x, y: spawn.y, score, megas, rods, pearls, eyes, keys, grid: template.map((r) => r.slice()) };
-      inBoss = true;
-      attempts--; // stepping through the portal isn't a new attempt
-      reset();
-    };
-
-    const startBoss = () => {
-      if (level.glitch) { startGlitch(); return; }
-      setFree(true);
-      boss = { hp: bossMax, stage: -1, t: 0, spawnT: 0, hurtT: 0, x: BOSS_X, rain: [], gone: false };
-      if (introSeen) nextStage();
-      else { state = "cut"; cutT = 0; }
-    };
-
-    const endCut = () => {
-      introSeen = true;
-      state = "run";
-      particles = [];
-      nextStage();
-    };
-
-    // The climb stage's platforms only exist while that stage is on.
-    const setPlats = (on) => {
-      for (const [x, y] of plats) {
-        grid[y][x] = on ? "J" : AIR;
-        // one appearing on top of you lifts you onto it rather than trapping you
-        if (on && touches(x, y, x + 1, y + 1)) { player.y = y - PLAYER_H; player.vy = 0; }
-      }
-    };
-
-    // rain TNT -> climb up and stomp -> shooter arm -> repeat
-    const nextStage = () => {
-      boss.stage = (boss.stage + 1) % 3;
-      boss.t = BOSS_STAGE;
-      boss.spawnT = 0.9;
-      setPlats(boss.stage === 1);
-      bullets = bullets.filter((b) => !b.straight); // its stars don't outlive the shooter stage
-    };
-
-    const smoke = (cx, cy, n, spread) => {
-      for (let i = 0; i < n; i++) {
-        const sz = 0.5 + Math.random() * 0.9;
-        particles.push({
-          x: cx + (Math.random() - 0.5) * spread - sz / 2, y: cy + (Math.random() - 0.5) * spread - sz / 2,
-          vx: (Math.random() - 0.5) * 1.2, vy: -Math.random() * 0.8, g: -0.4, s: sz,
-          life: 1 + Math.random() * 1.4,
-          c: ["#8a8a8a", "#a8a8a8", "#6f6f6f", "#c4c4c4"][(Math.random() * 4) | 0],
-        });
-      }
-    };
-
-    // where the dragon is during the intro: swoops in, then hangs there shaking
-    const dragonAt = () => {
-      const k = clamp(cutT / 1.8, 0, 1);
-      const ease = 1 - (1 - k) * (1 - k);
-      return { x: ARENA_W + 2 + (11 - ARENA_W - 2) * ease, y: 3 + Math.sin(cutT * 4) * 0.5 };
-    };
-
-    // Intro: the dragon flies in, is blown up, and the boss walks out of the smoke.
-    const updateCut = (dt) => {
-      const before = cutT;
-      cutT += dt;
-      const at = (t) => before < t && cutT >= t;
-      const d = dragonAt();
-      for (const t of [1.8, 2.05, 2.3, 2.55]) {
-        if (at(t)) explode(d.x + 1 + Math.random() * 4.4, d.y + 0.5 + Math.random() * 2.6,
-          ["#d05bff", "#f4f0ff", "#ffd54a", "#ff8a3d"]);
-      }
-      if (at(2.6)) smoke(16, 6.5, 70, 7);
-      if (at(3.2)) smoke(17, 7.5, 30, 5);
-      // the boss strides out from deep in the smoke to its spot
-      boss.x = BOSS_X + 3 * (1 - clamp((cutT - 2.8) / 1.6, 0, 1));
-      if (cutT >= CUT_END) endCut();
-    };
-
-    // ----- The Glitch -----
-    // Fix the glitched blocks (stand on them) to make it solid, then stomp it.
-    // Meanwhile it throws one glitchy attack after another.
-
-    const startGlitch = () => {
-      setFree(true);
-      setPlats(true); // its platforms are always there (except when they flicker)
-      const [x, top] = GLITCH_SPOTS[0];
-      boss = {
-        glitch: true, hp: GLITCH_HP, max: GLITCH_HP, fixT: 0, x, top, mode: "phase", solidT: 0, broken: [], rain: [], clones: [], hist: [],
-        atkT: 3, hurtT: 0, introT: 2.5, fakeT: 0, shakeT: 0, cloneT: 0, rainT: 0, dropT: 0, rewindFx: 0,
-        banner: "", bannerT: 0, last: "", gone: false,
-      };
-      breakBlocks();
-    };
-
-    // glitch three squares of floor or platform for the player to fix
-    const breakBlocks = () => {
-      const g = boss, cells = [];
-      for (let x = 1; x < ARENA_W - 1; x++) if (solidAt(x, H - 1)) cells.push([x, H - 1]);
-      if (g.fakeT <= 0) for (const [x, y] of plats) cells.push([x, y]);
-      const under = Math.floor(player.x + PLAYER_W / 2);
-      const pick = cells.filter(([x]) => Math.abs(x - under) > 1).sort(() => Math.random() - 0.5).slice(0, GLITCH_BLOCKS);
-      g.broken = pick.map(([x, y]) => ({ x, y, fixed: false }));
-      g.fixT = GLITCH_FIX_TIME;
-    };
-
-    const glitchMove = () => {
-      const g = boss;
-      const spots = GLITCH_SPOTS.filter(([x, top]) => x !== g.x || top !== g.top);
-      [g.x, g.top] = spots[Math.floor(Math.random() * spots.length)];
-      sparkle(g.x + 1, g.top + 1, GLITCH_COLORS);
-    };
-
-    const glitchAttack = () => {
-      const g = boss;
-      const anger = Math.round((1 - g.hp / g.max) * 4);
-      g.atkT = [5, 4.5, 4, 3.5, 3][anger] || 3;
-      const pool = ["rain", "fake", "screen", "clone", "rewind", "flip"].filter((a) => a !== g.last);
-      const a = pool[Math.floor(Math.random() * pool.length)];
-      g.last = a;
-      g.banner = { rain: "🔴 PIXEL RAIN", fake: "👻 FAKE BLOCKS", screen: "📺 SCREEN GLITCH",
-        clone: "🪞 CLONES", rewind: "⏪ REWIND", flip: "🔀 CONTROLS FLIPPED" }[a];
-      g.bannerT = 1.4;
-      if (a === "rain") { g.rainT = 3; g.dropT = 0; }
-      else if (a === "fake") g.fakeT = 3.5;
-      else if (a === "screen") g.shakeT = 1.6;
-      else if (a === "flip") flipT = 3;
-      else if (a === "clone") {
-        g.cloneT = 5;
-        g.clones = GLITCH_SPOTS.filter(([x, top]) => x !== g.x || top !== g.top)
-          .sort(() => Math.random() - 0.5).slice(0, 2).map(([x, top]) => ({ x, top }));
-      } else if (a === "rewind" && g.hist.length >= 2) {
-        // back to where you were about two seconds ago
-        player.x = g.hist[0];
-        player.y = g.hist[1];
-        player.vy = 0;
-        g.hist = [];
-        g.rewindFx = 0.6;
-      }
-    };
-
-    const glitchStomp = (top) => {
-      player.y = top - PLAYER_H;
-      player.vy = -JUMP_V;
-    };
-
-    // Returns true if the player died or the fight ended this step.
-    const updateGlitch = (dt) => {
-      const g = boss;
-      for (const k of ["introT", "hurtT", "bannerT", "rewindFx"]) if (g[k] > 0) g[k] -= dt;
-      if (flipT > 0) flipT -= dt;
-      g.hist.push(player.x, player.y);
-      if (g.hist.length > 2 / STEP * 2) g.hist.splice(0, 2);
-
-      if (g.shakeT > 0) {
-        g.shakeT -= dt;
-        canvas.style.transform = g.shakeT > 0
-          ? `translate(${(Math.random() - 0.5) * 12}px, ${(Math.random() - 0.5) * 8}px)` : "";
-      }
-      if (g.fakeT > 0) {
-        g.fakeT -= dt;
-        setPlats(g.fakeT <= 0 || Math.floor(g.fakeT * 2.5) % 2 === 0); // always ends with them back
-      }
-      if (g.cloneT > 0) { g.cloneT -= dt; if (g.cloneT <= 0) g.clones = []; }
-
-      // pixel rain zigzags down
-      for (const r of g.rain) {
-        r.y += RAIN_SPEED * 0.75 * dt;
-        r.x = r.x0 + Math.sin(r.y * 2.2) * 1.1;
-        if (touches(r.x + 0.2, r.y + 0.2, r.x + 0.8, r.y + 0.8)) { die("boom", true); return true; }
-        if (r.y >= H - 1.6) r.dead = true;
-      }
-      g.rain = g.rain.filter((r) => !r.dead);
-      if (g.rainT > 0) {
-        g.rainT -= dt;
-        g.dropT -= dt;
-        if (g.dropT <= 0) {
-          g.dropT = 0.22;
-          const x = Math.random() < 0.4 ? player.x : Math.random() * (ARENA_W - 2);
-          g.rain.push({ x0: clamp(x, 1.2, ARENA_W - 2.2), x: 0, y: -1 });
-        }
-      }
-
-      const feet = player.y + PLAYER_H;
-      const onTop = (x, top) => player.vy > 0 && player.x + PLAYER_W > x && player.x < x + GLITCH_SIZE &&
-        feet > top - 0.05 && feet < top + 0.6;
-      if (g.mode === "phase") {
-        if (player.onGround) {
-          const fy = Math.floor(feet + 0.05);
-          for (const c of g.broken) {
-            if (!c.fixed && c.y === fy && player.x + PLAYER_W > c.x && player.x < c.x + 1) {
-              c.fixed = true;
-              sparkle(c.x + 0.5, c.y, ["#8ff09a", "#ffffff", "#21e6ff"]);
-            }
-          }
-        }
-        if (g.broken.every((c) => c.fixed)) {
-          g.mode = "solid";
-          g.solidT = GLITCH_SOLID;
-        } else if (g.introT <= 0) {
-          g.fixT -= dt;
-          if (g.fixT <= 0) {
-            toast("⏰ Too slow! The blocks glitched again");
-            breakBlocks();
-          }
-        }
-      } else {
-        g.solidT -= dt;
-        for (const c of g.clones) {
-          if (onTop(c.x, c.top)) { glitchStomp(c.top); c.gone = true; toast("FAKE! That was a clone 🪞"); }
-        }
-        g.clones = g.clones.filter((c) => !c.gone);
-        if (g.hurtT <= 0 && onTop(g.x, g.top)) {
-          glitchStomp(g.top);
-          g.hp--;
-          g.hurtT = 1;
-          explode(g.x + 1, g.top + 0.5, GLITCH_COLORS);
-          if (g.hp <= 0) {
-            state = "bossdown";
-            downT = 0;
-            g.rain = [];
-            g.clones = [];
-            g.broken = [];
-            g.fakeT = 0;
-            setPlats(true);
-            flipT = 0;
-            canvas.style.transform = "";
-            return true;
-          }
-          g.mode = "phase";
-          glitchMove();
-          breakBlocks();
-        } else if (g.solidT <= 0) {
-          g.mode = "phase";
-          glitchMove();
-          breakBlocks();
-        }
-      }
-
-      if (g.introT <= 0) {
-        g.atkT -= dt;
-        if (g.atkT <= 0) glitchAttack();
-      }
-      return false;
-    };
-
-    // Returns true if the player died or the fight ended this step.
-    const updateBoss = (dt) => {
-      if (boss.glitch) return updateGlitch(dt);
-      const b = boss;
-      if (b.hurtT > 0) b.hurtT -= dt;
-
-      for (const r of b.rain) {
-        r.y += RAIN_SPEED * dt;
-        if (touches(r.x, r.y, r.x + 1, r.y + 1)) { die("boom", true); return true; }
-        if (r.y >= H - 2) {
-          r.dead = true;
-          sparkle(r.x + 0.5, H - 1.2, ["#ffd54a", "#ff8a3d", "#e04a2f", "#8c8c8c"]);
-        }
-      }
-      b.rain = b.rain.filter((r) => !r.dead);
-
-      // Its head and torso are one tall column: land on top to stomp it, and
-      // anywhere else it's simply a wall.
-      const feet = player.y + PLAYER_H;
-      if (player.x + PLAYER_W > BOSS_BODY && feet > BOSS_TOP) {
-        if (player.vy > 0 && feet < BOSS_TOP + 0.5) {
-          player.y = BOSS_TOP - PLAYER_H;
-          player.vy = -JUMP_V;
-          knock = -18; // thrown clear, so you don't drop onto its spike arm
-          if (b.hurtT <= 0) {
-            b.hp--;
-            b.hurtT = 1.5;
-            explode(player.x + PLAYER_W / 2, BOSS_TOP + 0.5, ["#ffd54a", "#ff8a3d", "#e04a2f", "#ffffff"]);
-            if (b.hp <= 0) {
-              state = "bossdown";
-              downT = 0;
-              setPlats(false);
-              bullets = [];
-              b.rain = [];
-              return true;
-            }
-            // a stomp ends the climb early and moves it on to its next attack
-            b.stage = 1;
-            nextStage();
-          }
-        } else {
-          player.x = BOSS_BODY - PLAYER_W;
-        }
-      }
-      // the spike arm hanging at its side
-      if (touches(b.x + 0.1, BOSS_TOP + 12 * BOSS_PX, b.x + 0.9, BOSS_TOP + 28 * BOSS_PX)) {
-        die("poof", true);
-        return true;
-      }
-
-      b.t -= dt;
-      if (b.t <= 0) nextStage();
-      b.spawnT -= dt;
-      if (b.spawnT <= 0) {
-        // It speeds up each time it's hit. Measured from the bare-handed
-        // five, so a sword's shorter fight still reaches its fastest.
-        const anger = Math.round((1 - b.hp / bossMax) * (BOSS_HP - 1));
-        if (b.stage === 0) {
-          b.spawnT = [0.3, 0.25, 0.2][anger] || 0.2;
-          // nearly half are aimed right at you, so you have to keep moving
-          const x = Math.random() < 0.45 ? player.x - 0.15 : Math.random() * (BOSS_X - 1);
-          b.rain.push({ x: clamp(x, 0, BOSS_X - 1), y: -1 });
-        } else if (b.stage === 2) {
-          b.spawnT = [1.2, 1, 0.8][anger] || 0.8;
-          const mx = b.x + 21.5 * BOSS_PX, my = BOSS_TOP + 21 * BOSS_PX;
-          const a = Math.atan2(player.y + PLAYER_H / 2 - my, player.x + PLAYER_W / 2 - mx);
-          // Unlike a Shooter block's stars these fly straight at where you were:
-          // in a small arena there's no outrunning ones that steer.
-          bullets.push({ x: mx, y: my, a, life: BULLET_LIFE, fromX: -9, fromY: -9, straight: true });
-        }
-      }
-      return false;
-    };
-
-    // Beaten: it shakes apart in a string of explosions, then the level is won.
-    const updateBossDown = (dt) => {
-      const before = downT;
-      downT += dt;
-      if (boss.glitch) {
-        // it breaks up into loose pixels
-        if (Math.floor(before / 0.1) !== Math.floor(downT / 0.1)) {
-          sparkle(boss.x + Math.random() * GLITCH_SIZE, boss.top + Math.random() * GLITCH_SIZE, GLITCH_COLORS);
-        }
-        if (downT >= 1.8) {
-          boss.gone = true;
-          state = "run";
-          win();
-        }
-        return;
-      }
-      if (Math.floor(before / 0.15) !== Math.floor(downT / 0.15)) {
-        explode(boss.x + Math.random() * 4.8, BOSS_TOP + Math.random() * 6.4,
-          ["#ffd54a", "#ff8a3d", "#e04a2f", "#8c8c8c"]);
-      }
-      if (downT >= 1.8) {
-        boss.gone = true;
-        smoke(boss.x + 2.4, BOSS_TOP + 3.5, 40, 5);
-        state = "run";
-        win();
-      }
-    };
-
-    // Open any shut door you've reached (from either side). A door's letter
-    // is in its bottom square; the square above is door too.
-    const openDoors = () => {
-      const y0 = Math.floor(player.y), y1 = Math.floor(player.y + PLAYER_H - 0.01);
-      for (let x = Math.floor(player.x - 3); x <= Math.floor(player.x + PLAYER_W + 3); x++) {
-        if (x < 0 || x >= width) continue;
-        for (let y = y0; y <= Math.min(H - 1, y1 + 1); y++) {
-          const ch = grid[y][x];
-          if (!isDoor(ch) || y - 1 > y1 || y < y0) continue;
-          const gap = x >= player.x + PLAYER_W ? x - (player.x + PLAYER_W) : player.x - (x + 1);
-          if (gap > TILES[ch].reach) continue;
-          if (TILES[ch].locked) {
-            if (keys < 1) { tellOnce("lock", "This door is locked. Find a 🔑 key!"); continue; }
-            keys--;
-            showItems();
-          }
-          grid[y][x] = "/" + ch;
-          doorT[noteKey(x, y)] = time;
-        }
-      }
-    };
-
-    const solidAt = (x, y) =>
-      x >= 0 && x < width && y >= 0 && y < H &&
-      (isSolid(grid[y][x]) || (y + 1 < H && isDoor(grid[y + 1][x])));
-
-    // A fresh press while touching a Blink teleports instead of jumping.
-    // Holding jump doesn't count, so you don't chain through every Blink.
-    // Returns true when the press was used up closing a dialog, so the caller
-    // doesn't also treat it as "holding jump".
-    const pressJump = () => {
-      if (state === "cut") { boss.x = BOSS_X; endCut(); return true; } // skip the intro
-      if (state === "talk") {
-        // a short grace so a jump you were already mashing doesn't skip the words
-        if (time - talkAt > 0.35) { state = "run"; talk = null; }
-        return true;
-      }
-      if (state === "run") {
-        for (let y = Math.floor(player.y); y <= Math.floor(player.y + PLAYER_H - 0.01); y++) {
-          for (let x = Math.floor(player.x); x <= Math.floor(player.x + PLAYER_W - 0.01); x++) {
-            if (grid[y] && grid[y][x] === "I" && blink(x, y)) return;
-          }
-        }
-      }
-      doJump();
-    };
-
-    const doJump = () => {
-      if (state !== "run" || stopT > 0) return;
-      if (player.onGround || coyote > 0) {
-        player.vy = -JUMP_V;
-        player.onGround = false;
-        coyote = 0;
-        buffer = 0;
-      } else {
-        buffer = JUMP_BUFFER;
-      }
-    };
-
-    const explode = (cx, cy, colors) => {
-      for (let i = 0; i < 34; i++) {
-        const a = Math.random() * Math.PI * 2;
-        const sp = 3 + Math.random() * 11;
-        particles.push({
-          x: cx, y: cy,
-          vx: Math.cos(a) * sp,
-          vy: Math.sin(a) * sp - 4,
-          life: 0.5 + Math.random() * 0.6,
-          c: colors[(Math.random() * colors.length) | 0],
-        });
-      }
-    };
-
-    // g = this particle's own gravity (negative floats up), s = its size in blocks
-    const ember = () => {
-      particles.push({
-        x: player.x + Math.random() * PLAYER_W, y: player.y + Math.random() * PLAYER_H,
-        vx: (Math.random() - 0.5) * 2, vy: -1 - Math.random() * 3, g: -5,
-        life: 0.4 + Math.random() * 0.5,
-        c: ["#ffd54a", "#ff8a3d", "#e04a2f", "#ff5a1f"][(Math.random() * 4) | 0],
-      });
-    };
-
-    const puff = () => {
-      for (let i = 0; i < 16; i++) {
-        const s = 0.22 + Math.random() * 0.26;
-        particles.push({
-          x: player.x + PLAYER_W / 2 + (Math.random() - 0.5) * 0.9 - s / 2,
-          y: player.y + PLAYER_H / 2 + (Math.random() - 0.5) * 0.9 - s / 2,
-          vx: (Math.random() - 0.5) * 1.6, vy: -0.3 - Math.random() * 1.2, g: -1.5, s,
-          life: 0.35 + Math.random() * 0.3,
-          c: ["#ffffff", "#e6e6e6", "#cfcfcf"][(Math.random() * 3) | 0],
-        });
-      }
-    };
-
-    // Each kind of death looks different: TNT and walls go boom, lava and fire
-    // set you alight, a spike makes you tip over and puff away, a watcher deletes.
-    // A shield from the shop turns one mob hit (blaze, fireball, end mob, the boss) into
-    // a couple of seconds where mobs can't hurt you. Only mobs: saving you
-    // from lava or a pit would need somewhere safe to put you, and not every
-    // safe-looking square is one you can still beat the level from. It is
-    // used up for good straight away, even if you then quit the level.
-    const shielded = () => {
-      if (shieldT > 0) return true;
-      if (bag.shields < 1) return false;
-      bag.shields--;
-      saveBag(Object.assign(loadBag(), { shields: bag.shields }));
-      shieldEl.textContent = "🛡 " + bag.shields;
-      shieldT = SHIELD_TIME;
-      toast("🛡 Your shield saved you!");
-      sparkle(player.x + PLAYER_W / 2, player.y + PLAYER_H / 2, ["#3f7fd6", "#9cc4ff", "#ffffff"]);
-      return true;
-    };
-
-    const die = (kind = "boom", byMob = false) => {
-      if (state !== "run") return;
-      if (byMob && shielded()) return;
-      state = "dead";
-      deathKind = kind;
-      deadT = 0;
-      window.BDBadges.add("deaths");
-      if (run) run.deaths++;
-      if (lifeStep < 1 / STEP && !checkpoint) window.BDBadges.earn("oops");
-      poofed = false;
-      if (kind === "burn") {
-        for (let i = 0; i < 14; i++) ember();
-      } else if (kind !== "poof") {
-        if (kind === "megaboom") {
-          explode(player.x + PLAYER_W / 2, player.y + PLAYER_H / 2, ["#f08bff", "#c22fd0", "#ffd54a", "#ffffff"]);
-        }
-        explode(player.x + PLAYER_W / 2, player.y + PLAYER_H / 2,
-          kind === "delete" ? ["#b46bff", "#2a1240", "#f4f0ff", "#7a2fd0"]
-            : ["#ffd54a", "#ff8a3d", "#e04a2f", "#8c8c8c"]);
-      }
-      jumpBtn.disabled = true;
-    };
-
-    const boom = (kind) => {
-      if (state === "run") window.BDBadges.add("tnt");
-      die(kind);
-    };
-
-    const win = () => {
-      if (state !== "run") return;
-      const beatGhost = endRun(true);
-      const M = window.BDMusic, B = window.BDBadges;
-      B.cleared(bestKey(level), builtinLevels().map(bestKey));
-      // first, so their coins are in the bag before the bag is re-read below
-      if (inBoss && level.glitch) B.earn("glitch");
-      const daily = level.daily && level.daily === dayKey() ? dailyLevelDone() : null;
-      dailyNote("win");
-      if (run && !run.deaths) dailyNote("perfect");
-      if (inBoss) dailyNote("boss");
-      if (inBoss && !level.glitch) { B.earn("boss"); if (!sword) B.earn("bare"); }
-      if (run && !run.deaths) B.earn("perfect");
-      if (!M.playing) B.earn("silent");
-      if (petBase === "petDog" && M.playing === "woof") B.earn("goodboy");
-      state = "win";
-      setBest(bestKey(level), score);
-      // re-read first: a shield used on the way has already been saved
-      Object.assign(bag, loadBag(), { rods, pearls, eyes });
-      bag.coins += score + (beatGhost ? GHOST_BONUS : 0);
-      bag.mega += megas;
-      saveBag(bag);
-      jumpBtn.disabled = true;
-      explode(player.x + PLAYER_W / 2, player.y + PLAYER_H / 2,
-        ["#4fe0d8", "#b6fffa", "#ffd54a", "#c58bff"]);
-      const carried = chain ? chain.carried : 0;
-      const runTotal = carried + score;
-      const more = chain && chain.i + 1 < chain.count;
-
-      const box = el("div", "overlay-msg");
-      box.innerHTML =
-        `<div class="big">${more || !chain ? "Level Complete!" : "You Finished!"}</div>` +
-        (beatGhost ? `<div class="big" style="font-size:1.1rem">👻 NEW BEST! You beat your ghost! +${GHOST_BONUS} coins</div>` : "") +
-        (daily ? `<div class="big" style="font-size:1.1rem">📅 Daily level done! 🔥 ${daily.streak}-day streak · ${daily.lines.join(" · ")}</div>` : "") +
-        `<div>Score: ${score} · Best: ${getBest(bestKey(level))}</div>` +
-        `<div>+${score} coins${megas ? ` · +${megas} megacoins` : ""} · ` +
-        `you now have ${bag.coins} coins${bag.mega ? ` and ${bag.mega} megacoins` : ""}</div>` +
-        (hasRods || hasPearls || hasEyes
-          ? `<div>In your inventory: ${rods} 🪄 · ${pearls} 🔮 · ${eyes} 👁</div>` : "") +
-        (chain && chain.count > 1
-          ? `<div class="run-total">Run total: ${runTotal} 💎` +
-            (more ? ` · ${chain.count - chain.i - 1} to go` : ` · all ${chain.count} levels!`) +
-            `</div>`
-          : "");
-      const row = el("div", "row");
-      row.style.justifyContent = "center";
-      row.style.marginTop = "10px";
-      if (more) {
-        const next = el("button", "green small", "▶ Next level");
-        next.onclick = () => { stop(); chain.playNext(runTotal); };
-        row.appendChild(next);
-      }
-      const again = el("button", more ? "small" : "green small", "▶ Play again");
-      again.onclick = () => reset(true);
-      const out = el("button", "small", fromEditor ? "← Editor" : "← Levels");
-      out.onclick = () => { stop(); onExit(); };
-      row.append(again, out);
-      box.appendChild(row);
-      msgSlot.innerHTML = "";
-      msgSlot.appendChild(box);
-      msgSlot.style.marginTop = "8px";
-    };
-
-    const sparkle = (x, y, colors) => {
-      for (let i = 0; i < 10; i++) {
-        particles.push({ x, y, vx: (Math.random() - 0.5) * 6, vy: -2 - Math.random() * 4,
-          life: 0.4 + Math.random() * 0.3, c: colors[(Math.random() * colors.length) | 0] });
-      }
-    };
-
-    const gotRod = (x, y) => {
-      rods++;
-      showItems();
-      sparkle(x, y, ["#ffe98a", "#f0a020"]);
-    };
-
-    // Jump to the nearest Blink further right. Only forward, so Blinks
-    // can't be used to loop back and farm gems.
-    const blink = (fromX, fromY) => {
-      let best = null, bestD = Infinity;
-      for (let y = 0; y < H; y++) {
-        for (let x = fromX + 1; x < width; x++) {
-          if (grid[y][x] !== "I") continue;
-          const d = (x - fromX) ** 2 + (y - fromY) ** 2;
-          if (d < bestD) { bestD = d; best = { x, y }; }
-        }
-      }
-      if (!best) return false;
-      sparkle(player.x + PLAYER_W / 2, player.y + PLAYER_H / 2, ["#b46bff", "#f4f0ff"]);
-      player.x = best.x + (1 - PLAYER_W) / 2;
-      player.y = best.y + (1 - PLAYER_H);
-      player.vy = 0;
-      // The game holds still while the camera glides over, so the jump is
-      // easy on the eyes and you're never dropped straight into danger.
-      warp = { t: 0, from: camX };
-      return true;
-    };
-
-    const mobSolid = (x0, y0, x1, y1) => {
-      for (let y = Math.floor(y0); y <= Math.floor(y1 - 0.001); y++) {
-        for (let x = Math.floor(x0); x <= Math.floor(x1 - 0.001); x++) {
-          if (solidAt(x, y)) return true;
-        }
-      }
-      return false;
-    };
-
-    // Is any part of you inside this Watcher's cone?
-    const canSee = (w) => {
-      const i = 0.14;
-      const xs = [player.x + i, player.x + PLAYER_W / 2, player.x + PLAYER_W - i];
-      const ys = [player.y + i, player.y + PLAYER_H / 2, player.y + PLAYER_H - i];
-      return xs.some((px) => ys.some((py) => inCone(grid, w.x, w.y, px, py)));
-    };
-    // timed from the (re)start, so each attempt sees the same rhythm, like a rhythm game
-    const eyeOpen = (w) => w.stare || (runT + w.ph) % WATCH_CYCLE < WATCH_OPEN;
-
-    // Player's hit box for things that move, a little forgiving like items.
-    const touches = (x0, y0, x1, y1) => {
-      const inset = 0.14;
-      return x1 > player.x + inset && x0 < player.x + PLAYER_W - inset &&
-        y1 > player.y + inset && y0 < player.y + PLAYER_H - inset;
-    };
-    const onScreen = (x) => x >= camX - 1 && x < camX + VIEW_COLS + 0.5;
-
-    // Moving lava, shooters and their stars. Returns true if you died.
-    const updateHazards = (dt) => {
-      for (const m of movers) {
-        if (!m.active && onScreen(m.x)) m.active = true;
-        if (!m.active || m.done) continue;
-        m.t += dt * (m.dir < 0 ? LAVA_RISE : LAVA_FALL);
-        if (m.t < 1) continue;
-        m.t = 0;
-        // Grow one block into empty air; anything else (ground, an item,
-        // the edge of the level) stops the flow for good.
-        const next = m.tip + m.dir;
-        const there = next >= 0 && next < H ? grid[next][m.x] : null;
-        const soak = there !== null && LOGGABLE.includes(baseOf(there));
-        if (there !== AIR && !soak) { m.done = true; continue; }
-        grid[next][m.x] = soak ? FLOWED + there : FLOWED;
-        m.tip = next;
-      }
-
-      for (const sh of shooters) {
-        if (!onScreen(sh.x)) continue;
-        sh.t -= dt;
-        if (sh.t > 0) continue;
-        sh.t = SHOOT_EVERY;
-        const bx = sh.x + 0.5, by = sh.y + 0.5;
-        const a = Math.atan2(player.y + PLAYER_H / 2 - by, player.x + PLAYER_W / 2 - bx);
-        bullets.push({ x: bx, y: by, a, life: BULLET_LIFE, fromX: sh.x, fromY: sh.y });
-      }
-
-      for (const b of bullets) {
-        // steer toward the player, but only so fast — you can outrun a turn
-        const want = Math.atan2(player.y + PLAYER_H / 2 - b.y, player.x + PLAYER_W / 2 - b.x);
-        let diff = want - b.a;
-        while (diff > Math.PI) diff -= Math.PI * 2;
-        while (diff < -Math.PI) diff += Math.PI * 2;
-        if (!b.straight) b.a += clamp(diff, -BULLET_TURN * dt, BULLET_TURN * dt);
-        const sp = b.straight ? BOSS_SHOT_SPEED : BULLET_SPEED;
-        b.x += Math.cos(b.a) * sp * dt;
-        b.y += Math.sin(b.a) * sp * dt;
-        b.life -= dt;
-        const cx = Math.floor(b.x), cy = Math.floor(b.y);
-        if ((cx !== b.fromX || cy !== b.fromY) && solidAt(cx, cy)) b.life = 0;
-        if (b.life > 0 && touches(b.x - 0.2, b.y - 0.2, b.x + 0.2, b.y + 0.2)) {
-          die("boom", !!b.straight); // the boss's stars count as a mob hit, a Shooter block's don't
-          return true;
-        }
-      }
-      bullets = bullets.filter((b) => b.life > 0);
-
-      for (const sp of spawners) {
-        if (!onScreen(sp.x) || sp.alive >= BLAZE_MAX) continue;
-        sp.t -= dt;
-        if (sp.t > 0) continue;
-        sp.t = SPAWN_EVERY;
-        // come out of whichever side of the cage is open, top first
-        const exits = [[0, -1], [-1, 0], [1, 0], [0, 1]];
-        const ex = exits.find(([dx, dy]) => {
-          const cx = sp.x + dx, cy = sp.y + dy;
-          return cx >= 0 && cx < width && cy >= 0 && cy < H && !isSolid(grid[cy][cx]);
-        });
-        if (!ex) continue;
-        const bx = sp.x + ex[0] + 0.5, by = sp.y + ex[1] + 0.5;
-        sp.alive++;
-        blazes.push({ x: bx, y: by, homeX: bx, homeY: by, t: BLAZE_SHOOT * 0.6, sp, ph: Math.random() * 6 });
-      }
-
-      for (const bz of blazes) {
-        // drift toward you, but stay near the spawner, bobbing up and down
-        const want = clamp(player.x + PLAYER_W / 2, bz.homeX - BLAZE_REACH, bz.homeX + BLAZE_REACH);
-        bz.x += clamp(want - bz.x, -BLAZE_DRIFT * dt, BLAZE_DRIFT * dt);
-        bz.y = bz.homeY + Math.sin(time * 2 + bz.ph) * 0.35;
-        const r = 0.4;
-        if (touches(bz.x - r, bz.y - r, bz.x + r, bz.y + r)) {
-          // landing on top pops it and bounces you; any other touch burns
-          if (player.vy > 0 && player.y + PLAYER_H < bz.y + 0.1) {
-            bz.dead = true;
-            bz.sp.alive--;
-            player.vy = -JUMP_V * 0.85;
-            explode(bz.x, bz.y, ["#ffd54a", "#ff8a3d", "#ffe98a"]);
-            gotRod(bz.x, bz.y);
-            continue;
-          }
-          die("burn", true);
-          return true;
-        }
-        if (!onScreen(bz.x)) continue;
-        bz.t -= dt;
-        if (bz.t > 0) continue;
-        bz.t = BLAZE_SHOOT;
-        const a = Math.atan2(player.y + PLAYER_H / 2 - bz.y, player.x + PLAYER_W / 2 - bz.x);
-        fireballs.push({ x: bz.x, y: bz.y, vx: Math.cos(a) * FIREBALL_SPEED,
-          vy: Math.sin(a) * FIREBALL_SPEED, life: BULLET_LIFE });
-      }
-      blazes = blazes.filter((bz) => !bz.dead);
-
-      for (const fb of fireballs) {
-        fb.x += fb.vx * dt;
-        fb.y += fb.vy * dt;
-        fb.life -= dt;
-        if (solidAt(Math.floor(fb.x), Math.floor(fb.y))) fb.life = 0;
-        if (fb.life > 0 && touches(fb.x - 0.2, fb.y - 0.2, fb.x + 0.2, fb.y + 0.2)) {
-          die("burn", true);
-          return true;
-        }
-      }
-      fireballs = fireballs.filter((fb) => fb.life > 0);
-
-      for (const w of watchers) {
-        if (onScreen(w.x) && eyeOpen(w) && canSee(w)) {
-          die("delete");
-          return true;
-        }
-      }
-
-      for (const m of mobs) {
-        if (m.gone) continue;
-        if (m.kind === "N" && !m.awake &&
-            m.x - player.x < ENDER_NOTICE && m.x > player.x + PLAYER_W) {
-          // teleport to stand on the ground a few blocks in front of you
-          m.awake = true;
-          const cx = Math.floor(player.x + ENDER_AHEAD);
-          for (let y = Math.max(1, Math.floor(player.y)); y < H - 1; y++) {
-            if (!solidAt(cx, y) && !solidAt(cx, y - 1) && solidAt(cx, y + 1)) {
-              sparkle(m.x + MOB_W / 2, m.y + MOB_H / 2, ["#e08cff", "#1c1c22"]);
-              m.x = cx + (1 - MOB_W) / 2;
-              m.y = y + 1 - MOB_H;
-              m.vy = 0;
-              sparkle(m.x + MOB_W / 2, m.y + MOB_H / 2, ["#e08cff", "#1c1c22"]);
-              break;
-            }
-          }
-        }
-        // woken watchers run after you, hopping up steps in the way
-        if ((m.kind === "V" || m.kind === "Q") && m.awake) {
-          const dir = Math.sign(player.x - m.x) || 1;
-          const nx = m.x + dir * CHASE_SPEED * dt;
-          if (!mobSolid(nx, m.y, nx + MOB_W, m.y + MOB_H)) m.x = nx;
-          else if (m.onGround) m.vy = -JUMP_V;
-          if (m.kind === "Q") {
-            m.glitchT -= dt;
-            if (m.glitchT <= 0) {
-              m.glitchT = GLITCH_EVERY;
-              const gx = m.x + dir * GLITCH_HOP;
-              if (!mobSolid(gx, m.y, gx + MOB_W, m.y + MOB_H)) {
-                sparkle(m.x + MOB_W / 2, m.y + MOB_H / 2, ["#ff4fd8", "#4fffb0"]);
-                m.x = gx;
-              }
-            }
-          }
-        }
-        m.vy += GRAVITY * dt;
-        const ny = m.y + m.vy * dt;
-        m.onGround = false;
-        if (m.vy > 0 && mobSolid(m.x, ny, m.x + MOB_W, ny + MOB_H)) {
-          m.y = Math.floor(ny + MOB_H) - MOB_H;
-          m.vy = 0;
-          m.onGround = true;
-        } else if (m.vy < 0 && mobSolid(m.x, ny, m.x + MOB_W, ny + MOB_H)) {
-          m.vy = 0;
-        } else {
-          m.y = ny;
-        }
-        if (m.y > H + 2) { m.gone = true; continue; }
-
-        if (!touches(m.x, m.y, m.x + MOB_W, m.y + MOB_H)) continue;
-        const stomp = player.vy > 0 && player.y + PLAYER_H < m.y + 0.45;
-        if (stomp) {
-          player.vy = -JUMP_V * 0.85;
-          if (m.kind === "N") {
-            m.gone = true;
-            sparkle(m.x + MOB_W / 2, m.y + MOB_H / 2, ["#e08cff", "#1c1c22", "#ffffff"]);
-          } else if (!m.awake) {
-            m.awake = true; // now it's noticed you
-          }
-          continue;
-        }
-        // a sleeping end watcher doesn't notice you brushing past; a corrupted one does
-        if (m.kind === "V" && !m.awake) continue;
-        die("delete", true);
-        return true;
-      }
-      mobs = mobs.filter((m) => !m.gone);
-      return false;
-    };
-
-    // --- physics ---
-    const update = (dt) => {
-      time += dt;
-      runT += dt;
-
-      for (const p of particles) {
-        p.vy += (p.g === undefined ? 26 : p.g) * dt;
-        p.x += p.vx * dt;
-        p.y += p.vy * dt;
-        p.life -= dt;
-      }
-      particles = particles.filter((p) => p.life > 0);
-
-      if (warp) {
-        warp.t += dt;
-        const k = clamp(warp.t / WARP_TIME, 0, 1);
-        const ease = k * k * (3 - 2 * k);
-        const to = clamp(player.x - VIEW_COLS * 0.32, 0, Math.max(0, width - VIEW_COLS));
-        camX = warp.from + (to - warp.from) * ease;
-        if (k >= 1) {
-          warp = null;
-          sparkle(player.x + PLAYER_W / 2, player.y + PLAYER_H / 2, ["#b46bff", "#f4f0ff"]);
-        }
-        return;
-      }
-
-      if (state === "dead") {
-        deadT += dt;
-        if (deathKind === "burn" && deadT < 0.7 && Math.random() < 0.5) ember();
-        if (deathKind === "poof" && !poofed && deadT >= POOF_AFTER) { poofed = true; puff(); }
-        if (deadT > 0.9) { if (level.endless) endlessOver(); else reset(); }
-        return;
-      }
-      if (state === "cut") { updateCut(dt); return; }
-      if (state === "bossdown") { updateBossDown(dt); return; }
-      if (state !== "run") return;
-
-      if (boostCD > 0) boostCD -= dt;
-      openDoors();
-      if (effect) {
-        effectT -= dt;
-        if (effectT <= 0) effect = null;
-      }
-      if (shieldT > 0) shieldT -= dt;
-
-      let speed = effect === "fast" ? SPEED_FAST : effect === "slow" ? SPEED_SLOW : SPEED_BASE;
-      if (level.endless) {
-        const lap = lapSpeed(player.x);
-        speed *= lap;
-        if (lap > 1) tellOnce("lap" + lap, `⚡ FASTER! Speed +${Math.round((lap - 1) * 100)}%`);
-      }
-
-      // horizontal — always forward, unless a Free move block handed you the controls
-      const oldX = player.x;
-      const dir = free ? ((moveR ? 1 : 0) - (moveL ? 1 : 0)) * (flipT > 0 ? -1 : 1) : 1;
-      if (stopT > 0) stopT -= dt;
-      else player.x += dir * speed * dt;
-      if (knock) {
-        // the shove from stomping the boss, fading out over about half a second
-        player.x += knock * dt;
-        knock *= Math.max(0, 1 - 4 * dt);
-        if (Math.abs(knock) < 0.5) knock = 0;
-      }
-      if (player.x < 0) player.x = 0;
-      if (inBoss) player.x = Math.min(player.x, width - PLAYER_W);
-      const y0 = Math.floor(player.y + 0.02);
-      const y1 = Math.floor(player.y + PLAYER_H - 0.02);
-      const rightCol = Math.floor(player.x + PLAYER_W);
-      let hitRow = -1;
-      for (let y = y0; y <= y1; y++) {
-        if (solidAt(rightCol, y)) { hitRow = y; break; }
-      }
-      if (hitRow >= 0) {
-        const overlap = player.y + PLAYER_H - hitRow;
-        if (grid[hitRow][rightCol] === "m" || grid[hitRow][rightCol] === "0") {
-          // Slime launches you off any side, not just the top.
-          player.x = oldX;
-          player.vy = grid[hitRow][rightCol] === "0" ? -MEGA_BOUNCE_V : -BOUNCE_V;
-          player.onGround = false;
-          rot = 0;
-        } else if (player.vy >= 0 && overlap < 0.35) {
-          // Clipped the very top of the block on the way down? Slide up onto
-          // the ledge instead of exploding — much kinder than pure GD rules.
-          player.y = hitRow - PLAYER_H;
-          player.vy = 0;
-          player.onGround = true;
-          rot = 0;
-        } else {
-          player.x = oldX;
-          // ran straight into a wall — only deadly when you can't stop yourself
-          if (!free) { die(); return; }
-        }
-      }
-      if (player.x < oldX) {
-        const leftCol = Math.floor(player.x);
-        for (let y = y0; y <= y1; y++) {
-          if (solidAt(leftCol, y)) { player.x = oldX; break; }
-        }
-      }
-
-      // vertical
-      player.vy += GRAVITY * dt;
-      if (flying) {
-        if (holding) {
-          player.vy = Math.max(player.vy - FLY_THRUST * dt, -FLY_UP_V);
-          if (Math.random() < 0.35) {
-            particles.push({
-              x: player.x + PLAYER_W * 0.3, y: player.y + PLAYER_H,
-              vx: -2 - Math.random() * 3, vy: 2 + Math.random() * 3,
-              life: 0.3 + Math.random() * 0.3,
-              c: ["#ffd54a", "#ff8a3d", "#e04a2f", "#c58bff"][(Math.random() * 4) | 0],
-            });
-          }
-        } else {
-          player.vy = Math.min(player.vy, GLIDE_FALL);
-        }
-      }
-      player.y += player.vy * dt;
-      if (flying && player.y < 0) { player.y = 0; player.vy = Math.max(0, player.vy); }
-      player.onGround = false;
-      const cx0 = Math.floor(player.x + 0.02);
-      const cx1 = Math.floor(player.x + PLAYER_W - 0.02);
-
-      if (player.vy > 0) {
-        const footRow = Math.floor(player.y + PLAYER_H);
-        for (let x = cx0; x <= cx1; x++) {
-          if (solidAt(x, footRow)) {
-            player.y = footRow - PLAYER_H;
-            if (grid[footRow][x] === "m" || grid[footRow][x] === "0") {
-              player.vy = grid[footRow][x] === "0" ? -MEGA_BOUNCE_V : -BOUNCE_V;
-              rot = 0;
-            } else {
-              player.vy = 0;
-              player.onGround = true;
-              rot = 0;
-            }
-            break;
-          }
-        }
-      } else if (player.vy < 0) {
-        const headRow = Math.floor(player.y);
-        for (let x = cx0; x <= cx1; x++) {
-          if (solidAt(x, headRow)) {
-            player.y = headRow + 1;
-            player.vy = 0;
-            break;
-          }
-        }
-      }
-
-      coyote = player.onGround ? COYOTE : Math.max(0, coyote - dt);
-      if (buffer > 0) {
-        buffer -= dt;
-        if (player.onGround) doJump();
-      }
-      if (holding && player.onGround) doJump();
-      if (flying) rot = holding ? -0.25 : 0.1; // nose up when climbing
-      else if (!player.onGround) rot += dt * 7;
-
-      // items — a slightly smaller box, so near-misses are forgiving
-      const inset = 0.14;
-      const ix0 = Math.floor(player.x + inset);
-      const ix1 = Math.floor(player.x + PLAYER_W - inset);
-      const iy0 = Math.floor(player.y + inset);
-      const iy1 = Math.floor(player.y + PLAYER_H - inset);
-      // mega TNT doesn't wait to be touched: getting near is enough
-      for (let y = Math.floor(player.y - MEGA_BLAST); y <= Math.floor(player.y + PLAYER_H + MEGA_BLAST); y++) {
-        for (let x = Math.floor(player.x - MEGA_BLAST); x <= Math.floor(player.x + PLAYER_W + MEGA_BLAST); x++) {
-          if (x < 0 || x >= width || y < 0 || y >= H || state !== "run") continue;
-          const near = grid[y][x];
-          // and the same for mega End TNT, mega lava and mega fire. Ask what the
-          // mega square started as: lava that later flowed into a square where
-          // a mega item was picked up is ordinary lava.
-          const was = MEGA_BASE[looks[noteKey(x, y)]];
-          if (near === "8" || (near === "T" && was === "T")) {
-            boom("megaboom");
-            return;
-          }
-          if (near === was && "LUDF".includes(near)) {
-            die("burn");
-            return;
-          }
-        }
-      }
-      for (let y = iy0; y <= iy1; y++) {
-        for (let x = ix0; x <= ix1; x++) {
-          if (x < 0 || x >= width || y < 0 || y >= H) continue;
-          const ch = grid[y][x];
-          if (ch === "t" || ch === "T") { boom(); return; }
-          if (ch === "8") { boom("megaboom"); return; }
-          if (isHiddenTnt(ch)) { boom(); return; }
-          if (ch === "A") { die("poof"); return; }
-          // The three invisible blocks work once each, then clear themselves
-          // (they come back when the level resets).
-          if (ch === "K") {
-            grid[y][x] = AIR;
-            talk = notes[noteKey(x, y)] || "…";
-            talkAt = time;
-            state = "talk";
-            holding = false;
-            continue;
-          }
-          if (ch === "O") {
-            grid[y][x] = AIR;
-            stopT = notes[noteKey(x, y)] || STOP_DEFAULT;
-          } else if (ch === "M") {
-            grid[y][x] = AIR;
-            setFree(true);
-          }
-          if (ch === "F" || isLava(ch)) {
-            die("burn");
-            return;
-          }
-          if (ch === "C") {
-            // Wings come off here, so each stretch between save points
-            // has to earn its own pair.
-            flying = false;
-            setBoost(false);
-            setFree(false); // like wings, free moving ends at a save point
-            grid[y][x] = "checkpointOn";
-            checkpoint = { x, y, score, megas, rods, pearls, eyes, keys, grid: grid.map((r) => r.slice()) };
-            toast("Checkpoint!");
-          }
-          if (COIN_VALUE[ch]) {
-            grid[y][x] = AIR;
-            score += COIN_VALUE[ch] * megaTimes(x, y);
-            scoreEl.textContent = "💎 " + score;
-            if (ch === "d") { window.BDBadges.add("diamonds", megaTimes(x, y)); dailyNote("diamond", megaTimes(x, y)); }
-            if (petBase) window.BDMusic.sfx(PET_SOUND[petBase]);
-          } else if (ch === "@") {
-            grid[y][x] = AIR;
-            megas += MEGATITE_PAYS * megaTimes(x, y);
-            megaEl.textContent = "Ⓜ " + megas;
-            sparkle(x + 0.5, y + 0.5, ["#f08bff", "#c22fd0", "#ffd54a"]);
-          } else if (ch === "b") {
-            effect = "fast";
-            effectT = EFFECT_TIME * megaTimes(x, y);
-          } else if (ch === "w") {
-            effect = "slow";
-            effectT = EFFECT_TIME * megaTimes(x, y);
-          } else if (ch === "r") {
-            grid[y][x] = AIR;
-            rods += megaTimes(x, y) - 1;
-            gotRod(x + 0.5, y + 0.5);
-          } else if (ch === "o") {
-            grid[y][x] = AIR;
-            eyes += megaTimes(x, y);
-            showItems();
-            sparkle(x + 0.5, y + 0.5, ["#7be0c2", "#c8fff0"]);
-          } else if (ch === "9") {
-            grid[y][x] = AIR;
-            pearls += megaTimes(x, y);
-            showItems();
-            sparkle(x + 0.5, y + 0.5, ["#1c6b60", "#8ff0dc"]);
-          } else if (ch === KEY) {
-            grid[y][x] = AIR;
-            keys++;
-            showItems();
-            sparkle(x + 0.5, y + 0.5, ["#ffd54a", "#a87a12", "#ffffff"]);
-          } else if (ch === "H") {
-            const made = Math.min(rods, pearls);
-            if (made) {
-              rods -= made;
-              pearls -= made;
-              eyes += made;
-              showItems();
-              sparkle(x + 0.5, y + 0.2, ["#7be0c2", "#c8fff0", "#ffe98a"]);
-              toast(made === 1 ? "Crafted an eye of ender!" : `Crafted ${made} eyes of ender!`);
-            } else if (!eyes) {
-              tellOnce("craft", "Crafting needs a blaze rod and an ender pearl");
-            }
-          } else if (ch === "R") {
-            if (eyes) {
-              eyes--;
-              framesLeft--;
-              grid[y][x] = "frameOn";
-              showItems();
-              sparkle(x + 0.5, y + 0.2, ["#7be0c2", "#c8fff0"]);
-              if (!framesLeft) toast("The boss portal is open!");
-            } else {
-              tellOnce("frame", "This frame needs an eye of ender");
-            }
-          } else if (ch === "f") {
-            grid[y][x] = AIR;
-            flying = true;
-            if (megaAt(x, y)) setBoost(true);
-          } else if (ch === "E") {
-            win();
-            return;
-          } else if (ch === "G") {
-            // Shut until every portal frame in the level has its eye. You run
-            // straight through a shut one and the level carries on.
-            if (framesLeft) {
-              tellOnce("portal", framesLeft === 1 ? "The boss portal needs 1 more eye"
-                : `The boss portal needs ${framesLeft} more eyes`);
-              continue;
-            }
-            enterBoss();
-            return;
-          }
-        }
-      }
-
-      if (updateHazards(dt)) return;
-      if (boss && updateBoss(dt)) return;
-
-      if (player.y > H + 1) {
-        die();
-        return;
-      }
-      if (player.x > width) { win(); return; }
-
-      camX = clamp(player.x - VIEW_COLS * 0.32, 0, Math.max(0, width - VIEW_COLS));
-
-      const pct = clamp(Math.round((player.x / width) * 100), 0, 100);
-      fill.style.width = level.endless ? "0%" : pct + "%";
-      pctEl.textContent = level.endless ? "🏃 " + Math.floor(player.x) : pct + "%";
-    };
-
-    // --- rendering ---
-    const drawBackground = () =>
-      Art.drawBackground(ctx, inBoss ? arenaBgOf(level)
-        : level.zones ? level.zones[Math.floor((camX + VIEW_COLS / 2) / level.zoneW) % level.zones.length]
-        : bgOf(level), canvas.width, canvas.height, camX * TS, TS, time, effect);
-
-    // The ghost: you, tinted glowing blue on a scratch canvas, see-through.
-    const ghostCv = el("canvas");
-    const drawGhost = () => {
-      if (!showGhost || inBoss || !best || !best.path) return;
-      const p = best.path, n = p.length / 3;
-      const f = runStep / GHOST_EVERY - 1;
-      if (n < 2 || f >= n - 1) return; // the ghost's run is over
-      const i = Math.max(0, Math.floor(f)), k = clamp(f - i, 0, 1);
-      const gx = p[i * 3] + (p[i * 3 + 3] - p[i * 3]) * k;
-      const gy = p[i * 3 + 1] + (p[i * 3 + 4] - p[i * 3 + 1]) * k;
-      const pw = PLAYER_W * TS, ph = PLAYER_H * TS;
-      ghostCv.width = Math.ceil(pw);
-      ghostCv.height = Math.ceil(ph);
-      const g = ghostCv.getContext("2d");
-      drawPlayer(g, 0, 0, ghostCv.width, ghostCv.height, 0, hero);
-      g.globalCompositeOperation = "source-atop";
-      g.fillStyle = "rgba(90, 180, 255, 0.75)";
-      g.fillRect(0, 0, ghostCv.width, ghostCv.height);
-      ctx.save();
-      ctx.globalAlpha = 0.55;
-      ctx.shadowColor = "#7fd0ff";
-      ctx.shadowBlur = 16;
-      ctx.translate((gx + PLAYER_W / 2 - camX) * TS, (gy + PLAYER_H / 2) * TS);
-      ctx.rotate(p[i * 3 + 2]);
-      ctx.drawImage(ghostCv, -pw / 2, -ph / 2);
-      ctx.restore();
-    };
-
-    // The Glitch's drop: the player flickers pink and blue
-    const glitchFx = glitchLookOn();
-    const fxCv = el("canvas");
-    const drawGlitchFx = (angle, pw, ph) => {
-      if (Math.random() < 0.5) return;
-      fxCv.width = Math.ceil(pw);
-      fxCv.height = Math.ceil(ph);
-      const f = fxCv.getContext("2d");
-      drawPlayer(f, 0, 0, fxCv.width, fxCv.height, 0, hero);
-      f.globalCompositeOperation = "source-atop";
-      f.fillStyle = Math.random() < 0.5 ? "rgba(255, 43, 214, 0.8)" : "rgba(33, 230, 255, 0.8)";
-      f.fillRect(0, 0, fxCv.width, fxCv.height);
-      ctx.save();
-      ctx.globalAlpha = 0.6;
-      ctx.translate((player.x + PLAYER_W / 2 - camX) * TS + (Math.random() - 0.5) * 8, (player.y + PLAYER_H / 2) * TS);
-      ctx.rotate(angle);
-      ctx.drawImage(fxCv, -pw / 2, -ph / 2);
-      ctx.restore();
-    };
-
-    // Badge Master's golden crown, turning with the player
-    const crownOn = window.BDBadges.has("master");
-    const drawCrown = (angle, pw, ph) => {
-      if (!crownOn) return;
-      const u = pw / 7;
-      ctx.save();
-      ctx.translate((player.x + PLAYER_W / 2 - camX) * TS, (player.y + PLAYER_H / 2) * TS);
-      ctx.rotate(angle);
-      const top = -ph / 2 - u * 3;
-      ctx.fillStyle = "#ffd54a";
-      ctx.fillRect(-u * 2.5, top + u * 1.5, u * 5, u * 1.5);
-      for (const x of [-2.5, -0.5, 1.5]) ctx.fillRect(x * u, top, u, u * 1.5);
-      ctx.fillStyle = "#e53935";
-      ctx.fillRect(-u * 0.5, top + u * 1.8, u, u * 0.9);
-      ctx.fillStyle = "#fff6c2";
-      ctx.fillRect(-u * 2.5, top + u * 1.5, u * 5, u * 0.35);
-      ctx.restore();
-    };
-
-    // the 7-day streak reward: a rainbow along where you've just been
-    const rainbow = trailOn();
-    const drawTrail = () => {
-      if (!rainbow || trail.length < 4) return;
-      const s = TS * 0.2;
-      for (let i = 0; i < trail.length; i += 2) {
-        ctx.fillStyle = `hsla(${(i * 12 + time * 240) % 360}, 90%, 60%, ${((i / trail.length) * 0.8).toFixed(2)})`;
-        ctx.fillRect((trail[i] + PLAYER_W / 2 - camX) * TS - s / 2, (trail[i + 1] + PLAYER_H * 0.65) * TS - s / 2, s, s);
-      }
-    };
-
-    // The pet runs where you were a moment ago, so it jumps when you jump.
-    const drawPet = () => {
-      const sp = pet && Art.SPRITES[pet];
-      if (!sp) return;
-      const sw = sp.width || sp.naturalWidth, sh = sp.height || sp.naturalHeight;
-      const h = TS * 0.6, w = (h * sw) / sh;
-      if (STILL_PETS.includes(petBase)) {
-        // sits on the start block of whatever you're playing (the boss arena too)
-        ctx.save();
-        ctx.imageSmoothingEnabled = false;
-        ctx.drawImage(sp, (spawn.x + 0.5 - camX) * TS - w / 2, (spawn.y + 1) * TS - h, w, h);
-        ctx.restore();
-        return;
-      }
-      if (trail.length < 2) return;
-      const fly = FLYING_PETS.includes(petBase);
-      const lift = fly ? TS * (0.55 + 0.08 * Math.sin(time * 6)) : 0;
-      ctx.save();
-      ctx.imageSmoothingEnabled = false;
-      ctx.drawImage(sp, (trail[0] + PLAYER_W / 2 - camX) * TS - w / 2 - TS * 0.3,
-        (trail[1] + PLAYER_H) * TS - h - lift, w, h);
-      ctx.restore();
-    };
-
-    // The player flashing red as they tip over, the way a beaten mob does.
-    // Tinted on a scratch canvas so only the player's own pixels turn red.
-    const hurtCv = el("canvas");
-    const drawHurtPlayer = (cx, cy, pw, ph, angle) => {
-      hurtCv.width = Math.ceil(pw);
-      hurtCv.height = Math.ceil(ph);
-      const h = hurtCv.getContext("2d");
-      drawPlayer(h, 0, 0, hurtCv.width, hurtCv.height, 0, hero);
-      h.globalCompositeOperation = "source-atop";
-      h.fillStyle = "rgba(255, 40, 40, 0.55)";
-      h.fillRect(0, 0, hurtCv.width, hurtCv.height);
-      ctx.save();
-      ctx.translate(cx, cy);
-      ctx.rotate(angle);
-      ctx.drawImage(hurtCv, -pw / 2, -ph / 2);
-      ctx.restore();
-    };
-
-    const drawGlitch = () => {
-      const g = boss;
-      if (g.gone) return;
-      const rnd = () => GLITCH_COLORS[(Math.random() * GLITCH_COLORS.length) | 0];
-      // glitched squares: fizzing pixels and a pink outline
-      for (const c of g.broken) {
-        if (c.fixed) continue;
-        for (let i = 0; i < 6; i++) {
-          ctx.fillStyle = rnd();
-          ctx.fillRect((c.x - camX) * TS + Math.random() * TS * 0.75, c.y * TS + Math.random() * TS * 0.8, TS * 0.25, TS * 0.2);
-        }
-        ctx.strokeStyle = "#ff2bd6";
-        ctx.lineWidth = 3;
-        ctx.strokeRect((c.x - camX) * TS + 2, c.y * TS + 2, TS - 4, TS - 4);
-      }
-      const solid = g.mode === "solid";
-      const body = (x, top, real) => {
-        const px = (x - camX) * TS, py = top * TS, size = GLITCH_SIZE * TS, n = 8, cell = size / n;
-        const seed = Math.floor(time * 10);
-        ctx.save();
-        if (state === "bossdown") ctx.globalAlpha = clamp(1.2 - downT / 1.8, 0, 1);
-        else if (!solid) ctx.globalAlpha = 0.45 + 0.2 * Math.sin(time * 13);
-        else if (real && g.hurtT > 0 && Math.sin(time * 40) > 0) ctx.globalAlpha = 0.35;
-        for (let yy = 0; yy < n; yy++) {
-          for (let xx = 0; xx < n; xx++) {
-            const h = (xx * 73 + yy * 151 + seed * 197 + (real ? 0 : 31)) % 97;
-            if (h < 12 && !solid) continue; // holes while it's not solid
-            ctx.fillStyle = GLITCH_COLORS[h % GLITCH_COLORS.length];
-            const jx = h % 7 === 0 ? (Math.random() - 0.5) * cell : 0;
-            ctx.fillRect(px + xx * cell + jx, py + yy * cell, cell + 1, cell + 1);
-          }
-        }
-        const look = clamp(player.x - x, -1, 1) * cell * 0.4;
-        for (const ex of [1.5, 5]) {
-          ctx.fillStyle = "#ffffff";
-          ctx.fillRect(px + ex * cell, py + 2.5 * cell, cell * 1.5, cell * 1.5);
-          ctx.fillStyle = "#000000";
-          ctx.fillRect(px + ex * cell + cell * 0.45 + look, py + 2.95 * cell, cell * 0.6, cell * 0.6);
-        }
-        if (solid) {
-          ctx.strokeStyle = "#ffffff";
-          ctx.lineWidth = 3;
-          ctx.strokeRect(px, py, size, size);
-        }
-        ctx.restore();
-      };
-      body(g.x, g.top, true);
-      for (const c of g.clones) body(c.x, c.top, false);
-      for (const r of g.rain) {
-        ctx.fillStyle = Math.floor(time * 20 + r.x0 * 7) % 2 ? "#ff2bd6" : "#21e6ff";
-        ctx.fillRect((r.x - camX) * TS + TS * 0.2, r.y * TS + TS * 0.2, TS * 0.6, TS * 0.6);
-      }
-      if (g.shakeT > 0) {
-        // coloured static all over the screen
-        ctx.save();
-        ctx.globalAlpha = 0.5;
-        for (let i = 0; i < 40; i++) {
-          ctx.fillStyle = rnd();
-          ctx.fillRect(Math.random() * canvas.width, Math.random() * canvas.height, Math.random() * 140, 2 + Math.random() * 8);
-        }
-        ctx.restore();
-      }
-      if (g.rewindFx > 0) {
-        ctx.fillStyle = `rgba(120, 200, 255, ${Math.min(0.5, g.rewindFx).toFixed(2)})`;
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-      }
-    };
-
-    const drawBoss = () => {
-      if (boss.glitch) { drawGlitch(); return; }
-      const b = boss;
-      const px = TS * BOSS_PX;
-      if (state === "cut" && cutT < 2.6) {
-        const d = dragonAt();
-        // once it's been hit it shakes and flickers
-        const hit = cutT > 1.8;
-        ctx.save();
-        if (hit && Math.sin(time * 50) > 0) ctx.globalAlpha = 0.45;
-        const flap = 1 + Math.sin(time * 14) * 0.12;
-        Art.drawSprite(ctx, "dragon", (d.x - camX) * TS + (hit ? Math.sin(time * 70) * 5 : 0),
-          d.y * TS + (1 - flap) * 9 * px, 32 * px, 18 * px * flap);
-        ctx.restore();
-      }
-      if (b.gone || (state === "cut" && cutT < 2.8)) return;
-      const walking = state === "cut" && cutT < 4.4;
-      const bob = walking ? Math.abs(Math.sin(time * 9)) * -5 : Math.sin(time * 3) * 2;
-      const shake = state === "bossdown" ? Math.sin(time * 80) * 5 : 0;
-      ctx.save();
-      if (state === "cut") ctx.globalAlpha = clamp((cutT - 2.8) / 0.9, 0, 1);
-      else if (state === "bossdown") ctx.globalAlpha = clamp(1.2 - downT / 1.8, 0, 1);
-      else if (b.hurtT > 0 && Math.sin(time * 40) > 0) ctx.globalAlpha = 0.35;
-      Art.drawSprite(ctx, "boss", (b.x - camX) * TS + shake, BOSS_TOP * TS + bob, 24 * px, 32 * px);
-      ctx.restore();
-
-      for (const r of b.rain) {
-        // a red mark on the floor shows where each one will land
-        ctx.fillStyle = "rgba(255, 60, 60, 0.55)";
-        ctx.fillRect((r.x - camX) * TS, (H - 1) * TS - 5, TS, 5);
-        drawTile(ctx, "t", (r.x - camX) * TS, r.y * TS, TS, time, false);
-      }
-    };
-
-    const drawGlitchHud = () => {
-      const g = boss;
-      if (g.gone) return;
-      ctx.textBaseline = "top";
-      ctx.font = "bold 18px ui-monospace, monospace";
-      ctx.textAlign = "right";
-      ctx.fillStyle = "#ffffff";
-      // ten chunks, so they're narrower than the TNT Mech's
-      const bx = canvas.width / 2 - g.max * 22;
-      ctx.fillText("THE GLITCH", bx - 10, 14);
-      for (let i = 0; i < g.max; i++) {
-        ctx.fillStyle = "#1c1c1c";
-        ctx.fillRect(bx + i * 44, 12, 40, 20);
-        ctx.fillStyle = i < g.hp ? "#ff2bd6" : "#4a4a4a";
-        ctx.fillRect(bx + i * 44 + 3, 15, 34, 14);
-      }
-      ctx.textAlign = "center";
-      ctx.font = "bold 20px ui-monospace, monospace";
-      if (g.mode === "solid") {
-        ctx.fillStyle = "#ffffff";
-        ctx.fillText(`⚡ IT'S SOLID! STOMP IT! ${Math.max(0, g.solidT).toFixed(1)}`, canvas.width / 2, 44);
-      } else if (state === "run") {
-        ctx.fillStyle = "#8ff09a";
-        const done = g.broken.filter((c) => c.fixed).length;
-        ctx.fillStyle = g.fixT < 5 ? "#ff6b6b" : "#8ff09a";
-        ctx.fillText(`🛠 Fix the glitched blocks: ${done}/${g.broken.length} · ⏰ ${Math.max(0, g.fixT).toFixed(0)}`, canvas.width / 2, 44);
-      }
-      if (flipT > 0) {
-        ctx.fillStyle = "#ffd54a";
-        ctx.fillText("🔀 CONTROLS FLIPPED", canvas.width / 2, 72);
-      }
-      if (g.introT > 0 || g.bannerT > 0) {
-        const intro = g.introT > 0;
-        ctx.font = `bold ${intro ? 60 : 40}px ui-monospace, monospace`;
-        const text = intro ? "THE GLITCH" : g.banner;
-        const y = canvas.height / 2 - 40;
-        // drawn three times, a little apart, like a broken screen
-        ctx.fillStyle = "#21e6ff";
-        ctx.fillText(text, canvas.width / 2 - 3 + (Math.random() - 0.5) * 4, y);
-        ctx.fillStyle = "#ff2bd6";
-        ctx.fillText(text, canvas.width / 2 + 3 + (Math.random() - 0.5) * 4, y);
-        ctx.fillStyle = "#ffffff";
-        ctx.fillText(text, canvas.width / 2, y);
-      }
-    };
-
-    const drawBossHud = () => {
-      if (boss.glitch) { drawGlitchHud(); return; }
-      const b = boss;
-      ctx.textBaseline = "top";
-      if (state === "cut") {
-        if (cutT > 4.2) {
-          ctx.fillStyle = "#ff6b6b";
-          ctx.font = "bold 54px ui-monospace, monospace";
-          ctx.textAlign = "center";
-          ctx.fillText("TNT MECH", canvas.width / 2, 150);
-        }
-        ctx.fillStyle = "rgba(255,255,255,0.7)";
-        ctx.font = "bold 16px ui-monospace, monospace";
-        ctx.textAlign = "right";
-        ctx.fillText("jump to skip ▶", canvas.width - 16, canvas.height - 28);
-        return;
-      }
-      if (b.gone) return;
-      // health: one chunk per stomp it can still take
-      ctx.font = "bold 18px ui-monospace, monospace";
-      ctx.textAlign = "right";
-      ctx.fillStyle = "#ffffff";
-      const bx = canvas.width / 2 - bossMax * 32;
-      ctx.fillText("TNT MECH", bx - 10, 14);
-      for (let i = 0; i < bossMax; i++) {
-        ctx.fillStyle = "#1c1c1c";
-        ctx.fillRect(bx + i * 64, 12, 60, 20);
-        ctx.fillStyle = i < b.hp ? "#e04a2f" : "#4a4a4a";
-        ctx.fillRect(bx + i * 64 + 3, 15, 54, 14);
-      }
-      if (state !== "run") return;
-      ctx.textAlign = "center";
-      ctx.font = "bold 22px ui-monospace, monospace";
-      ctx.fillStyle = ["#ff8a80", "#8ff09a", "#ffd54a"][b.stage];
-      ctx.fillText(["TNT RAIN! Dodge!", "CLIMB UP! Stomp its head!", "SHOOTER ARM! Dodge!"][b.stage] +
-        "  " + Math.ceil(b.t), canvas.width / 2, 42);
-    };
-
-    const drawDialog = () => {
-      const pad = 22, bw = canvas.width - 120, x0 = 60;
-      ctx.font = "bold 24px ui-monospace, monospace";
-      ctx.textAlign = "left";
-      ctx.textBaseline = "top";
-      const lines = [];
-      let line = "";
-      for (const word of String(talk).split(/\s+/)) {
-        const tryLine = line ? line + " " + word : word;
-        if (line && ctx.measureText(tryLine).width > bw - pad * 2) { lines.push(line); line = word; }
-        else line = tryLine;
-      }
-      if (line) lines.push(line);
-      const bh = pad * 2 + lines.length * 32 + 26;
-      const y0 = 24; // up top, so it never covers the player standing on the ground
-      ctx.fillStyle = "rgba(20, 20, 28, 0.92)";
-      ctx.fillRect(x0, y0, bw, bh);
-      ctx.strokeStyle = "#ffd54a";
-      ctx.lineWidth = 4;
-      ctx.strokeRect(x0, y0, bw, bh);
-      ctx.fillStyle = "#ffffff";
-      lines.forEach((l, i) => ctx.fillText(l, x0 + pad, y0 + pad + i * 32));
-      if (Math.sin(time * 5) > -0.3) {
-        ctx.fillStyle = "#ffd54a";
-        ctx.font = "bold 16px ui-monospace, monospace";
-        ctx.textAlign = "right";
-        ctx.fillText("▶ jump to carry on", x0 + bw - pad, y0 + bh - pad - 8);
-      }
-    };
-
-    const render = () => {
-      drawBackground();
-      showBoost();
-
-      const startX = Math.max(0, Math.floor(camX) - 1);
-      const endX = Math.min(width - 1, Math.ceil(camX + VIEW_COLS) + 1);
-      for (let x = startX; x <= endX; x++) {
-        for (let y = 0; y < H; y++) {
-          const ch = grid[y][x];
-          if (isDoor(ch)) {
-            Art.drawSprite(ctx, ch, (x - camX) * TS, (y - 1) * TS, TS, TS * 2);
-          } else if (isOpenDoor(ch)) {
-            const t = clamp((time - (doorT[noteKey(x, y)] || 0)) / DOOR_SWING, 0, 1);
-            const px = (x - camX) * TS, top = (y - 1) * TS;
-            ctx.save();
-            if (ch[1] === "\u0184") {
-              // the Mechanical door splits in half: the top slides up and the
-              // bottom slides down, each into its own square, leaving a sliver
-              const shift = TS * 0.85 * t;
-              const sp = Art.SPRITES[ch[1]];
-              const half = (sp.height || sp.naturalHeight) / 2, sw = sp.width || sp.naturalWidth;
-              ctx.imageSmoothingEnabled = false;
-              for (const [cy, src, dy] of [[top, 0, -shift], [top + TS, half, shift]]) {
-                ctx.save();
-                ctx.beginPath();
-                ctx.rect(px, cy, TS, TS);
-                ctx.clip();
-                ctx.drawImage(sp, 0, src, sw, half, px, cy + dy, TS, TS);
-                ctx.restore();
-              }
-            } else {
-              // the others swing open on their left hinge: squeeze to a thin edge
-              ctx.globalAlpha = 1 - 0.25 * t;
-              Art.drawSprite(ctx, ch[1], px, top, TS * (1 - 0.82 * t), TS * 2);
-            }
-            ctx.restore();
-          } else if (isLogged(ch)) {
-            drawTile(ctx, "L", (x - camX) * TS, y * TS, TS, time, false);
-            const own = looks[noteKey(x, y)];
-            drawTile(ctx, own && baseOf(own) === ch[1] ? own : ch[1], (x - camX) * TS, y * TS, TS, time, false);
-          } else if (ch !== AIR && ch !== "P" && !isHidden(ch)) {
-            let key = ch === FLOWED ? "L" : overOf(ch) || ch;
-            if (ch === "W" && !eyeOpen({ x, ph: (x * 0.37) % WATCH_CYCLE })) key = "watcherClosed";
-            // still the block it started as (not blown up, switched on or grown over)? use its own look
-            const own = looks[noteKey(x, y)];
-            if (own && key === ch && baseOf(own) === ch) key = own;
-            const shut = ch === "G" && framesLeft > 0;
-            if (shut) ctx.globalAlpha = 0.35;
-            drawTile(ctx, key, (x - camX) * TS, y * TS, TS, time,
-              y > 0 && isSolid(grid[y - 1][x]));
-            if (shut) ctx.globalAlpha = 1;
-          }
-        }
-      }
-
-      for (const w of watchers) {
-        if (w.x >= startX - 4 && w.x <= endX + 4) drawCone(ctx, grid, w.x, w.y, TS, -camX * TS, eyeOpen(w));
-      }
-
-      // the next block of lava oozing out of each active source
-      for (const m of movers) {
-        if (!m.active || m.done) continue;
-        const next = m.tip + m.dir;
-        const there = next >= 0 && next < H ? grid[next][m.x] : null;
-        const plant = there !== null && LOGGABLE.includes(baseOf(there));
-        if (there !== AIR && !plant) continue;
-        const h = TS * m.t;
-        const y = m.dir < 0 ? (next + 1) * TS - h : next * TS;
-        ctx.save();
-        ctx.beginPath();
-        ctx.rect((m.x - camX) * TS, y, TS, h);
-        ctx.clip();
-        drawTile(ctx, "L", (m.x - camX) * TS, next * TS, TS, time, false);
-        ctx.restore();
-        // lava oozing into a plant's square goes behind it, so draw the plant again on top
-        if (plant) {
-          const own = looks[noteKey(m.x, next)];
-          drawTile(ctx, own && baseOf(own) === there ? own : there, (m.x - camX) * TS, next * TS, TS, time, false);
-        }
-      }
-      for (const b of bullets) {
-        const bs = TS * 0.55;
-        ctx.save();
-        ctx.translate((b.x - camX) * TS, b.y * TS);
-        ctx.rotate(time * 6);
-        drawTile(ctx, "bullet", -bs / 2, -bs / 2, bs, time, false);
-        ctx.restore();
-      }
-
-      for (const m of mobs) {
-        // a corrupted watcher flickers sideways now and then
-        const jit = m.kind === "Q" && Math.sin(time * 37 + m.x) > 0.8 ? TS * 0.12 : 0;
-        Art.drawSprite(ctx, m.look || m.kind, (m.x - camX) * TS - TS * 0.05 + jit, (m.y + MOB_H - 2) * TS,
-          TS * 0.9, TS * 2);
-        if (m.awake && m.kind !== "N") {
-          ctx.fillStyle = "#ff4f6b";
-          ctx.font = "bold 20px ui-monospace, monospace";
-          ctx.textAlign = "center";
-          ctx.textBaseline = "bottom";
-          ctx.fillText("!", (m.x + MOB_W / 2 - camX) * TS, m.y * TS - 2);
-        }
-      }
-
-      if (boss) drawBoss();
-
-      for (const bz of blazes) {
-        const bs = TS * 0.8;
-        const px = (bz.x - camX) * TS, py = bz.y * TS;
-        // rods spinning around the head, in two rings like the real thing
-        for (let i = 0; i < 6; i++) {
-          const a = time * (i < 3 ? 2.5 : -2) + (i % 3) * (Math.PI * 2 / 3);
-          const rr = TS * (i < 3 ? 0.55 : 0.4);
-          ctx.fillStyle = i % 2 ? "#f0a020" : "#ffd54a";
-          ctx.fillRect(px + Math.cos(a) * rr - TS * 0.06, py + TS * (i < 3 ? 0.05 : 0.35) +
-            Math.sin(a) * rr * 0.3 - TS * 0.14, TS * 0.12, TS * 0.28);
-        }
-        drawTile(ctx, "blaze", px - bs / 2, py - bs / 2, bs, time, false);
-      }
-      for (const fb of fireballs) {
-        const fs = TS * 0.5;
-        ctx.save();
-        ctx.translate((fb.x - camX) * TS, fb.y * TS);
-        ctx.rotate(time * 8);
-        drawTile(ctx, "fireball", -fs / 2, -fs / 2, fs, time, false);
-        ctx.restore();
-      }
-
-      if (state !== "dead" && flying) {
-        const ws = TS * 1.5;
-        const flap = Math.sin(time * (holding ? 22 : 8)) * TS * 0.08;
-        drawTile(ctx, "wingsWorn",
-          (player.x + PLAYER_W / 2 - camX) * TS - ws / 2,
-          (player.y + PLAYER_H * 0.45) * TS - ws / 2 + flap, ws, time, false);
-      }
-      if (state === "dead") {
-        const cx = (player.x + PLAYER_W / 2 - camX) * TS, cy = (player.y + PLAYER_H / 2) * TS;
-        const pw = PLAYER_W * TS, ph = PLAYER_H * TS;
-        if (deathKind === "burn") {
-          // the player fades away inside a flame instead of blowing up
-          const k = clamp(deadT / 0.7, 0, 1);
-          ctx.save();
-          ctx.globalAlpha = 1 - k;
-          drawPlayer(ctx, cx - pw / 2, cy - ph / 2, pw, ph, rot, hero);
-          ctx.globalAlpha = clamp((0.9 - deadT) / 0.2, 0, 1);
-          const fs = TS * (1.1 + 0.5 * k);
-          drawTile(ctx, "F", cx - fs / 2, (player.y + PLAYER_H) * TS - fs, fs, time, false);
-          ctx.restore();
-        } else if (deathKind === "poof" && deadT < POOF_AFTER) {
-          drawHurtPlayer(cx, cy, pw, ph, (deadT / POOF_AFTER) * Math.PI / 2);
-        }
-      }
-      drawGhost();
-      drawTrail();
-      drawPet();
-      if (state !== "dead") {
-        const k = warp ? clamp((warp.t / WARP_TIME - 0.7) / 0.3, 0, 1) : 1;
-        if (k > 0) {
-          const pw = PLAYER_W * TS * k, ph = PLAYER_H * TS * k;
-          drawPlayer(ctx, (player.x + PLAYER_W / 2 - camX) * TS - pw / 2,
-            (player.y + PLAYER_H / 2) * TS - ph / 2, pw, ph, rot, hero);
-          if (window.BDBadges.has("master")) drawCrown(rot, pw, ph);
-          if (glitchFx) drawGlitchFx(rot, pw, ph);
-          // sword in hand for the boss fight
-          if (inBoss && sword) {
-            drawTile(ctx, SWORDS[sword].key, (player.x + PLAYER_W * 0.55 - camX) * TS,
-              (player.y - 0.05) * TS, TS * 0.75, 0, false);
-          }
-          // the shield's bubble, blinking as it runs out
-          if (shieldT > 0 && (shieldT > 0.6 || Math.floor(time * 12) % 2)) {
-            ctx.strokeStyle = "#9cc4ff";
-            ctx.lineWidth = 4;
-            ctx.strokeRect((player.x - 0.15 - camX) * TS, (player.y - 0.15) * TS,
-              (PLAYER_W + 0.3) * TS, (PLAYER_H + 0.3) * TS);
-          }
-        }
-      }
-
-      for (const p of particles) {
-        ctx.globalAlpha = clamp(p.life, 0, 1);
-        ctx.fillStyle = p.c;
-        const ps = TS * (p.s || 0.16);
-        ctx.fillRect((p.x - camX) * TS, p.y * TS, ps, ps);
-      }
-      ctx.globalAlpha = 1;
-
-      if (warp) {
-        ctx.fillStyle = "rgba(150, 80, 230, " + (0.35 * Math.sin(Math.PI * clamp(warp.t / WARP_TIME, 0, 1))).toFixed(3) + ")";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-      }
-
-      if (effect) {
-        ctx.fillStyle = effect === "fast" ? "#ffd54a" : "#c9c9d6";
-        ctx.font = "bold 26px ui-monospace, monospace";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "top";
-        ctx.fillText(effect === "fast" ? "⚡ FAST!" : "🥀 SLOW…", canvas.width / 2, 16);
-      }
-      if (flying && state === "run") {
-        const y = effect ? 52 : 16;
-        ctx.fillStyle = "#e2dcf2";
-        ctx.font = "bold 26px ui-monospace, monospace";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "top";
-        ctx.fillText("🪽 FLY! hold jump", canvas.width / 2, y);
-      }
-
-      if (boss) drawBossHud();
-
-      if (state === "run" && (stopT > 0 || (free && !boss))) {
-        const y = 16 + (effect ? 36 : 0) + (flying ? 36 : 0);
-        ctx.fillStyle = stopT > 0 ? "#ff8a80" : "#8ff09a";
-        ctx.font = "bold 26px ui-monospace, monospace";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "top";
-        ctx.fillText(stopT > 0 ? "✋ STOP " + stopT.toFixed(1) : "◀ FREE MOVE ▶", canvas.width / 2, y);
-      }
-
-      if (state === "talk") drawDialog();
-
-      if (state === "dead") {
-        ctx.fillStyle = "rgba(0,0,0,0.35)";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        if (deathKind === "boom" || deathKind === "megaboom") {
-          drawExplosion(ctx,
-            (player.x + PLAYER_W / 2 - camX) * TS,
-            (player.y + PLAYER_H / 2) * TS,
-            TS * (deathKind === "megaboom" ? 6.5 : 3.2), deadT);
-        }
-        ctx.fillStyle = "#ff6b6b";
-        ctx.font = "bold 46px ui-monospace, monospace";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText({ burn: "BURNED!", delete: "DELETED!", poof: "POOF!", megaboom: "MEGA BOOM!" }[deathKind] || "BOOM!",
-          canvas.width / 2, canvas.height / 2);
-      }
-    };
+    Object.assign(P, {
+      bag, bossMax, canvas, chain, ctx, endlessOver, endRun, fill, fromEditor, hasEyes,
+      hasPearls, hasRods, hero, jumpBtn, level, megaAt, megaEl, megaTimes, msgSlot, notes,
+      onExit, pctEl, pet, petBase, reset, scoreEl, setBoost, setFree, shieldEl, showBoost,
+      showItems, strip, sword, tellOnce, trail, TS, VIEW_COLS
+    });
+    // the boss fights (the TNT Mech and The Glitch) (blockdash-play-bosses.js)
+    const bosses = window.BDPlayBosses(S, P, BD);
+    Object.assign(P, bosses);
+    const { startBoss } = bosses;
+
+    // dying and winning, explosions and sparkles, and Blink teleports (blockdash-play-life.js)
+    const life = window.BDPlayLife(S, P, BD);
+    Object.assign(P, life);
+
+    // things that move and hurt you (lava, shooters, mobs, blazes, Watchers) (blockdash-play-hazards.js)
+    const hazards = window.BDPlayHazards(S, P, BD);
+    Object.assign(P, hazards);
+
+    // how the player moves each step (running, jumping, doors and what you touch) (blockdash-play-physics.js)
+    const physics = window.BDPlayPhysics(S, P, BD);
+    Object.assign(P, physics);
+    const { pressJump, update } = physics;
+
+    // drawing each frame (level, player, pet, ghost, mobs, bosses and the HUD) (blockdash-play-draw.js)
+    const draw = window.BDPlayDraw(S, P, BD);
+    Object.assign(P, draw);
+    const { render } = draw;
 
     // --- loop ---
     const STEP = 1 / 120;
@@ -5124,14 +3481,14 @@
       let guard = 0;
       while (acc >= STEP && guard++ < 30) { update(STEP); afterStep(); acc -= STEP; }
       render();
-      window.BDMusic.boss(inBoss && state !== "win" ? (level.glitch ? "glitch" : true) : false);
+      window.BDMusic.boss(S.inBoss && S.state !== "win" ? (level.glitch ? "glitch" : true) : false);
       raf = requestAnimationFrame(loop);
     };
 
     const stop = () => {
       running = false;
       cancelAnimationFrame(raf);
-      if (run && endRun(false)) ghostBonus();
+      if (S.run && endRun(false)) ghostBonus();
       window.BDMusic.boss(false);
       window.BDMusic.level(null);
       window.removeEventListener("keydown", onKeyDown);
@@ -5141,12 +3498,12 @@
     const onKeyDown = (e) => {
       if (e.key === " " || e.key === "ArrowUp" || e.key === "w" || e.key === "W") {
         e.preventDefault();
-        if (e.repeat || holding) return;
-        if (!pressJump()) holding = true;
+        if (e.repeat || S.holding) return;
+        if (!pressJump()) S.holding = true;
       } else if (e.key === "ArrowLeft" || e.key === "a" || e.key === "A") {
-        moveL = true;
+        S.moveL = true;
       } else if (e.key === "ArrowRight" || e.key === "d" || e.key === "D") {
-        moveR = true;
+        S.moveR = true;
       } else if (e.key === "r" || e.key === "R") {
         reset(true);
       } else if (e.key === "Shift") {
@@ -5154,21 +3511,21 @@
       }
     };
     const onKeyUp = (e) => {
-      if (e.key === " " || e.key === "ArrowUp" || e.key === "w" || e.key === "W") holding = false;
-      else if (e.key === "ArrowLeft" || e.key === "a" || e.key === "A") moveL = false;
-      else if (e.key === "ArrowRight" || e.key === "d" || e.key === "D") moveR = false;
+      if (e.key === " " || e.key === "ArrowUp" || e.key === "w" || e.key === "W") S.holding = false;
+      else if (e.key === "ArrowLeft" || e.key === "a" || e.key === "A") S.moveL = false;
+      else if (e.key === "ArrowRight" || e.key === "d" || e.key === "D") S.moveR = false;
     };
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener("keyup", onKeyUp);
 
-    const press = (e) => { e.preventDefault(); if (!pressJump()) holding = true; };
+    const press = (e) => { e.preventDefault(); if (!pressJump()) S.holding = true; };
     const hold = (btn, set) => {
       btn.addEventListener("pointerdown", (e) => { e.preventDefault(); set(true); });
       for (const ev of ["pointerup", "pointercancel", "pointerleave"]) btn.addEventListener(ev, () => set(false));
     };
-    hold(leftBtn, (v) => { moveL = v; });
-    hold(rightBtn, (v) => { moveR = v; });
-    const release = () => { holding = false; };
+    hold(leftBtn, (v) => { S.moveL = v; });
+    hold(rightBtn, (v) => { S.moveR = v; });
+    const release = () => { S.holding = false; };
     canvas.addEventListener("pointerdown", press);
     canvas.addEventListener("pointerup", release);
     canvas.addEventListener("pointercancel", release);
@@ -5176,6 +3533,10 @@
     jumpBtn.addEventListener("pointerup", release);
     jumpBtn.addEventListener("pointercancel", release);
     boostBtn.addEventListener("pointerdown", (e) => { e.preventDefault(); boost(); });
+
+    Object.assign(P, {
+      STEP, stop
+    });
 
     reset();
     loop(performance.now());

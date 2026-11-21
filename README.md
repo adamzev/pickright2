@@ -137,7 +137,12 @@ go back to the pack, not to the art the code draws.
 ### Files
 
 - `blockdash.html` / `blockdash.css`
-- `blockdash.js` — game engine, level editor, art studio, storage, pack tools
+- `blockdash.js` — menus, shop, level editor, art studio, storage, pack tools, and
+  the play screen's setup, restarts and game loop
+- `blockdash-play-*.js` — the rest of the play screen, which `showPlay` in
+  `blockdash.js` loads with its shared values (`S`) and helpers (`P`):
+  `physics` (moving the player), `hazards` (lava, shooters, mobs, Watchers),
+  `life` (dying, winning, effects), `bosses` (TNT Mech, The Glitch), `draw` (each frame)
 - `blockdash-art.js` — all the pixel art, isolated so sprites can be swapped for
   PNGs via `BDArt.loadSprites({ g: "art/grass.png", ... })` or repainted via
   `BDArt.getPixels` / `setPixels`
