@@ -1,0 +1,12 @@
+{
+  "name": "block-dash",
+  "private": true,
+  "description": "Block Dash's replay test (the game itself needs no install)",
+  "scripts": {
+    "test": "node tests/replay.js",
+    "test:update": "node tests/replay.js --update"
+  },
+  "devDependencies": {
+    "jsdom": "^29.1.1"
+  }
+}

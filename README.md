@@ -149,6 +149,15 @@ go back to the pack, not to the art the code draws.
 - `blockdash-levels.js` — the official levels, converted from a levels `.json` download
 - `blockdash-artpack.js` — the official art, converted from an art `.json` download
 
+### Replay test
+
+`npm install` once, then `npm test` (about 45 seconds). It plays every level,
+Endless, the daily level, both bosses and the win screens with scripted key
+presses, and checks every frame draws exactly what it did last time
+(`tests/replay-golden.json`). Use it to check that a clean-up changed nothing.
+When a change *should* alter play (new block, new level, tweaked jump), it will
+fail too: check the game in the browser, then `npm run test:update`.
+
 ## Versions
 
 - **Web** (`docs/`) — mobile-friendly static site, deployed to GitHub Pages
