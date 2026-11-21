@@ -1041,6 +1041,7 @@
     // pets and coins from before badges existed still count
     window.BDBadges.coins(loadBag().coins);
     if (PETS.every(([k]) => loadPets().owned.includes(k))) window.BDBadges.earn("pets");
+    window.BDBadges.checkMaster();
     clear();
     const levels = loadLevels();
     const builtin = builtinLevels();

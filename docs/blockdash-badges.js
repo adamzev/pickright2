@@ -79,7 +79,12 @@
     showNext();
     // the game hands out rewards (Badge Master's surprise)
     window.dispatchEvent(new CustomEvent("bd-badge", { detail: id }));
-    if (id !== "master" && LIST.every((b) => b.id === "master" || data.got[b.id])) earn("master");
+    checkMaster();
+  };
+  // also run on the title screen, for badges earned before Badge Master existed
+  const checkMaster = () => {
+    load();
+    if (!data.got.master && LIST.every((b) => b.id === "master" || data.got[b.id])) earn("master");
   };
 
   const add = (stat, n = 1) => {
@@ -98,6 +103,7 @@
     count: () => { load(); return LIST.filter((b) => data.got[b.id]).length; },
     earn,
     add,
+    checkMaster,
     // a song started playing; allSongs is every song there is
     heard(song, allSongs) {
       load();
