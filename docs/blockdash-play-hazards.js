@@ -8,9 +8,10 @@ window.BDPlayHazards = (S, P, BD) => {
   const {
     AIR, baseOf, BLAZE_DRIFT, BLAZE_MAX, BLAZE_REACH, BLAZE_SHOOT, BOSS_SHOT_SPEED,
     BULLET_LIFE, BULLET_SPEED, BULLET_TURN, CHASE_SPEED, clamp, ENDER_AHEAD, ENDER_NOTICE,
-    FIREBALL_SPEED, FLOWED, GLITCH_EVERY, GLITCH_HOP, GRAVITY, H, inCone, isSolid, JUMP_V,
-    LAVA_FALL, LAVA_RISE, LOGGABLE, MOB_H, MOB_W, PLAYER_H, PLAYER_W, SHOOT_EVERY,
-    SPAWN_EVERY, WATCH_CYCLE, WATCH_OPEN
+    FALL_ACCEL, FALL_MAX, FALL_PUSH, FIREBALL_SPEED, FLOWED, GLITCH_EVERY, GLITCH_HOP,
+    GLITCH_IRON, GRAVITY, H, inCone, isSolid, JUMP_V, LAVA_FALL, LAVA_RISE, LOGGABLE, MOB_H,
+    MOB_W, nextToWater, PLAYER_H, PLAYER_W, SHOOT_EVERY, SPAWN_EVERY, WATCH_CYCLE,
+    WATCH_OPEN
   } = BD;
   const {
     die, explode, gotRod, sparkle, VIEW_COLS
@@ -54,9 +55,16 @@ window.BDPlayHazards = (S, P, BD) => {
       // Grow one block into empty air; anything else (ground, an item,
       // the edge of the level) stops the flow for good.
       const next = m.tip + m.dir;
-      const there = next >= 0 && next < H ? S.grid[next][m.x] : null;
+      const there = next >= 0 && next < S.grid.length ? S.grid[next][m.x] : null;
       const soak = there !== null && LOGGABLE.includes(baseOf(there));
       if (there !== AIR && !soak) { m.done = true; continue; }
+      if (nextToWater(S.grid, m.x, next)) {
+        // lava meeting water hardens into stone, with a hiss of steam
+        S.grid[next][m.x] = "s";
+        m.done = true;
+        sparkle(m.x + 0.5, next + 0.5, ["#e8e8f0", "#c9c9d6", "#ffffff"]);
+        continue;
+      }
       S.grid[next][m.x] = soak ? FLOWED + there : FLOWED;
       m.tip = next;
     }
@@ -100,7 +108,7 @@ window.BDPlayHazards = (S, P, BD) => {
       const exits = [[0, -1], [-1, 0], [1, 0], [0, 1]];
       const ex = exits.find(([dx, dy]) => {
         const cx = sp.x + dx, cy = sp.y + dy;
-        return cx >= 0 && cx < S.width && cy >= 0 && cy < H && !isSolid(S.grid[cy][cx]);
+        return cx >= 0 && cx < S.width && cy >= 0 && cy < S.grid.length && !isSolid(S.grid[cy][cx]);
       });
       if (!ex) continue;
       const bx = sp.x + ex[0] + 0.5, by = sp.y + ex[1] + 0.5;
@@ -163,7 +171,7 @@ window.BDPlayHazards = (S, P, BD) => {
         // teleport to stand on the ground a few blocks in front of you
         m.awake = true;
         const cx = Math.floor(S.player.x + ENDER_AHEAD);
-        for (let y = Math.max(1, Math.floor(S.player.y)); y < H - 1; y++) {
+        for (let y = Math.max(1, Math.floor(S.player.y)); y < S.grid.length - 1; y++) {
           if (!P.solidAt(cx, y) && !P.solidAt(cx, y - 1) && P.solidAt(cx, y + 1)) {
             sparkle(m.x + MOB_W / 2, m.y + MOB_H / 2, ["#e08cff", "#1c1c22"]);
             m.x = cx + (1 - MOB_W) / 2;
@@ -204,7 +212,7 @@ window.BDPlayHazards = (S, P, BD) => {
       } else {
         m.y = ny;
       }
-      if (m.y > H + 2) { m.gone = true; continue; }
+      if (m.y > S.grid.length + 2) { m.gone = true; continue; }
 
       if (!touches(m.x, m.y, m.x + MOB_W, m.y + MOB_H)) continue;
       const stomp = S.player.vy > 0 && S.player.y + PLAYER_H < m.y + 0.45;
@@ -224,7 +232,51 @@ window.BDPlayHazards = (S, P, BD) => {
       return true;
     }
     S.mobs = S.mobs.filter((m) => !m.gone);
+    updateFallers(dt);
     return false;
+  };
+
+  // Glitchy iron: once its column is on screen and there's nothing under it,
+  // it lifts out of the grid and falls. It lands as a block again on the
+  // first solid square below, or drops out of the level.
+  const updateFallers = (dt) => {
+    const x0 = Math.max(0, Math.floor(S.camX) - 1);
+    const x1 = Math.min(S.width - 1, Math.ceil(S.camX + VIEW_COLS));
+    for (let x = x0; x <= x1; x++) {
+      if (!onScreen(x)) continue;
+      for (let y = S.grid.length - 1; y >= 0; y--) {
+        const ch = S.grid[y][x];
+        if (baseOf(ch) !== GLITCH_IRON || P.solidAt(x, y + 1)) continue;
+        S.grid[y][x] = AIR;
+        S.fallers.push({ x, y, vy: 0, ch });
+      }
+    }
+    const p = S.player;
+    for (const f of S.fallers) {
+      f.vy = Math.min(f.vy + FALL_ACCEL * dt, FALL_MAX);
+      let ny = f.y + f.vy * dt;
+      // never into another falling block below it in the same column
+      for (const g of S.fallers) {
+        if (g !== f && g.x === f.x && g.y > f.y && ny > g.y - 1) { ny = g.y - 1; f.vy = Math.min(f.vy, g.vy); }
+      }
+      // Landing on you pushes you down. It rests on your head until you run out from under it.
+      const overX = f.x < p.x + PLAYER_W && f.x + 1 > p.x;
+      if (overX && ny + 1 > p.y && f.y + 1 <= p.y + 0.3) {
+        ny = p.y - 1;
+        f.vy = 0;
+        p.vy = Math.max(p.vy, FALL_PUSH);
+      }
+      const row = Math.floor(ny) + 1;
+      if (ny > Math.floor(ny) && P.solidAt(f.x, row)) {
+        const at = Math.floor(ny);
+        if (at >= 0 && (S.grid[at][f.x] === AIR || S.grid[at][f.x] === "P")) S.grid[at][f.x] = f.ch;
+        f.done = true;
+        continue;
+      }
+      f.y = ny;
+      if (f.y >= S.grid.length) f.done = true;
+    }
+    S.fallers = S.fallers.filter((f) => !f.done);
   };
 
   return {

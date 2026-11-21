@@ -763,6 +763,64 @@ window.BDArt = (() => {
     "................",
   ], { y: "#a87a12", Y: "#ffd54a" });
 
+  // ---- glitchy blocks: The Glitch got into the stone and the iron ----
+  const GLITCH_PAINT = { m: "#ff2bd6", c: "#21e6ff", k: "#111111" };
+  const glitchStone = paintMap([
+    "ssssssdssssslsss",
+    "slssssssdssssssd",
+    "sssdsslsssssdsss",
+    "ssssssssssslssss",
+    "mmmmssssdssssccc",
+    "sssmmmmsssssccss",
+    "dssssssslssssssl",
+    "sssslsssssdsssss",
+    "ssdssssssssssdss",
+    "kkkkkkssssssssss",
+    "sssssscccccsssss",
+    "slssssssssssmmls",
+    "sssdssslssssssss",
+    "ssssssssssdsssss",
+    "sdsssslssssssssd",
+    "ssssssssssslssss",
+  ], { s: "#8c8c8c", d: "#6b6b6b", l: "#a8a8a8", ...GLITCH_PAINT });
+  const glitchIron = paintMap([
+    "dddddddddddddddd",
+    "dIIIIIIIIIIIIIId",
+    "dIoIIIIIIIIIIoId",
+    "dIIIIIIIIIIIIIId",
+    "dIIiiiiiiiiiiIId",
+    "dIIiIIIIIIIIiIId",
+    "mmmmmmIIIIIIiIId",
+    "dIIiIIIIccccccId",
+    "dIIiIIIIIIIIiIId",
+    "dIIiIIIIIIIIiIId",
+    "dIIiiiiiiiiiiIId",
+    "dIIIIIIIIIIImmmd",
+    "dIIIIIIIIIIIIIId",
+    "dIoIIIIIIIIIIoId",
+    "dIIIIIIIIIIIIIId",
+    "dddddddddddddddd",
+  ], { d: "#6f7078", I: "#d6d8de", i: "#a9acb5", o: "#4a4c55", ...GLITCH_PAINT });
+
+  const water = paintMap([
+    "bbbbbbbbbbbbbbbb",
+    "bbbbbbbbbbbbbbbb",
+    "bbwwwbbbbbbbbbbb",
+    "bbbbbwwbbbbbbbbb",
+    "bbbbbbbbbbbwwwbb",
+    "bbbbbbbbbbbbbbww",
+    "bbbbbbbbbbbbbbbb",
+    "bBBbbbbbbbbbbbbb",
+    "bbbBBbbbbbwwwbbb",
+    "bbbbbbbbbbbbbwwb",
+    "bbbbbbbbbbbbbbbb",
+    "bbbbbbwwwbbbbbbb",
+    "bbbbbbbbbwwbbbbb",
+    "bbbbbbbbbbbbbbBB",
+    "bBBbbbbbbbbbbbbb",
+    "bbbBBbbbbbbbbbbb",
+  ], { b: "#2f6fd6", B: "#2559b4", w: "#8cc4ff" });
+
   // ---- money: emerald, gold and megatite pickups, and the shop's goods ----
 
   const emerald = mk(S, S, (c) => {
@@ -1322,6 +1380,9 @@ window.BDArt = (() => {
     "\u0184": doorMech,
     "\u0185": doorLocked,
     "\u0186": keyItem,
+    "\u0187": glitchStone,
+    "\u0188": glitchIron,
+    "\u0189": water,
     swordStone: swordStone,
     swordIron: swordIron,
     swordDiamond: swordDiamond,
@@ -1726,6 +1787,32 @@ window.BDArt = (() => {
     if (sh > sw) {
       const w = size * sw / sh;
       return blit(ctx, sp, x + (size - w) / 2, y, w, size);
+    }
+    if (ch === "\u0189") {
+      // see-through, with a slow shimmer drifting along
+      ctx.save();
+      ctx.globalAlpha = 0.7;
+      blit(ctx, sp, x, y, size, size);
+      ctx.globalAlpha = 0.18 + 0.1 * Math.sin(time * 2 + x * 0.04);
+      ctx.fillStyle = "#cfe6ff";
+      ctx.fillRect(x, y + size * (0.2 + 0.1 * Math.sin(time * 1.5 + x * 0.02)), size, size * 0.08);
+      ctx.restore();
+      return;
+    }
+    if (ch === "\u0187" || ch === "\u0188") {
+      // now and then a slice of it jumps sideways, tinted like The Glitch
+      blit(ctx, sp, x, y, size, size);
+      if ((time * 1.7 + x * 0.013) % 1 > 0.1) return;
+      const band = Math.max(1, Math.round(sh * 3 / 16));
+      const row = Math.floor((time * 23 + x * 0.07) % (sh - band));
+      const k = size / sh;
+      ctx.drawImage(sp, 0, row, sw, band, x + 3 * k, y + row * k, size, band * k);
+      ctx.save();
+      ctx.globalAlpha = 0.35;
+      ctx.fillStyle = row % 2 ? "#ff2bd6" : "#21e6ff";
+      ctx.fillRect(x, y + row * k, size, band * k);
+      ctx.restore();
+      return;
     }
     if (ch === "m" || ch === "0") {
       // slime squishes gently

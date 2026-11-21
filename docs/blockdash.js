@@ -4,7 +4,8 @@
 
   // ---------- constants ----------
 
-  const H = 12; // level height in blocks (fixed — one screen tall)
+  const H = 12; // the screen's height in blocks, and the shortest a level can be
+  const MAX_H = 48; // the tallest a level can be; taller levels scroll up and down
   const AIR = ".";
   const ERASER = "X";
 
@@ -78,10 +79,31 @@
     "\u0184": { name: "Mechanical door", solid: true, door: true, reach: 2.5 },
     "\u0185": { name: "Upgraded door", solid: true, door: true, reach: 0.4, locked: true },
     "\u0186": { name: "Key" },
+    "\u0187": { name: "Glitchy stone", solid: true },
+    "\u0188": { name: "Glitchy iron", solid: true },
+    "\u0189": { name: "Water" },
   };
   const KEY = "\u0186";
   const DOORS = ["\u0180", "\u0181", "\u0182", "\u0183", "\u0184", "\u0185"];
   const isDoor = (ch) => !!(TILES[ch] && TILES[ch].door);
+  // Glitchy stone blinks: there for BLINK_TIME seconds, then gone (you fall
+  // through) for the same again. Timed from the (re)start, like the Watchers.
+  const GLITCH_STONE = "\u0187";
+  const BLINK_TIME = 1;
+  const blinkOn = (t) => t % (2 * BLINK_TIME) < BLINK_TIME;
+  // Glitchy iron falls once it's on screen and lands as a block again. It
+  // doesn't hurt: landing on you pushes you down instead.
+  const GLITCH_IRON = "\u0188";
+  const FALL_PUSH = 8; // blocks a second, downward
+  const FALL_MAX = 2.5; // blocks a second: it floats down gently
+  const FALL_ACCEL = 12; // how fast it gets up to that speed
+  // Water: you sink slowly, each jump press is a swim stroke up, and you keep
+  // running forward, just slower. Near the surface a press jumps you out.
+  const WATER = "\u0189";
+  const WATER_GRAVITY = 15; // blocks a second, every second (out of water it's GRAVITY)
+  const SINK_MAX = 3;
+  const SWIM_V = 6.5;
+  const WATER_SLOW = 0.6; // of your usual speed
   // an opened door stays in its square as "/" + the door, so it can still be drawn
   const isOpenDoor = (ch) => ch.length === 2 && ch[0] === "/";
   // the rest of the mega blocks: one per ordinary block (see BDArt.MEGA)
@@ -110,7 +132,7 @@
   const MEGA_PICK = "~"; // likewise, the palette button that opens the mega blocks
 
   const PALETTE = ["g", "s", "p", "n", "k", "e", "m", "t", "T", "h", "A", "L", "U", "D", "F", "S", "Z",
-    "W", "Y", "V", "Q", "N", "I", "C", "d", "+", "$", "@", "r", "9", "o", "H", "R", "b", "%", "w", "f", "K", "O", "M", "E", "G", "J", "B", ...DOORS, KEY, MEGA_PICK, MINE, "P", ERASER];
+    "W", "Y", "V", "Q", "N", "I", "C", "d", "+", "$", "@", "r", "9", "o", "H", "R", "b", "%", "w", "f", "K", "O", "M", "E", "G", "J", "B", GLITCH_STONE, GLITCH_IRON, WATER, ...DOORS, KEY, MEGA_PICK, MINE, "P", ERASER];
 
   // The boss arena is drawn in the same editor as the level, with a slightly
   // different set of blocks: no portals, save points or note-carrying blocks
@@ -177,6 +199,23 @@
   // behind it) and burns like lava. Play-only, like FLOWED.
   const LOGGABLE = "wB";
   const isLogged = (ch) => ch.length === 2 && ch[0] === FLOWED;
+  // Lava touching water (above, below or beside it) turns into stone, like in
+  // Minecraft. Returns the squares it changed.
+  const NEXT_TO = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+  const nextToWater = (g, x, y) =>
+    NEXT_TO.some(([dx, dy]) => g[y + dy] && baseOf(g[y + dy][x + dx] || AIR) === WATER);
+  const quench = (g) => {
+    const hit = [];
+    for (let y = 0; y < g.length; y++) {
+      for (let x = 0; x < g[y].length; x++) {
+        const ch = g[y][x];
+        const lava = ch === FLOWED || "LUD".includes(baseOf(ch));
+        if (lava && nextToWater(g, x, y)) hit.push([x, y]);
+      }
+    }
+    for (const [x, y] of hit) g[y][x] = "s";
+    return hit;
+  };
   const isLava = (ch) => ch === "L" || ch === "U" || ch === "D" || ch === FLOWED || isLogged(ch);
   const SHOOT_EVERY = 2; // seconds between stars
   const BULLET_SPEED = 5.5; // slower than you run, so they hit from ahead
@@ -397,7 +436,7 @@
 
   const rowsToGrid = (rows) => {
     const width = Math.max(...rows.map((r) => r.length));
-    return Array.from({ length: H }, (_, y) => {
+    return Array.from({ length: clamp(rows.length, H, MAX_H) }, (_, y) => {
       const row = rows[y] || "";
       return Array.from({ length: width }, (_, x) => {
         const ch = row[x];
@@ -425,18 +464,18 @@
 
   const findSpawn = (g) => {
     const width = g[0].length;
-    for (let y = 0; y < H; y++) {
+    for (let y = 0; y < g.length; y++) {
       for (let x = 0; x < width; x++) {
         if (baseOf(g[y][x]) === "P") return { x, y };
       }
     }
     // no start block placed — drop in above the first floor we can find
     for (let x = 0; x < width; x++) {
-      for (let y = H - 1; y >= 0; y--) {
+      for (let y = g.length - 1; y >= 0; y--) {
         if (isSolid(g[y][x])) return { x, y: y - 1 };
       }
     }
-    return { x: 1, y: H - 2 };
+    return { x: 1, y: g.length - 2 };
   };
 
   // ---------- the Watcher's cone of vision ----------
@@ -444,8 +483,8 @@
   // the first solid block, so what you see shaded is exactly where it can see.
 
   const coneStop = (g, wy, cx) => {
-    for (let y = wy + 1; y < H; y++) if (isSolid(g[y][cx])) return y;
-    return H;
+    for (let y = wy + 1; y < g.length; y++) if (isSolid(g[y][cx])) return y;
+    return g.length;
   };
 
   const inCone = (g, wx, wy, px, py) => {
@@ -484,8 +523,6 @@
 
   // ---------- levels that ship with the game (blockdash-levels.js) ----------
 
-  // Normalise anything that claims to be a level into { name, rows } with
-  // exactly H rows of equal length, or throw.
   const bgOf = (o) =>
     (window.BDArt.BACKGROUNDS.some((b) => b.key === o.bg) ? o.bg : "overworld");
   // what goes in a saved or downloaded level; overworld levels stay { name, rows }
@@ -524,6 +561,8 @@
     return o;
   };
 
+  // Normalise anything that claims to be a level into { name, rows } with
+  // H to MAX_H rows of equal length, or throw.
   const normalizeLevel = (o, fallbackName) => {
     if (!o || typeof o !== "object" || !Array.isArray(o.rows) || !o.rows.length) {
       throw new Error("not a level");
@@ -1792,6 +1831,9 @@
       ["\u0184", "Mechanical door — opens by itself when you get within a couple of blocks"],
       ["\u0185", "Upgraded door — locked! It only opens if you're carrying a key, and uses the key up. Without one it's a wall"],
       ["\u0186", "Key — opens one Upgraded door. Keys only work in the level you find them in"],
+      [GLITCH_STONE, "Glitchy stone — blinks on and off every second. When it's gone, you fall through!"],
+      [GLITCH_IRON, "Glitchy iron — floats down slowly as soon as it's on screen. If it lands on you, it pushes you down"],
+      [WATER, "Water — swim! You sink slowly; press jump to swim up, or jump out near the top. Lava touching water turns into stone"],
       ["P", "Start — where you spawn"],
     ].forEach(([ch, text]) => {
       const r = el("div", "row tight");
@@ -2807,6 +2849,7 @@
     undoBtn.onclick = () => {
       const prev = undoStack.pop();
       if (!prev) { toast("Nothing to undo"); return; }
+      if (prev.notes) setNotes(prev.notes);
       grid = prev;
       autosave();
       render();
@@ -2820,7 +2863,7 @@
     const floorBtn = el("button", "small", "Fill floor");
     floorBtn.onclick = () => {
       pushUndo();
-      for (let x = 0; x < grid[0].length; x++) grid[H - 1][x] = "g";
+      for (let x = 0; x < grid[0].length; x++) grid[grid.length - 1][x] = "g";
       autosave();
       render();
     };
@@ -2830,13 +2873,19 @@
     const longerBtn = el("button", "small", "+ Longer");
     longerBtn.onclick = () => setWidth(grid[0].length + 10);
 
+    // Taller levels grow (or shrink) at the top, so the floor stays where it is.
+    const lowerBtn = el("button", "small", "− Lower");
+    lowerBtn.onclick = () => setHeight(grid.length - 4);
+    const higherBtn = el("button", "small", "+ Higher");
+    higherBtn.onclick = () => setHeight(grid.length + 4);
+
     const clearBtn = el("button", "danger small", "Clear all");
     clearBtn.onclick = () => {
       if (!confirm("Erase the whole level?")) return;
       pushUndo();
       const w = grid[0].length;
-      grid = Array.from({ length: H }, () => Array(w).fill(AIR));
-      grid[H - 2][2] = "P";
+      grid = Array.from({ length: grid.length }, () => Array(w).fill(AIR));
+      grid[grid.length - 2][2] = "P";
       autosave();
       render();
     };
@@ -2844,7 +2893,7 @@
     const lenLabel = el("span", "hint");
 
     tools.append(modeBtn, undoBtn, leftBtn, rightBtn, floorBtn,
-      shorterBtn, longerBtn, clearBtn, lenLabel);
+      shorterBtn, longerBtn, lowerBtn, higherBtn, clearBtn, lenLabel);
     gridPanel.appendChild(tools);
     gridPanel.appendChild(
       el("p", "hint",
@@ -2854,8 +2903,11 @@
     );
     root.appendChild(gridPanel);
 
-    const pushUndo = () => {
-      undoStack.push(grid.map((r) => r.slice()));
+    // withNotes: also remember the Dialog and Stop notes, for changes that move them
+    const pushUndo = (withNotes) => {
+      const snap = grid.map((r) => r.slice());
+      if (withNotes) snap.notes = { ...notes };
+      undoStack.push(snap);
       if (undoStack.length > 60) undoStack.shift();
     };
 
@@ -2869,9 +2921,38 @@
       render();
     };
 
+    const setNotes = (n) => {
+      for (const k of Object.keys(notes)) delete notes[k];
+      Object.assign(notes, n);
+    };
+
+    const setHeight = (h) => {
+      if (editing === "arena") { toast("The boss arena is always one screen tall"); return; }
+      h = clamp(h, H, MAX_H);
+      const add = h - grid.length;
+      if (!add) { toast(h === H ? "Levels can't be lower than one screen" : `Levels can be up to ${MAX_H} tall`); return; }
+      if (add < 0 && grid.slice(0, -add).some((r) => r.some((ch) => ch !== AIR))) {
+        if (!confirm("The top rows have blocks in them. Remove them anyway?")) return;
+      }
+      pushUndo(true);
+      const w = grid[0].length;
+      grid = add > 0
+        ? [...Array.from({ length: add }, () => Array(w).fill(AIR)), ...grid]
+        : grid.slice(-add);
+      // notes are keyed by square, and every square just moved down (or up)
+      const moved = {};
+      for (const [k, v] of Object.entries(notes)) {
+        const [x, y] = k.split(",").map(Number);
+        if (y + add >= 0) moved[noteKey(x, y + add)] = v;
+      }
+      setNotes(moved);
+      autosave();
+      render();
+    };
+
     const setCell = (cx, cy) => {
       const w = grid[0].length;
-      if (cx < 0 || cx >= w || cy < 0 || cy >= H) return false;
+      if (cx < 0 || cx >= w || cy < 0 || cy >= grid.length) return false;
       let ch = sel === ERASER ? AIR : sel;
       const cur = grid[cy][cx];
       // Hidden TNT and an item stack into one trapped square, in either order.
@@ -2884,7 +2965,7 @@
       if (cur === ch && (want === undefined || notes[noteKey(cx, cy)] === want)) return false;
       if (want !== undefined) notes[noteKey(cx, cy)] = want;
       if (kind === "P") {
-        for (let y = 0; y < H; y++) {
+        for (let y = 0; y < grid.length; y++) {
           for (let x = 0; x < w; x++) if (baseOf(grid[y][x]) === "P") grid[y][x] = AIR;
         }
       }
@@ -2951,11 +3032,11 @@
 
     const render = () => {
       const w = grid[0].length;
-      if (canvas.width !== w * TS) {
+      if (canvas.width !== w * TS || canvas.height !== grid.length * TS) {
         canvas.width = w * TS;
-        canvas.height = H * TS;
+        canvas.height = grid.length * TS;
       }
-      lenLabel.textContent = `${w} blocks · ${countDiamonds(grid)} 💎`;
+      lenLabel.textContent = `${w} long · ${grid.length} tall · ${countDiamonds(grid)} 💎`;
 
       // the editor canvas is the whole level, so draw the backdrop once per screen-width
       const view = Math.min(canvas.width, 24 * TS);
@@ -2969,7 +3050,7 @@
         ctx.restore();
       }
 
-      for (let y = 0; y < H; y++) {
+      for (let y = 0; y < grid.length; y++) {
         for (let x = 0; x < w; x++) {
           const ch = grid[y][x];
           if (ch !== AIR) {
@@ -2986,7 +3067,7 @@
           }
         }
       }
-      for (let y = 0; y < H; y++) {
+      for (let y = 0; y < grid.length; y++) {
         for (let x = 0; x < w; x++) if ("WY".includes(baseOf(grid[y][x]))) drawCone(ctx, grid, x, y, TS, 0, true);
       }
 
@@ -3003,7 +3084,7 @@
       ctx.lineWidth = 3;
       ctx.strokeStyle = "rgba(0,0,0,0.75)";
       ctx.fillStyle = "#ffffff";
-      for (let y = 0; y < H; y++) {
+      for (let y = 0; y < grid.length; y++) {
         for (let x = 0; x < w; x++) {
           const ch = baseOf(grid[y][x]);
           if (ch !== "O" && ch !== "K") continue;
@@ -3027,7 +3108,7 @@
         ctx.lineTo(x * TS + 0.5, canvas.height);
         ctx.stroke();
       }
-      for (let y = 0; y <= H; y++) {
+      for (let y = 0; y <= grid.length; y++) {
         ctx.beginPath();
         ctx.moveTo(0, y * TS + 0.5);
         ctx.lineTo(canvas.width, y * TS + 0.5);
@@ -3063,19 +3144,21 @@
   // blockdash.js's own names that the play files (blockdash-play-*.js) use
   const BD = {
     AIR, ARENA_W, arenaBgOf, arenaGrid, Art, baseOf, bestKey, bgOf, BLAZE_DRIFT, BLAZE_MAX,
-    BLAZE_REACH, BLAZE_SHOOT, BOSS_BODY, BOSS_HP, BOSS_PX, BOSS_SHOT_SPEED, BOSS_STAGE,
-    BOSS_TOP, BOSS_X, BOUNCE_V, builtinLevels, BULLET_LIFE, BULLET_SPEED, BULLET_TURN,
-    CHASE_SPEED, clamp, COIN_VALUE, COYOTE, CUT_END, dailyLevelDone, dailyNote, dayKey,
-    DOOR_SWING, drawCone, drawExplosion, drawPlayer, drawTile, EFFECT_TIME, el, ENDER_AHEAD,
-    ENDER_NOTICE, findSpawn, FIREBALL_SPEED, FLOWED, FLY_THRUST, FLY_UP_V, FLYING_PETS,
-    getBest, GHOST_BONUS, GHOST_EVERY, GLIDE_FALL, GLITCH_BLOCKS, GLITCH_COLORS,
-    GLITCH_EVERY, GLITCH_FIX_TIME, GLITCH_HOP, GLITCH_HP, GLITCH_SIZE, GLITCH_SOLID,
-    GLITCH_SPOTS, glitchLookOn, GRAVITY, H, inCone, isDoor, isHidden, isHiddenTnt, isLava,
-    isLogged, isOpenDoor, isSolid, JUMP_BUFFER, JUMP_V, KEY, lapSpeed, LAVA_FALL, LAVA_RISE,
-    loadBag, LOGGABLE, MEGA_BASE, MEGA_BLAST, MEGA_BOUNCE_V, MEGATITE_PAYS, MOB_H, MOB_W,
-    noteKey, overOf, PET_SOUND, PLAYER_H, PLAYER_W, POOF_AFTER, RAIN_SPEED, saveBag, setBest,
-    SHIELD_TIME, SHOOT_EVERY, SPAWN_EVERY, SPEED_BASE, SPEED_FAST, SPEED_SLOW, STILL_PETS,
-    STOP_DEFAULT, SWORDS, TILES, toast, trailOn, WARP_TIME, WATCH_CYCLE, WATCH_OPEN
+    BLAZE_REACH, BLAZE_SHOOT, blinkOn, BOSS_BODY, BOSS_HP, BOSS_PX, BOSS_SHOT_SPEED,
+    BOSS_STAGE, BOSS_TOP, BOSS_X, BOUNCE_V, builtinLevels, BULLET_LIFE, BULLET_SPEED,
+    BULLET_TURN, CHASE_SPEED, clamp, COIN_VALUE, COYOTE, CUT_END, dailyLevelDone, dailyNote,
+    dayKey, DOOR_SWING, drawCone, drawExplosion, drawPlayer, drawTile, EFFECT_TIME, el,
+    ENDER_AHEAD, ENDER_NOTICE, FALL_ACCEL, FALL_MAX, FALL_PUSH, findSpawn, FIREBALL_SPEED,
+    FLOWED, FLY_THRUST, FLY_UP_V, FLYING_PETS, getBest, GHOST_BONUS, GHOST_EVERY, GLIDE_FALL,
+    GLITCH_BLOCKS, GLITCH_COLORS, GLITCH_EVERY, GLITCH_FIX_TIME, GLITCH_HOP, GLITCH_HP,
+    GLITCH_IRON, GLITCH_SIZE, GLITCH_SOLID, GLITCH_SPOTS, GLITCH_STONE, glitchLookOn,
+    GRAVITY, H, inCone, isDoor, isHidden, isHiddenTnt, isLava, isLogged, isOpenDoor, isSolid,
+    JUMP_BUFFER, JUMP_V, KEY, lapSpeed, LAVA_FALL, LAVA_RISE, loadBag, LOGGABLE, MEGA_BASE,
+    MEGA_BLAST, MEGA_BOUNCE_V, MEGATITE_PAYS, MOB_H, MOB_W, nextToWater, noteKey, overOf,
+    PET_SOUND, PLAYER_H, PLAYER_W, POOF_AFTER, RAIN_SPEED, saveBag, setBest, SHIELD_TIME,
+    SHOOT_EVERY, SINK_MAX, SPAWN_EVERY, SPEED_BASE, SPEED_FAST, SPEED_SLOW, STILL_PETS,
+    STOP_DEFAULT, SWIM_V, SWORDS, TILES, toast, trailOn, WARP_TIME, WATCH_CYCLE, WATCH_OPEN,
+    WATER, WATER_GRAVITY, WATER_SLOW
   };
 
   // `chain` links a level to the ones after it: { i, count, carried, playNext }.
@@ -3218,7 +3301,7 @@
       rods: 0, pearls: 0, eyes: 0, megas: 0, shieldT: 0, framesLeft: 0, told: {},
       watchers: [], mobs: [], runT: 0, warp: null, free: false, moveL: false, moveR: false,
       stopT: 0, talk: null, talkAt: 0, poofed: false, inBoss: false, boss: null,
-      introSeen: false, cutT: 0, downT: 0, knock: 0, plats: [], flipT: 0,
+      introSeen: false, cutT: 0, downT: 0, knock: 0, plats: [], flipT: 0, fallers: [], camY: 0,
     });
 
     const showItems = () => {
@@ -3379,8 +3462,9 @@
       S.watchers = [];
       S.mobs = [];
       S.plats = [];
+      S.fallers = [];
       S.runT = 0;
-      for (let y = 0; y < H; y++) {
+      for (let y = 0; y < S.grid.length; y++) {
         for (let x = 0; x < S.width; x++) {
           if (S.grid[y][x] === FLOWED) S.grid[y][x] = AIR;
           else if (isLogged(S.grid[y][x])) S.grid[y][x] = S.grid[y][x][1];
@@ -3404,6 +3488,8 @@
           }
         }
       }
+      quench(S.grid);
+      for (const m of S.movers) if (S.grid[m.tip][m.x] === "s") m.done = true;
       S.player = {
         x: at.x + 0.15,
         y: at.y + (1 - PLAYER_H),
@@ -3429,6 +3515,7 @@
       S.stopT = 0;
       S.talk = null;
       S.camX = clamp(S.player.x - VIEW_COLS * 0.32, 0, Math.max(0, S.width - VIEW_COLS));
+      S.camY = clamp(S.player.y - H / 2, 0, S.grid.length - H);
       S.effect = null;
       S.effectT = 0;
       S.flying = false;

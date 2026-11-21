@@ -6,11 +6,11 @@
 window.BDPlayDraw = (S, P, BD) => {
   "use strict";
   const {
-    AIR, arenaBgOf, Art, baseOf, bgOf, BOSS_PX, BOSS_TOP, clamp, DOOR_SWING, drawCone,
-    drawExplosion, drawPlayer, drawTile, el, FLOWED, FLYING_PETS, GHOST_EVERY, GLITCH_COLORS,
-    GLITCH_SIZE, glitchLookOn, H, isDoor, isHidden, isLogged, isOpenDoor, isSolid, LOGGABLE,
-    MOB_H, MOB_W, noteKey, overOf, PLAYER_H, PLAYER_W, POOF_AFTER, STILL_PETS, SWORDS,
-    trailOn, WARP_TIME, WATCH_CYCLE
+    AIR, arenaBgOf, Art, baseOf, bgOf, BLINK_TIME, blinkOn, BOSS_PX, BOSS_TOP, clamp,
+    DOOR_SWING, drawCone, drawExplosion, drawPlayer, drawTile, el, FLOWED, FLYING_PETS,
+    GHOST_EVERY, GLITCH_COLORS, GLITCH_SIZE, GLITCH_STONE, glitchLookOn, H, isDoor, isHidden,
+    isLogged, isOpenDoor, isSolid, LOGGABLE, MOB_H, MOB_W, noteKey, overOf, PLAYER_H,
+    PLAYER_W, POOF_AFTER, STILL_PETS, SWORDS, trailOn, WARP_TIME, WATCH_CYCLE
   } = BD;
   const {
     bossMax, canvas, ctx, dragonAt, eyeOpen, hero, level, pet, petBase, showBoost, sword,
@@ -363,10 +363,16 @@ window.BDPlayDraw = (S, P, BD) => {
     drawBackground();
     showBoost();
 
+    // A level taller than the screen slides up and down under it: everything
+    // in the level is drawn moved up by camY, the HUD on top isn't.
+    const lifted = S.camY !== 0;
+    if (lifted) { ctx.save(); ctx.translate(0, -S.camY * TS); }
     const startX = Math.max(0, Math.floor(S.camX) - 1);
     const endX = Math.min(S.width - 1, Math.ceil(S.camX + VIEW_COLS) + 1);
+    const startY = Math.max(0, Math.floor(S.camY) - 1);
+    const endY = Math.min(S.grid.length - 1, Math.ceil(S.camY + H) + 1);
     for (let x = startX; x <= endX; x++) {
-      for (let y = 0; y < H; y++) {
+      for (let y = startY; y <= endY; y++) {
         const ch = S.grid[y][x];
         if (isDoor(ch)) {
           Art.drawSprite(ctx, ch, (x - S.camX) * TS, (y - 1) * TS, TS, TS * 2);
@@ -405,11 +411,17 @@ window.BDPlayDraw = (S, P, BD) => {
           // still the block it started as (not blown up, switched on or grown over)? use its own look
           const own = S.looks[noteKey(x, y)];
           if (own && key === ch && baseOf(own) === ch) key = own;
-          const shut = ch === "G" && S.framesLeft > 0;
-          if (shut) ctx.globalAlpha = 0.35;
+          let faded = ch === "G" && S.framesLeft > 0;
+          if (faded) ctx.globalAlpha = 0.35;
+          // glitchy stone: a faint ghost while it's gone, flickering just before it goes
+          if (baseOf(ch) === GLITCH_STONE) {
+            const left = BLINK_TIME - (S.runT % (2 * BLINK_TIME));
+            if (!blinkOn(S.runT)) { ctx.globalAlpha = 0.15; faded = true; }
+            else if (left < 0.25 && Math.floor(left * 16) % 2 === 0) { ctx.globalAlpha = 0.5; faded = true; }
+          }
           drawTile(ctx, key, (x - S.camX) * TS, y * TS, TS, S.time,
             y > 0 && isSolid(S.grid[y - 1][x]));
-          if (shut) ctx.globalAlpha = 1;
+          if (faded) ctx.globalAlpha = 1;
         }
       }
     }
@@ -422,7 +434,7 @@ window.BDPlayDraw = (S, P, BD) => {
     for (const m of S.movers) {
       if (!m.active || m.done) continue;
       const next = m.tip + m.dir;
-      const there = next >= 0 && next < H ? S.grid[next][m.x] : null;
+      const there = next >= 0 && next < S.grid.length ? S.grid[next][m.x] : null;
       const plant = there !== null && LOGGABLE.includes(baseOf(there));
       if (there !== AIR && !plant) continue;
       const h = TS * m.t;
@@ -438,6 +450,9 @@ window.BDPlayDraw = (S, P, BD) => {
         const own = S.looks[noteKey(m.x, next)];
         drawTile(ctx, own && baseOf(own) === there ? own : there, (m.x - S.camX) * TS, next * TS, TS, S.time, false);
       }
+    }
+    for (const f of S.fallers) {
+      drawTile(ctx, f.ch, (f.x - S.camX) * TS, f.y * TS, TS, S.time, false);
     }
     for (const b of S.bullets) {
       const bs = TS * 0.55;
@@ -543,6 +558,7 @@ window.BDPlayDraw = (S, P, BD) => {
       ctx.fillRect((p.x - S.camX) * TS, p.y * TS, ps, ps);
     }
     ctx.globalAlpha = 1;
+    if (lifted) ctx.restore();
 
     if (S.warp) {
       ctx.fillStyle = "rgba(150, 80, 230, " + (0.35 * Math.sin(Math.PI * clamp(S.warp.t / WARP_TIME, 0, 1))).toFixed(3) + ")";

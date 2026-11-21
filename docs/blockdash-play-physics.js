@@ -6,11 +6,12 @@
 window.BDPlayPhysics = (S, P, BD) => {
   "use strict";
   const {
-    AIR, BOSS_X, BOUNCE_V, clamp, COIN_VALUE, COYOTE, dailyNote, EFFECT_TIME, FLY_THRUST,
-    FLY_UP_V, GLIDE_FALL, GRAVITY, H, isDoor, isHiddenTnt, isLava, isSolid, JUMP_BUFFER,
-    JUMP_V, KEY, lapSpeed, MEGA_BASE, MEGA_BLAST, MEGA_BOUNCE_V, MEGATITE_PAYS, noteKey,
-    PET_SOUND, PLAYER_H, PLAYER_W, POOF_AFTER, SPEED_BASE, SPEED_FAST, SPEED_SLOW,
-    STOP_DEFAULT, TILES, toast, WARP_TIME
+    AIR, baseOf, blinkOn, BOSS_X, BOUNCE_V, clamp, COIN_VALUE, COYOTE, dailyNote,
+    EFFECT_TIME, FLY_THRUST, FLY_UP_V, GLIDE_FALL, GLITCH_STONE, GRAVITY, H, isDoor,
+    isHiddenTnt, isLava, isSolid, JUMP_BUFFER, JUMP_V, KEY, lapSpeed, MEGA_BASE, MEGA_BLAST,
+    MEGA_BOUNCE_V, MEGATITE_PAYS, noteKey, PET_SOUND, PLAYER_H, PLAYER_W, POOF_AFTER,
+    SINK_MAX, SPEED_BASE, SPEED_FAST, SPEED_SLOW, STOP_DEFAULT, SWIM_V, TILES, toast,
+    WARP_TIME, WATER, WATER_GRAVITY, WATER_SLOW
   } = BD;
   const {
     blink, boom, die, ember, endCut, endlessOver, enterBoss, fill, gotRod, level, megaAt,
@@ -25,7 +26,7 @@ window.BDPlayPhysics = (S, P, BD) => {
     const y0 = Math.floor(S.player.y), y1 = Math.floor(S.player.y + PLAYER_H - 0.01);
     for (let x = Math.floor(S.player.x - 3); x <= Math.floor(S.player.x + PLAYER_W + 3); x++) {
       if (x < 0 || x >= S.width) continue;
-      for (let y = y0; y <= Math.min(H - 1, y1 + 1); y++) {
+      for (let y = y0; y <= Math.min(S.grid.length - 1, y1 + 1); y++) {
         const ch = S.grid[y][x];
         if (!isDoor(ch) || y - 1 > y1 || y < y0) continue;
         const gap = x >= S.player.x + PLAYER_W ? x - (S.player.x + PLAYER_W) : S.player.x - (x + 1);
@@ -41,9 +42,18 @@ window.BDPlayPhysics = (S, P, BD) => {
     }
   };
 
-  const solidAt = (x, y) =>
-    x >= 0 && x < S.width && y >= 0 && y < H &&
-    (isSolid(S.grid[y][x]) || (y + 1 < H && isDoor(S.grid[y + 1][x])));
+  const solidAt = (x, y) => {
+    if (x < 0 || x >= S.width || y < 0 || y >= S.grid.length) return false;
+    const ch = S.grid[y][x];
+    if (baseOf(ch) === GLITCH_STONE) {
+      // One that blinks back on around you lets you out instead of trapping you:
+      // squares you were already in at the start of this step don't count.
+      const b = S.stepBox;
+      const inside = b && x < b.x1 && x + 1 > b.x0 && y < b.y1 && y + 1 > b.y0;
+      return blinkOn(S.runT) && !inside;
+    }
+    return isSolid(ch) || (y + 1 < S.grid.length && isDoor(S.grid[y + 1][x]));
+  };
 
   // A fresh press while touching a Blink teleports instead of jumping.
   // Holding jump doesn't count, so you don't chain through every Blink.
@@ -66,8 +76,24 @@ window.BDPlayPhysics = (S, P, BD) => {
     doJump();
   };
 
+  // Is this square water? Whether you're swimming goes by the middle of you;
+  // whether you're at the surface, by the square at the top of you.
+  const waterAt = (x, y) => {
+    const row = S.grid[Math.floor(y)];
+    return !!row && baseOf(row[Math.floor(x)] || AIR) === WATER;
+  };
+  const swimming = () => waterAt(S.player.x + PLAYER_W / 2, S.player.y + PLAYER_H / 2);
+
   const doJump = () => {
     if (S.state !== "run" || S.stopT > 0) return;
+    if (swimming() && !S.flying) {
+      // a stroke up, or a full jump out when your head's already out of the water
+      const surface = !waterAt(S.player.x + PLAYER_W / 2, S.player.y);
+      S.player.vy = surface ? -JUMP_V : -SWIM_V;
+      S.player.onGround = false;
+      S.buffer = 0;
+      return;
+    }
     if (S.player.onGround || S.coyote > 0) {
       S.player.vy = -JUMP_V;
       S.player.onGround = false;
@@ -124,11 +150,15 @@ window.BDPlayPhysics = (S, P, BD) => {
     if (S.shieldT > 0) S.shieldT -= dt;
 
     let speed = S.effect === "fast" ? SPEED_FAST : S.effect === "slow" ? SPEED_SLOW : SPEED_BASE;
+    const wet = swimming();
+    if (wet) speed *= WATER_SLOW;
     if (level.endless) {
       const lap = lapSpeed(S.player.x);
       speed *= lap;
       if (lap > 1) tellOnce("lap" + lap, `⚡ FASTER! Speed +${Math.round((lap - 1) * 100)}%`);
     }
+
+    S.stepBox = { x0: S.player.x, y0: S.player.y, x1: S.player.x + PLAYER_W, y1: S.player.y + PLAYER_H };
 
     // horizontal — always forward, unless a Free move block handed you the controls
     const oldX = S.player.x;
@@ -179,7 +209,8 @@ window.BDPlayPhysics = (S, P, BD) => {
     }
 
     // vertical
-    S.player.vy += GRAVITY * dt;
+    if (wet && !S.flying) S.player.vy = Math.min(S.player.vy + WATER_GRAVITY * dt, SINK_MAX);
+    else S.player.vy += GRAVITY * dt;
     if (S.flying) {
       if (S.holding) {
         S.player.vy = Math.max(S.player.vy - FLY_THRUST * dt, -FLY_UP_V);
@@ -235,6 +266,7 @@ window.BDPlayPhysics = (S, P, BD) => {
     }
     if (S.holding && S.player.onGround) doJump();
     if (S.flying) S.rot = S.holding ? -0.25 : 0.1; // nose up when climbing
+    else if (wet) S.rot = 0; // no spinning while you swim
     else if (!S.player.onGround) S.rot += dt * 7;
 
     // items — a slightly smaller box, so near-misses are forgiving
@@ -246,7 +278,7 @@ window.BDPlayPhysics = (S, P, BD) => {
     // mega TNT doesn't wait to be touched: getting near is enough
     for (let y = Math.floor(S.player.y - MEGA_BLAST); y <= Math.floor(S.player.y + PLAYER_H + MEGA_BLAST); y++) {
       for (let x = Math.floor(S.player.x - MEGA_BLAST); x <= Math.floor(S.player.x + PLAYER_W + MEGA_BLAST); x++) {
-        if (x < 0 || x >= S.width || y < 0 || y >= H || S.state !== "run") continue;
+        if (x < 0 || x >= S.width || y < 0 || y >= S.grid.length || S.state !== "run") continue;
         const near = S.grid[y][x];
         // and the same for mega End TNT, mega lava and mega fire. Ask what the
         // mega square started as: lava that later flowed into a square where
@@ -264,7 +296,7 @@ window.BDPlayPhysics = (S, P, BD) => {
     }
     for (let y = iy0; y <= iy1; y++) {
       for (let x = ix0; x <= ix1; x++) {
-        if (x < 0 || x >= S.width || y < 0 || y >= H) continue;
+        if (x < 0 || x >= S.width || y < 0 || y >= S.grid.length) continue;
         const ch = S.grid[y][x];
         if (ch === "t" || ch === "T") { boom(); return; }
         if (ch === "8") { boom("megaboom"); return; }
@@ -299,6 +331,11 @@ window.BDPlayPhysics = (S, P, BD) => {
           setFree(false); // like wings, free moving ends at a save point
           S.grid[y][x] = "checkpointOn";
           S.checkpoint = { x, y, score: S.score, megas: S.megas, rods: S.rods, pearls: S.pearls, eyes: S.eyes, keys: S.keys, grid: S.grid.map((r) => r.slice()) };
+          // glitchy iron still falling goes back where it is, to fall again after a respawn
+          for (const f of S.fallers) {
+            const fy = Math.floor(f.y);
+            if (fy >= 0 && fy < S.grid.length && S.checkpoint.grid[fy][f.x] === AIR) S.checkpoint.grid[fy][f.x] = f.ch;
+          }
           toast("Checkpoint!");
         }
         if (COIN_VALUE[ch]) {
@@ -384,13 +421,20 @@ window.BDPlayPhysics = (S, P, BD) => {
     if (updateHazards(dt)) return;
     if (S.boss && updateBoss(dt)) return;
 
-    if (S.player.y > H + 1) {
+    if (S.player.y > S.grid.length + 1) {
       die();
       return;
     }
     if (S.player.x > S.width) { win(); return; }
 
     S.camX = clamp(S.player.x - VIEW_COLS * 0.32, 0, Math.max(0, S.width - VIEW_COLS));
+    // In a level taller than the screen, the screen follows you up and down,
+    // keeping you at least 3 blocks from its top and 4 from its bottom.
+    if (S.grid.length > H) {
+      if (S.player.y < S.camY + 3) S.camY = S.player.y - 3;
+      else if (S.player.y + PLAYER_H > S.camY + H - 4) S.camY = S.player.y + PLAYER_H - (H - 4);
+      S.camY = clamp(S.camY, 0, S.grid.length - H);
+    } else S.camY = 0;
 
     const pct = clamp(Math.round((S.player.x / S.width) * 100), 0, 100);
     fill.style.width = level.endless ? "0%" : pct + "%";

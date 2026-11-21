@@ -178,7 +178,7 @@ window.BDPlayLife = (S, P, BD) => {
   // can't be used to loop back and farm gems.
   const blink = (fromX, fromY) => {
     let best = null, bestD = Infinity;
-    for (let y = 0; y < H; y++) {
+    for (let y = 0; y < S.grid.length; y++) {
       for (let x = fromX + 1; x < S.width; x++) {
         if (S.grid[y][x] !== "I") continue;
         const d = (x - fromX) ** 2 + (y - fromY) ** 2;
