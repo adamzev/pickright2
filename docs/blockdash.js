@@ -1272,6 +1272,15 @@
     return panel;
   };
 
+  // ---------- the tutorial (blockdash-tutorial.js) ----------
+
+  const showTutorial = () => window.BDTutorial.show({
+    root, el, clear,
+    look: pickedHero(),
+    onMenu: () => showMenu(),
+    onPlay: () => playSeries(builtinLevels(), 0, 0, () => showMenu()),
+  });
+
   // ---------- the music screen ----------
 
   const showMusic = () => {
@@ -1508,6 +1517,9 @@
       artBtn.onclick = () => showArtStudio();
       head.appendChild(artBtn);
     }
+    const tutorial = el("button", "small", "📖 Tutorial");
+    tutorial.onclick = () => showTutorial();
+    head.appendChild(tutorial);
     const music = el("button", "small", "🎵 Music");
     music.onclick = () => showMusic();
     head.appendChild(music);
