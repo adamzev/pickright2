@@ -23,6 +23,8 @@
     rain: { name: "Rainy Day", icon: "🌧️", what: "Soft and sleepy, with raindrops." },
     spooky: { name: "Spooky", icon: "🎃", what: "Halloween organ and ghosts. WoooOOooo!" },
     final: { name: "Final Boss", icon: "🏁", what: "Even scarier than Boss Fight." },
+    // secret: only listed once you're a Badge Master
+    champion: { name: "Champion", icon: "👑", what: "For a true Badge Master.", secret: true },
     off: { name: "No music", icon: "🔇", what: "Quiet. Boss fights stay quiet too." },
   };
   const VOLUMES = { quiet: 0.25, mid: 0.55, loud: 1 };
@@ -673,6 +675,33 @@
     dragon: roar,
   };
 
+  const CHAMP_ROOTS = [48, 53, 55, 48]; // C F G C
+  const CHAMP_LEAD = [
+    72, null, 72, 72, 79, null, null, null,
+    77, 76, 74, 76, 72, null, null, null,
+    72, null, 76, 79, 84, null, 83, 81,
+    79, null, 77, null, 79, null, null, null,
+  ];
+  PLAY.champion = {
+    bpm: 116,
+    step(s, t, d) {
+      const bar = Math.floor(s / 16) % 4, b = s % 16;
+      const root = CHAMP_ROOTS[bar];
+      const chord = [0, 4, 7];
+      if (b === 0) for (const c of chord) tone(t, root + 12 + c, d * 15, { wave: "sawtooth", gain: 0.035, lowpass: 1500, attack: 0.1 });
+      if (b === 0 || b === 8) tone(t, root - 12, 0, { wave: "sine", gain: 0.5, decay: 0.5, slide: root - 14 }); // timpani
+      if (b === 4 || b === 12) snare(t, 0.2);
+      if (bar === 3 && b >= 12) snare(t, 0.12 + (b - 12) * 0.04);
+      if (b === 0 && bar === 0) hiss(t, 1.2, 0.08, "highpass", 5000); // cymbal
+      if (b % 4 === 2) tone(t, root + (b % 8 === 2 ? 7 : 12), d * 1.5, { wave: "triangle", gain: 0.35 });
+      const n = noteAt(CHAMP_LEAD, s % 64);
+      if (n) {
+        tone(t, n[0], n[1] * d * 0.9, { wave: "sawtooth", gain: 0.1, lowpass: 2400, attack: 0.02 }); // trumpets
+        tone(t, n[0] - 12, n[1] * d * 0.9, { wave: "square", gain: 0.04 });
+      }
+    },
+  };
+
   // ----- playing -----
 
   const wanted = () => {
@@ -706,7 +735,7 @@
     playing = want;
     clearInterval(timer);
     if (!want) return;
-    if (window.BDBadges) window.BDBadges.heard(want, Object.keys(SONGS).filter((k) => k !== "off"));
+    if (window.BDBadges) window.BDBadges.heard(want, Object.keys(SONGS).filter((k) => k !== "off" && !SONGS[k].secret));
     bus = ctx.createGain();
     bus.connect(master);
     step = 0;

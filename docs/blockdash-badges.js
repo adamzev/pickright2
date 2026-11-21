@@ -20,11 +20,12 @@
     { id: "builder", icon: "🏗️", name: "Builder", how: "Make a level in the Level Maker" },
     { id: "rich", icon: "💰", name: "Rich", how: "Have 10,000 coins at once" },
     { id: "perfect", icon: "✨", name: "Perfect", how: "Finish a level without dying once" },
+    { id: "master", icon: "🏆", name: "Badge Master", how: "Get every other badge, for a surprise reward!" },
     { id: "cat", icon: "🐱", name: "Crazy Cat Person", how: "Cat player, cat pet and the Meow song, all at once", secret: true },
     { id: "goodboy", icon: "🐶", name: "Good Boy", how: "Finish a level with the dog pet and the Woof song", secret: true },
     { id: "oops", icon: "😵", name: "Oops", how: "Die within 1 second of starting a level", secret: true },
     { id: "kaboom", icon: "💥", name: "KABOOM", how: "Get blown up by TNT 50 times", secret: true },
-    { id: "owl", icon: "🦉", name: "Night Owl", how: "Play after 10 o'clock at night", secret: true },
+    { id: "owl", icon: "🦉", name: "Night Owl", how: "Play after 8 o'clock in the evening", secret: true },
     { id: "clicky", icon: "🖱️", name: "Clicky Fingers", how: "Click the Block Dash title 10 times", secret: true },
     { id: "photo", icon: "🤏", name: "Photo Finish", how: "Beat your ghost by less than half a second", secret: true },
     { id: "silent", icon: "🔇", name: "Silent Runner", how: "Finish a level with no music", secret: true },
@@ -76,6 +77,9 @@
     save();
     queue.push(BY_ID[id]);
     showNext();
+    // the game hands out rewards (Badge Master's surprise)
+    window.dispatchEvent(new CustomEvent("bd-badge", { detail: id }));
+    if (id !== "master" && LIST.every((b) => b.id === "master" || data.got[b.id])) earn("master");
   };
 
   const add = (stat, n = 1) => {
@@ -110,8 +114,10 @@
     coins(n) { if (n >= 10000) earn("rich"); },
     titleClick() { if (++titleClicks >= 10) earn("clicky"); },
     nightCheck() {
+      // 8pm, not later: earlier than screen time ends, and the badge
+      // shouldn't be a reason to stay up late
       const h = new Date().getHours();
-      if (h >= 22 || h < 5) earn("owl");
+      if (h >= 20 || h < 5) earn("owl");
     },
   };
 })();

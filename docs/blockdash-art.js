@@ -1781,7 +1781,19 @@ window.BDArt = (() => {
     { key: "end", label: "🌌 The End" },
     { key: "endStorage", label: "📦 End storage rooms" },
     { key: "deepCave", label: "⛏ Deep cave" },
+    // mega: bought in the shop, then pickable in the Level Maker
+    { key: "megaOverworld", label: "✨ Mega Overworld", mega: true, base: "overworld" },
+    { key: "megaNether", label: "✨ Mega Nether", mega: true, base: "nether" },
+    { key: "megaMooshroom", label: "✨ Mega Mooshroom", mega: true, base: "mooshroom" },
+    { key: "megaEnd", label: "✨ Mega End", mega: true, base: "end" },
+    { key: "megaEndStorage", label: "✨ Mega End storage", mega: true, base: "endStorage" },
+    { key: "megaDeepCave", label: "✨ Mega Deep cave", mega: true, base: "deepCave" },
   ];
+  // the ordinary background a mega one is built on (or the key itself)
+  const bgBase = (k) => {
+    const b = BACKGROUNDS.find((x) => x.key === k);
+    return b && b.base ? b.base : k;
+  };
 
   const wrapX = (base, scroll, rate, span, pad) =>
     ((base - scroll * rate) % span + span) % span - pad;
@@ -1841,8 +1853,283 @@ window.BDArt = (() => {
     }
   };
 
+  // ---- mega backgrounds: extra layers drawn over the ordinary one ----
+  // Everything scales from the screen height, so shop thumbnails work too.
+
+  const glowDot = (ctx, x, y, r, color) => {
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, color);
+    g.addColorStop(1, "rgba(0, 0, 0, 0)");
+    ctx.fillStyle = g;
+    ctx.fillRect(x - r, y - r, r * 2, r * 2);
+  };
+
+  // a blocky crystal: a diamond shape made of stacked rectangles
+  const crystal = (ctx, x, baseY, w, h, color, light, up) => {
+    const rows = 6;
+    for (let i = 0; i < rows; i++) {
+      const k = i < rows / 2 ? (i + 1) / (rows / 2) : (rows - i) / (rows / 2);
+      const rw = Math.max(2, w * k);
+      const y = up ? baseY - h + (i * h) / rows : baseY + (i * h) / rows;
+      ctx.fillStyle = i % 2 ? color : light;
+      ctx.fillRect(x + (w - rw) / 2, y, rw, h / rows + 1);
+    }
+  };
+
+  const MEGA_LAYERS = {
+    // drawn whole rather than over the ordinary Overworld, so the sunset sky
+    // and mountains sit behind the clouds and hills instead of tinting them
+    megaOverworld(ctx, W, H, scroll, ts, t) {
+      const groundY = H - ts;
+      const sky = ctx.createLinearGradient(0, 0, 0, H);
+      sky.addColorStop(0, "#3d2c6e");
+      sky.addColorStop(0.45, "#e0607e");
+      sky.addColorStop(0.8, "#ffa66b");
+      sky.addColorStop(1, "#ffd59a");
+      ctx.fillStyle = sky;
+      ctx.fillRect(0, 0, W, H);
+      // the sun, low on the horizon
+      const sx = wrapX(W * 0.7, scroll, 0.02, W + H * 0.6, H * 0.3), sy = groundY - H * 0.3;
+      glowDot(ctx, sx, sy, H * 0.35, "rgba(255, 230, 150, 0.7)");
+      ctx.fillStyle = "#ffe08a";
+      const sr = Math.round(H * 0.08);
+      ctx.fillRect(Math.round(sx - sr), Math.round(sy - sr), sr * 2, sr * 2);
+      // a blocky rainbow
+      const cols = ["#e53935", "#fb8c00", "#fdd835", "#43a047", "#1e88e5", "#5e35b1", "#8e24aa"];
+      const rx = wrapX(W * 0.35, scroll, 0.05, W + H * 1.6, H * 0.8);
+      const band = H * 0.025;
+      ctx.globalAlpha = 0.5;
+      cols.forEach((c, i) => {
+        const r = H * 0.6 - i * band;
+        ctx.fillStyle = c;
+        for (let a = 0; a <= 40; a++) {
+          const ang = Math.PI + (a / 40) * Math.PI;
+          ctx.fillRect(rx + Math.cos(ang) * r - band / 2, groundY + Math.sin(ang) * r - band / 2, band * 1.3, band * 1.3);
+        }
+      });
+      ctx.globalAlpha = 1;
+      // far-off purple mountains with snowy tips
+      const span = W + H * 1.6;
+      for (let i = 0; i < 5; i++) {
+        const mx = wrapX(i * H * 0.55, scroll, 0.08, span, H * 0.5);
+        const mh = H * (0.3 + ((i * 37) % 10) / 50);
+        const step = Math.max(1, Math.round(mh / 8));
+        ctx.fillStyle = i % 2 ? "#6b4a86" : "#5a3d76";
+        for (let k = 0; k < 8; k++) {
+          const w = Math.round(((mh * (8 - k)) / 8) * 1.6);
+          ctx.fillRect(Math.round(mx - w / 2), Math.round(groundY - step * (k + 1)), w, step + 1);
+        }
+        ctx.fillStyle = "#f4eaff";
+        ctx.fillRect(Math.round(mx - mh * 0.1), Math.round(groundY - step * 8), Math.round(mh * 0.2), step);
+      }
+      // pink-lit clouds
+      const cspan = W + H;
+      for (let i = 0; i < 6; i++) {
+        const size = H * (0.2 + (i % 3) * 0.1);
+        ctx.globalAlpha = 0.85;
+        drawCloud(ctx, wrapX(i * H * 0.62, scroll, 0.22, cspan, H * 0.4), H * (0.04 + ((i * 71) % 110) / 540), size);
+        ctx.globalAlpha = 1;
+      }
+      ctx.fillStyle = "rgba(255, 130, 150, 0.25)";
+      ctx.fillRect(0, 0, W, H * 0.45);
+      // green hills in the evening light
+      const hspan = W + H;
+      for (let i = 0; i < 10; i++) {
+        const x = wrapX(i * H * 0.48, scroll, 0.5, hspan, H * 0.48);
+        const hgt = H * (0.075 + ((i * 53) % 70) / 540);
+        ctx.fillStyle = "#4f6b3a";
+        ctx.fillRect(x, groundY - hgt, H * 0.37, hgt + ts);
+        ctx.fillStyle = "#8aa060";
+        ctx.fillRect(x, groundY - hgt, H * 0.37, H * 0.018);
+      }
+      // birds
+      ctx.fillStyle = "#2b1f33";
+      for (let i = 0; i < 5; i++) {
+        const bx = wrapX(i * W * 0.31 + t * H * 0.08, scroll, 0.15, W + 100, 50);
+        const by = H * (0.12 + ((i * 29) % 25) / 100) + Math.sin(t * 2 + i) * H * 0.01;
+        const p = Math.max(1, H * 0.006);
+        const flap = Math.sin(t * 9 + i * 2) > 0 ? -p : p;
+        ctx.fillRect(bx, by, p * 2, p);
+        ctx.fillRect(bx - p * 2, by + flap, p * 2, p);
+        ctx.fillRect(bx + p * 2, by + flap, p * 2, p);
+      }
+    },
+
+    megaNether(ctx, W, H, scroll, ts, t) {
+      const groundY = H - ts;
+      // lava waterfalls pouring from the ceiling
+      const span = W + H;
+      for (let i = 0; i < 3; i++) {
+        const x = wrapX(i * H * 0.7 + H * 0.2, scroll, 0.3, span, H * 0.1);
+        const w = H * 0.05;
+        // dim, so they read as far away and not as lava you can touch
+        ctx.fillStyle = "rgba(200, 80, 20, 0.5)";
+        ctx.fillRect(x, 0, w, groundY);
+        ctx.fillStyle = "rgba(255, 170, 70, 0.4)";
+        const step = H * 0.06;
+        for (let y = ((t * H * 0.5) % step) - step; y < groundY; y += step) ctx.fillRect(x + w * 0.25, y, w * 0.3, step * 0.4);
+        glowDot(ctx, x + w / 2, groundY, H * 0.12, "rgba(255, 140, 40, 0.5)");
+      }
+      // crimson trees
+      const tspan = W + H * 1.2;
+      for (let i = 0; i < 4; i++) {
+        const x = wrapX(i * H * 0.6 + H * 0.45, scroll, 0.45, tspan, H * 0.3);
+        const th = H * (0.18 + (i % 3) * 0.04), tw = H * 0.03;
+        ctx.fillStyle = "#6b1f2a";
+        ctx.fillRect(x, groundY - th, tw, th);
+        ctx.fillStyle = "#b0222f";
+        ctx.fillRect(x - tw * 2.5, groundY - th - tw * 2, tw * 6, tw * 2.5);
+        ctx.fillRect(x - tw * 1.5, groundY - th - tw * 3.5, tw * 4, tw * 1.6);
+        ctx.fillStyle = "#ffb347"; // shroomlights
+        ctx.fillRect(x - tw * 1.5, groundY - th - tw * 1.2, tw * 0.8, tw * 0.8);
+        ctx.fillRect(x + tw * 2, groundY - th - tw * 2.2, tw * 0.8, tw * 0.8);
+      }
+      // lots more embers, glowing
+      for (let i = 0; i < 30; i++) {
+        const x = wrapX(i * 97 + Math.sin(t + i) * 20, scroll, 0.6, W + 40, 20);
+        const y = H - ((t * H * 0.06 + i * 53) % (H + 20));
+        glowDot(ctx, x, y, H * 0.012, "rgba(255, 190, 90, 0.9)");
+      }
+    },
+
+    megaMooshroom(ctx, W, H, scroll, ts, t) {
+      const groundY = H - ts;
+      ctx.fillStyle = "rgba(255, 120, 200, 0.22)"; // pink sky
+      ctx.fillRect(0, 0, W, H);
+      // giant glowing mushrooms
+      const span = W + H * 1.4;
+      for (let i = 0; i < 4; i++) {
+        const x = wrapX(i * H * 0.7, scroll, 0.2, span, H * 0.4);
+        const capW = H * (0.32 + (i % 2) * 0.1);
+        const h = H * (0.35 + (i % 3) * 0.06);
+        const pulse = 0.35 + 0.15 * Math.sin(t * 1.5 + i);
+        glowDot(ctx, x + capW / 2, groundY - h, capW * 0.9, `rgba(255, 140, 220, ${pulse})`);
+        drawMushroom(ctx, x, groundY, h, capW, i % 2 === 0);
+      }
+      // sparkly spores drifting up
+      for (let i = 0; i < 26; i++) {
+        const x = wrapX(i * 83 + Math.sin(t * 0.8 + i) * 25, scroll, 0.5, W + 40, 20);
+        const y = H - ((t * H * 0.04 + i * 41) % (H + 20));
+        const c = ["rgba(255, 200, 240, 0.9)", "rgba(200, 255, 230, 0.9)", "rgba(255, 255, 200, 0.9)"][i % 3];
+        glowDot(ctx, x, y, H * 0.01, c);
+      }
+    },
+
+    megaEnd(ctx, W, H, scroll, ts, t) {
+      // a purple galaxy swirl
+      const cx = wrapX(W * 0.65, scroll, 0.03, W + H, H * 0.5), cy = H * 0.32;
+      glowDot(ctx, cx, cy, H * 0.35, "rgba(170, 90, 255, 0.35)");
+      for (let arm = 0; arm < 2; arm++) {
+        for (let i = 0; i < 40; i++) {
+          const a = i * 0.25 + arm * Math.PI + t * 0.15;
+          const r = i * H * 0.0065;
+          ctx.fillStyle = i % 3 ? "rgba(220, 180, 255, 0.7)" : "rgba(255, 255, 255, 0.9)";
+          const d = Math.max(1, H * 0.006);
+          ctx.fillRect(cx + Math.cos(a) * r * 1.6, cy + Math.sin(a) * r * 0.7, d, d);
+        }
+      }
+      // floating End islands, bobbing
+      const span = W + H * 1.2;
+      for (let i = 0; i < 3; i++) {
+        const x = wrapX(i * H * 0.65 + H * 0.3, scroll, 0.18, span, H * 0.4);
+        const y = H * (0.25 + i * 0.12) + Math.sin(t * 0.7 + i * 2) * H * 0.015;
+        const w = H * (0.22 - i * 0.03);
+        ctx.fillStyle = "rgba(225, 222, 160, 0.75)";
+        ctx.fillRect(x, y, w, w * 0.15);
+        ctx.fillRect(x + w * 0.15, y + w * 0.15, w * 0.7, w * 0.12);
+        ctx.fillRect(x + w * 0.35, y + w * 0.27, w * 0.3, w * 0.1);
+        ctx.fillStyle = "rgba(40, 20, 50, 0.8)"; // a little obsidian pillar
+        ctx.fillRect(x + w * 0.45, y - w * 0.4, w * 0.1, w * 0.4);
+      }
+      // shooting stars, one every couple of seconds
+      for (let i = 0; i < 2; i++) {
+        const k = ((t * 0.45 + i * 0.5) % 1);
+        if (k > 0.35) continue;
+        const sx = W * (0.15 + 0.55 * ((Math.floor(t * 0.45 + i * 0.5) * 0.37 + i * 0.3) % 1)) + k * W * 0.9;
+        const sy = H * 0.05 + k * H * 0.45;
+        ctx.strokeStyle = `rgba(255, 255, 255, ${1 - k / 0.35})`;
+        ctx.lineWidth = Math.max(1, H * 0.005);
+        ctx.beginPath();
+        ctx.moveTo(sx, sy);
+        ctx.lineTo(sx - H * 0.12, sy - H * 0.06);
+        ctx.stroke();
+      }
+    },
+
+    megaEndStorage(ctx, W, H, scroll, ts, t) {
+      const groundY = H - ts;
+      // the whole room slowly pulses purple
+      ctx.fillStyle = `rgba(160, 60, 255, ${0.08 + 0.06 * Math.sin(t * 2)})`;
+      ctx.fillRect(0, 0, W, H);
+      // glowing purple crystals, floor and ceiling
+      const span = W + H;
+      for (let i = 0; i < 6; i++) {
+        const x = wrapX(i * H * 0.33, scroll, 0.35, span, H * 0.2);
+        const up = i % 2 === 0;
+        const h = H * (0.2 + (i % 3) * 0.06), w = H * 0.08;
+        const y = up ? groundY : 0;
+        glowDot(ctx, x + w / 2, up ? groundY - h / 2 : h / 2, h, `rgba(190, 100, 255, ${0.3 + 0.2 * Math.sin(t * 3 + i)})`);
+        crystal(ctx, x, y, w, h, "#9b4dff", "#d9b3ff", up);
+      }
+      // floating crates
+      const cspan = W + H * 1.3;
+      for (let i = 0; i < 4; i++) {
+        const x = wrapX(i * H * 0.45 + H * 0.15, scroll, 0.25, cspan, H * 0.2);
+        const y = H * (0.2 + (i % 3) * 0.15) + Math.sin(t * 1.1 + i * 1.7) * H * 0.02;
+        const s = H * 0.07;
+        ctx.fillStyle = "rgba(150, 100, 60, 0.85)";
+        ctx.fillRect(x, y, s, s);
+        ctx.fillStyle = "rgba(100, 65, 35, 0.9)";
+        ctx.fillRect(x, y, s, s * 0.12);
+        ctx.fillRect(x, y + s * 0.88, s, s * 0.12);
+        ctx.fillRect(x + s * 0.44, y, s * 0.12, s);
+      }
+    },
+
+    megaDeepCave(ctx, W, H, scroll, ts, t) {
+      const groundY = H - ts;
+      // a waterfall
+      const wx = wrapX(H * 0.9, scroll, 0.3, W + H, H * 0.1), ww = H * 0.07;
+      ctx.fillStyle = "rgba(60, 140, 230, 0.75)";
+      ctx.fillRect(wx, 0, ww, groundY);
+      ctx.fillStyle = "rgba(220, 240, 255, 0.7)";
+      const step = H * 0.05;
+      for (let y = ((t * H * 0.6) % step) - step; y < groundY; y += step) {
+        ctx.fillRect(wx + ww * 0.15, y, ww * 0.15, step * 0.5);
+        ctx.fillRect(wx + ww * 0.6, y + step * 0.4, ww * 0.15, step * 0.4);
+      }
+      glowDot(ctx, wx + ww / 2, groundY, H * 0.1, "rgba(200, 230, 255, 0.5)"); // splash mist
+      // dripstone hanging from the roof, with sparkles
+      const span = W + H;
+      for (let i = 0; i < 7; i++) {
+        const x = wrapX(i * H * 0.3 + H * 0.1, scroll, 0.4, span, H * 0.1);
+        const h = H * (0.08 + ((i * 13) % 5) / 40), w = H * 0.03;
+        ctx.fillStyle = "#7a6a58";
+        for (let k = 0; k < 4; k++) ctx.fillRect(x + (w * k) / 8, (h * k) / 4, w - (w * k) / 4, h / 4 + 1);
+        if (Math.sin(t * 3 + i * 1.3) > 0.7) glowDot(ctx, x + w / 2, h, H * 0.015, "rgba(255, 255, 255, 0.95)");
+      }
+      // glowing crystals on the floor
+      for (let i = 0; i < 5; i++) {
+        const x = wrapX(i * H * 0.4 + H * 0.25, scroll, 0.5, W + H, H * 0.1);
+        const h = H * (0.14 + (i % 3) * 0.05), w = H * 0.065;
+        const c = i % 2 ? ["#36d6e7", "#b8f6ff"] : ["#3f7bff", "#bcd0ff"];
+        glowDot(ctx, x + w / 2, groundY - h / 2, h, `rgba(80, 200, 255, ${0.3 + 0.15 * Math.sin(t * 2 + i)})`);
+        crystal(ctx, x, groundY, w, h, c[0], c[1], true);
+      }
+    },
+  };
+
   // effect: null | "fast" | "slow" (lightning / wither rose tints)
   const drawBackground = (ctx, kind, W, H, scroll, ts, t, effect) => {
+    if (MEGA_LAYERS[kind]) {
+      if (kind !== "megaOverworld") drawBackground(ctx, bgBase(kind), W, H, scroll, ts, t, null);
+      MEGA_LAYERS[kind](ctx, W, H, scroll, ts, t);
+      if (effect) {
+        ctx.fillStyle = effect === "fast" ? "rgba(255, 190, 60, 0.25)" : "rgba(40, 40, 60, 0.4)";
+        ctx.fillRect(0, 0, W, H);
+      }
+      return;
+    }
     const groundY = H - ts;
     if (kind === "nether") {
       ctx.fillStyle = skyGrad(ctx, H, "#1e0303", "#6a1a0e");
@@ -2080,6 +2367,7 @@ window.BDArt = (() => {
     drawEraser,
     drawBackground,
     BACKGROUNDS,
+    bgBase,
     drawSprite,
     registerSprite,
     loadSprites,

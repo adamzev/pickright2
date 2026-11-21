@@ -361,6 +361,8 @@
       coins: n(b.coins), mega: n(b.mega), shields: n(b.shields),
       sword: Math.min(n(b.sword), SWORDS.length - 1),
       unlocked: Array.isArray(b.unlocked) ? b.unlocked.filter((k) => TILES[k] && TILES[k].mega) : [],
+      // mega backgrounds bought in the shop
+      bgs: Array.isArray(b.bgs) ? b.bgs.filter((k) => window.BDArt.BACKGROUNDS.some((x) => x.mega && x.key === k)) : [],
     };
   };
 
@@ -399,7 +401,7 @@
   // The arena a level gets until someone draws their own: a floor, a start
   // and three Boss platforms stepping up toward the boss's head.
   const defaultArena = (bg) => {
-    const floor = { nether: "n", end: "e", endStorage: "e", deepCave: "p" }[bg] || "g";
+    const floor = { nether: "n", end: "e", endStorage: "e", deepCave: "p" }[window.BDArt.bgBase(bg)] || "g";
     const g = Array.from({ length: H }, (_, y) => Array(ARENA_W).fill(y === H - 1 ? floor : AIR));
     g[H - 2][2] = "P";
     for (const [x, y] of BOSS_PLATS) g[y][x] = "J";
@@ -739,6 +741,15 @@
     return panel;
   };
 
+  // Badge Master's surprise: a crown, a secret song and a pile of coins
+  const MASTER_COINS = 1000;
+  window.addEventListener("bd-badge", (e) => {
+    if (e.detail !== "master") return;
+    const b = loadBag();
+    saveBag(Object.assign(b, { coins: b.coins + MASTER_COINS }));
+    setTimeout(() => toast(`🏆 SURPRISE! A golden crown 👑, a secret song in 🎵 Music, and +${MASTER_COINS} coins!`), 3200);
+  });
+
   // ---------- badges screen ----------
   const showBadges = () => {
     clear();
@@ -857,6 +868,7 @@
     songs.appendChild(el("h2", null, "Pick a song"));
     const list = stack();
     for (const [k, song] of Object.entries(M.SONGS)) {
+      if (song.secret && !window.BDBadges.has("master")) continue;
       const row = el("div", "row tight");
       const pick = el("button", k === M.song ? "green" : "", `${song.icon} ${song.name}${k === M.song ? " ✓" : ""}`);
       pick.style.minWidth = "170px";
@@ -882,6 +894,15 @@
 
   // ---------- the shop ----------
 
+  const MEGA_BG_WHAT = {
+    megaOverworld: "A sunset, a rainbow, birds and mountains",
+    megaNether: "Lava waterfalls, embers and crimson trees",
+    megaMooshroom: "Giant glowing mushrooms and floating spores",
+    megaEnd: "A galaxy swirl, shooting stars and floating islands",
+    megaEndStorage: "Glowing crystals, pulsing lights and floating crates",
+    megaDeepCave: "A waterfall, glowing crystals and sparkly dripstone",
+  };
+
   const showShop = () => {
     clear();
     const bag = loadBag();
@@ -895,6 +916,13 @@
 
     const thumb = (key) => {
       if (petBaseOf(key)) return spriteThumb(key, 48, 48); // pets aren't square
+      if (Art.BACKGROUNDS.some((b) => b.key === key)) {
+        const c = el("canvas");
+        c.width = 86;
+        c.height = 48;
+        Art.drawBackground(c.getContext("2d"), key, 86, 48, 0, 8, 3, null);
+        return c;
+      }
       const c = el("canvas");
       c.width = c.height = 48;
       drawTile(c.getContext("2d"), key, 0, 0, 48, 0, false);
@@ -995,6 +1023,17 @@
         () => spend({ mega: bag.mega - MEGA_COST, unlocked: bag.unlocked.concat(ch) })));
     });
     root.appendChild(megaShop);
+
+    const bgShop = el("div", "panel");
+    bgShop.appendChild(el("h2", null, "✨ Mega backgrounds"));
+    bgShop.appendChild(el("p", "hint",
+      "Fancier versions of the backgrounds. Buy one and you can pick it for your levels in the Level Maker."));
+    Art.BACKGROUNDS.filter((b) => b.mega).forEach((b) => {
+      bgShop.appendChild(item(b.key, b.label.replace("✨ ", ""), MEGA_BG_WHAT[b.key], MEGA_COST, "megacoins",
+        bag.bgs.includes(b.key) ? "Yours ✓" : "",
+        () => spend({ mega: bag.mega - MEGA_COST, bgs: bag.bgs.concat(b.key) })));
+    });
+    root.appendChild(bgShop);
   };
 
   const showMenu = () => {
@@ -2008,6 +2047,11 @@
     const bgBtns = Art.BACKGROUNDS.map((b) => {
       const btn = el("button", "small", b.label);
       btn.onclick = () => {
+        // a mega background has to be bought in the shop before it can be picked
+        if (b.mega && !loadBag().bgs.includes(b.key) && b.key !== shownBg()) {
+          toast(`Buy ${b.label.replace("✨ ", "")} in the Shop: ${MEGA_COST} megacoins`);
+          return;
+        }
         // the buttons set the background of whichever one is being edited
         if (editing === "arena") arenaBg = b.key;
         else bg = b.key;
@@ -2020,6 +2064,11 @@
     });
     const showBg = () =>
       bgBtns.forEach((x, i) => x.classList.toggle("green", Art.BACKGROUNDS[i].key === shownBg()));
+    // locked mega backgrounds look locked
+    const ownedBgs = loadBag().bgs;
+    Art.BACKGROUNDS.forEach((b, i) => {
+      if (b.mega && !ownedBgs.includes(b.key)) bgBtns[i].textContent = "🔒 " + b.label.replace("✨ ", "");
+    });
     bgRow.append(...bgBtns);
     namePanel.appendChild(bgRow);
 
@@ -2051,7 +2100,9 @@
     musicRow.style.marginTop = "8px";
     musicRow.appendChild(el("span", "hint", "Music:"));
     const musicBtns = [[null, "Player's choice"]]
-      .concat(Object.entries(window.BDMusic.SONGS).map(([k, sg]) => [k, `${sg.icon} ${sg.name}`]))
+      .concat(Object.entries(window.BDMusic.SONGS)
+        .filter(([k, sg]) => !sg.secret || window.BDBadges.has("master") || k === music)
+        .map(([k, sg]) => [k, `${sg.icon} ${sg.name}`]))
       .map(([k, label]) => {
         const btn = el("button", "small" + (k === music ? " green" : ""), label);
         btn.onclick = () => {
@@ -3818,6 +3869,25 @@
       ctx.restore();
     };
 
+    // Badge Master's golden crown, turning with the player
+    const crownOn = window.BDBadges.has("master");
+    const drawCrown = (angle, pw, ph) => {
+      if (!crownOn) return;
+      const u = pw / 7;
+      ctx.save();
+      ctx.translate((player.x + PLAYER_W / 2 - camX) * TS, (player.y + PLAYER_H / 2) * TS);
+      ctx.rotate(angle);
+      const top = -ph / 2 - u * 3;
+      ctx.fillStyle = "#ffd54a";
+      ctx.fillRect(-u * 2.5, top + u * 1.5, u * 5, u * 1.5);
+      for (const x of [-2.5, -0.5, 1.5]) ctx.fillRect(x * u, top, u, u * 1.5);
+      ctx.fillStyle = "#e53935";
+      ctx.fillRect(-u * 0.5, top + u * 1.8, u, u * 0.9);
+      ctx.fillStyle = "#fff6c2";
+      ctx.fillRect(-u * 2.5, top + u * 1.5, u * 5, u * 0.35);
+      ctx.restore();
+    };
+
     // The pet runs where you were a moment ago, so it jumps when you jump.
     const drawPet = () => {
       const sp = pet && Art.SPRITES[pet];
@@ -4110,6 +4180,7 @@
           const pw = PLAYER_W * TS * k, ph = PLAYER_H * TS * k;
           drawPlayer(ctx, (player.x + PLAYER_W / 2 - camX) * TS - pw / 2,
             (player.y + PLAYER_H / 2) * TS - ph / 2, pw, ph, rot, hero);
+          if (window.BDBadges.has("master")) drawCrown(rot, pw, ph);
           // sword in hand for the boss fight
           if (inBoss && sword) {
             drawTile(ctx, SWORDS[sword].key, (player.x + PLAYER_W * 0.55 - camX) * TS,
