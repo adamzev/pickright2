@@ -74,12 +74,15 @@ function boot(profile) {
 
   // canvases record what they're asked to draw
   let log = [];
+  // Canvases set up while loading (sprites) are named "art", the rest by the
+  // order play creates them, so adding new art doesn't renumber everything.
   let canvases = 0;
+  let prefix = "art";
   const fmt = (v) => typeof v === "number" ? Math.round(v * 1000) / 1000
     : v && v.tagName ? v.tagName : v && v.__id ? v.__id : typeof v === "object" ? "obj" : v;
   w.HTMLCanvasElement.prototype.getContext = function () {
     if (this.__ctx) return this.__ctx;
-    const id = "cv" + (++canvases);
+    const id = prefix === "art" ? "art" : prefix + (++canvases);
     const target = { canvas: this, __id: id };
     this.__ctx = new Proxy(target, {
       get(t, k) {
@@ -101,6 +104,8 @@ function boot(profile) {
   w.HTMLCanvasElement.prototype.toDataURL = () => "data:,";
 
   code.forEach((c, i) => w.eval(c + "\n//# sourceURL=" + scripts[i]));
+  prefix = "cv";
+  log = []; // drawing done while loading isn't part of play
   return {
     w,
     tick(ms) { now += ms; const cb = frame; frame = null; if (cb) cb(now); },
