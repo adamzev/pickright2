@@ -1237,7 +1237,21 @@ window.BDArt = (() => {
     ".c..m..k..",
   ], { m: "#ff2bd6", c: "#21e6ff", k: "#111111", w: "#ffffff" });
 
+  // Sir Rock, from the original Pick Right adventure: "It does nothing."
+  const petRock = paintMap([
+    "....dddddd....",
+    "..ddGGGGGGdd..",
+    ".dGGLLGGGGGGd.",
+    "dGGLGGGGGGGGGd",
+    "dGGGeGGGGeGGGd",
+    "dGGGGGGGGGGGGd",
+    "dGGGGkkkkGGGGd",
+    ".dGGGGGGGGGGd.",
+    "..dddddddddd..",
+  ], { d: "#4a4a4a", G: "#8a8a8a", L: "#b8b8b8", e: "#1a1a1a", k: "#2a2a2a" });
+
   const SPRITES = {
+    petRock: petRock,
     petGlitch: petGlitch,
     petCat: petCat,
     petDog: petDog,
@@ -1394,6 +1408,7 @@ window.BDArt = (() => {
     { key: "petParrot", label: "Parrot pet" },
     { key: "petDragon", label: "Baby dragon pet" },
     { key: "petGlitch", label: "Glitch pet" },
+    { key: "petRock", label: "Sir Rock" },
   ];
 
   // The built-in look, kept aside so "reset" can always get back to it.

@@ -496,3 +496,27 @@ button.tool-btn.sel {
 /* the secret level's card flickers pink and blue */
 .glitch-card { border-color: #ff2bd6; animation: glitch-flicker 1.2s steps(2) infinite; }
 @keyframes glitch-flicker { 50% { border-color: #21e6ff; } }
+
+/* sound on/off, always in the top-right corner; dim and grey so it
+   doesn't pull the eye away from the game until you hover it */
+.bd-speaker {
+  position: fixed;
+  top: 10px;
+  right: 10px;
+  z-index: 50;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  filter: grayscale(1);
+  opacity: 0.35;
+}
+.bd-speaker:hover, .bd-speaker:focus-visible { opacity: 0.9; background: rgba(255, 255, 255, 0.08); }

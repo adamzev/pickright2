@@ -22,6 +22,7 @@
     { id: "perfect", icon: "✨", name: "Perfect", how: "Finish a level without dying once" },
     { id: "master", icon: "🏆", name: "Badge Master", how: "Get every other badge, for a surprise reward!" },
     // extra: a bonus on top; it doesn't count toward Badge Master or the total
+    { id: "legend", icon: "🔥", name: "Daily Legend", how: "Finish the daily level 30 days in a row", extra: true },
     { id: "glitch", icon: "🌀", name: "Glitch Slayer", how: "Beat The Glitch, the secret boss", secret: true, extra: true },
     { id: "cat", icon: "🐱", name: "Crazy Cat Person", how: "Cat player, cat pet and the Meow song, all at once", secret: true },
     { id: "goodboy", icon: "🐶", name: "Good Boy", how: "Finish a level with the dog pet and the Woof song", secret: true },

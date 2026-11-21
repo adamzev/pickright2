@@ -46,6 +46,10 @@
     try { localStorage.setItem(KEY, JSON.stringify(settings)); } catch (e) { /* ignore */ }
   };
 
+  // Every visit starts quiet; the speaker button turns sound on. Not saved,
+  // so nobody gets blasted by music they turned on last time.
+  let muted = true;
+
   let ctx = null, master, echo, pulse, noise;
   let inBoss = false, levelSong = null, playing = null, bus = null, step = 0, nextT = 0, timer = 0;
   // Mega versions: a separate remix of each song, unlocked in the shop.
@@ -744,7 +748,7 @@
   // ----- playing -----
 
   const wanted = () => {
-    if (settings.song === "off") return null;
+    if (muted || settings.song === "off") return null;
     if (inBoss) return inBoss;
     if (levelSong === "off") return null;
     return levelSong || settings.song;
@@ -890,8 +894,25 @@
     else ctx.resume();
   });
 
+  // ----- the speaker button, in the corner of every screen -----
+  const speaker = document.createElement("button");
+  speaker.className = "bd-speaker";
+  const setMuted = (m) => {
+    muted = m;
+    speaker.textContent = m ? "🔇" : "🔊";
+    speaker.title = m ? "Sound is off. Click to turn it on" : "Sound is on. Click to turn it off";
+    update();
+  };
+  // pointerdown would also reach unlock first, which is what starts audio
+  speaker.addEventListener("click", (e) => { e.stopPropagation(); setMuted(!muted); speaker.blur(); });
+  setMuted(true);
+  const addSpeaker = () => document.body.appendChild(speaker);
+  if (document.body) addSpeaker(); else document.addEventListener("DOMContentLoaded", addSpeaker);
+
   window.BDMusic = {
     SONGS,
+    get muted() { return muted; },
+    setMuted,
     VOLUMES,
     get song() { return settings.song; },
     get vol() { return settings.vol; },
@@ -915,6 +936,8 @@
       if (!SONGS[k]) return;
       settings.song = k;
       save();
+      // picking a song means you want to hear it
+      setMuted(false);
       unlock();
       // picking a song again restarts it, so you can hear it from the top
       playing = playing === wanted() ? "restart" : playing;
@@ -936,7 +959,7 @@
     // kind: cat, dog, frog, parrot or dragon. A run of diamonds is one sound,
     // not a pile of them.
     sfx(kind) {
-      if (!SFX[kind] || !ctx || ctx.state !== "running") return;
+      if (muted || !SFX[kind] || !ctx || ctx.state !== "running") return;
       if (ctx.currentTime - sfxAt < 0.3) return;
       sfxAt = ctx.currentTime;
       if (!sfxBus) { sfxBus = ctx.createGain(); sfxBus.connect(master); }

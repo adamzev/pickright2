@@ -82,6 +82,11 @@
   };
 
   const renderPickPreview = (option) => {
+    // Picking Sir Rock here unlocks him as a pet in Block Dash (same site,
+    // so Block Dash can read this).
+    if (option.name === "A pet rock") {
+      try { localStorage.setItem("pickright_sir_rock", "1"); } catch (e) { /* ignore */ }
+    }
     // If both picture and result_picture exist: show preview first
     if (option.picture && option.picture.length && option.result_picture) {
       setScreen(`

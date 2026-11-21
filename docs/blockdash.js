@@ -161,6 +161,9 @@
   const GLITCH_SIZE = 2;
   const GLITCH_SPOTS = [[17, 9], [11, 9], [8.5, 4.8], [16.5, 3.5], [4.5, 6.8]];
   const GLITCH_SOLID = 6; // seconds it stays stompable
+  const GLITCH_HP = 10; // stomps to beat it; a sword doesn't shorten this one
+  const GLITCH_BLOCKS = 5; // squares to fix before it turns solid
+  const GLITCH_FIX_TIME = 15; // seconds to fix them all, or they glitch again
   const GLITCH_COLORS = ["#ff2bd6", "#21e6ff", "#111111", "#ffffff", "#7b2bff"];
   const BOSS_SHOT_SPEED = 7; // its stars fly straight, so this can beat the Shooter's 5.5
   const CUT_END = 5; // seconds the intro runs for
@@ -708,16 +711,29 @@
   ];
   const PET_SOUND = Object.fromEntries(PETS.map(([k, , snd]) => [k, snd]));
   PET_SOUND.petGlitch = "glitch"; // The Glitch's reward: not in the shop, not needed for Pet Lover
+  // Sir Rock, from the original Pick Right adventure: unlocked by picking
+  // the pet rock there. Makes no sound (there's no "rock" sound) and never
+  // moves from the start.
+  PET_SOUND.petRock = "rock";
   const FLYING_PETS = ["petParrot", "petDragon", "petGlitch"];
+  const STILL_PETS = ["petRock"];
   const CAT_LOOK = "\ue934"; // the shipped black-cat player look
   const petBaseOf = (k) => (PET_SOUND[k] ? k : PET_SOUND[Art.baseOf(k)] ? Art.baseOf(k) : null);
-  const allPets = () => PETS.map(([key, label]) => ({ key, label })).concat([{ key: "petGlitch", label: "Glitch" }])
+  const allPets = () => PETS.map(([key, label]) => ({ key, label })).concat([{ key: "petGlitch", label: "Glitch" }, { key: "petRock", label: "Sir Rock" }])
     .concat(Art.customBlocks().filter((b) => PET_SOUND[b.base]).map((b) => ({ key: b.key, label: b.label })));
+  const rockFound = () => {
+    try { return localStorage.getItem("pickright_sir_rock") === "1"; } catch (e) { return false; }
+  };
   const loadPets = () => {
     let p = {};
     try { p = JSON.parse(localStorage.getItem(PET_KEY) || "{}") || {}; } catch (e) { /* no pets yet */ }
     // a drawn pet whose art isn't in this browser is kept, just not shown
     const owned = Array.isArray(p.owned) ? p.owned.filter((k) => typeof k === "string") : [];
+    // Sir Rock is owned only while the adventure says you picked him; a save
+    // from when he was briefly free for everyone may list him anyway
+    const rockAt = owned.indexOf("petRock");
+    if (rockFound() && rockAt < 0) owned.push("petRock");
+    if (!rockFound() && rockAt >= 0) owned.splice(rockAt, 1);
     return { owned, pick: owned.includes(p.pick) && petBaseOf(p.pick) ? p.pick : null };
   };
   const savePets = (p) => {
@@ -730,12 +746,18 @@
     const panel = el("div", "panel");
     panel.appendChild(el("h2", null, "🐾 Pick your pet"));
     const mine = allPets().filter((pt) => pets.owned.includes(pt.key));
-    if (!mine.length) {
-      panel.appendChild(el("p", "hint", `No pets yet. Buy one in the 🛒 Shop for ${PET_COST} coins!`));
-      return panel;
-    }
+    if (!mine.length) panel.appendChild(el("p", "hint", `No pets yet. Buy one in the 🛒 Shop for ${PET_COST} coins!`));
     const row = el("div", "row");
-    [{ key: null, label: "None" }].concat(mine).forEach(({ key, label }) => {
+    // a locked card, so there's something to go looking for
+    const lockedRock = () => {
+      const item = el("div", "pal-item");
+      item.style.minWidth = "76px";
+      item.style.opacity = "0.45";
+      item.title = "Find me in Pick Right";
+      item.append(spriteThumb("petRock", 48, 48), el("div", "lbl", "🔒 Sir Rock"), el("div", "lbl", "Find me in Pick Right"));
+      return item;
+    };
+    (mine.length ? [{ key: null, label: "None" }].concat(mine) : []).forEach(({ key, label }) => {
       const item = el("div", "pal-item" + (key === pets.pick ? " sel" : ""));
       item.style.minWidth = "76px";
       const thumb = key ? spriteThumb(key, 48, 48) : el("canvas");
@@ -748,6 +770,7 @@
       };
       row.appendChild(item);
     });
+    if (!rockFound()) row.appendChild(lockedRock());
     panel.appendChild(row);
     return panel;
   };
@@ -878,6 +901,232 @@
     root.appendChild(panel);
   };
 
+  // ---------- made-up levels: Endless and the daily level ----------
+  // Built from a seed out of short pieces (flat run, gap, hazard, step,
+  // floating platform). Gaps are at most 3 wide and steps at most 2 high:
+  // a jump covers about 4 blocks across and 2.4 up.
+  const WORLDS = [
+    { bg: "overworld", ground: "g", hazard: "t" },
+    { bg: "nether", ground: "n", hazard: "L" }, // lava is a pit in the floor
+    { bg: "end", ground: "e", hazard: "T" },
+    { bg: "deepCave", ground: "p", hazard: "A" },
+  ];
+  const ZONE = 200; // Endless changes world every this many blocks
+  const ENDLESS_W = 4000; // "endless": nobody runs 4000 blocks without dying
+  const ENDLESS_HARDEST = 2000; // blocks until the pieces are as hard as they get
+  // +5% speed per lap of the four worlds, up to +20%. Even then a jump goes
+  // about 5 blocks, so a 3-wide gap and its 3 blocks of landing still work.
+  const lapSpeed = (x) => 1 + Math.min(0.2, 0.05 * Math.floor(x / (ZONE * WORLDS.length)));
+
+  const seeded = (seed) => () => { // mulberry32: same seed, same level
+    seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+
+  // hardAt(x): 0 (gentle) to 1 (hardest) at block x
+  const buildLevel = (width, worldAt, rand, hardAt = () => 0.3) => {
+    const g = Array.from({ length: H }, () => Array(width).fill(AIR));
+    const floor = H - 1;
+    const put = (x, y, ch) => { if (x >= 0 && x < width && y >= 0 && y < H) g[y][x] = ch; };
+    const ground = (x, n = 1) => { for (let i = 0; i < n; i++) put(x + i, floor, worldAt(x + i).ground); };
+    const pick = (n) => Math.floor(rand() * n);
+    // n squares of the world's hazard starting at x (lava is a pit; the rest sit on the floor)
+    const hazard = (x, n) => {
+      const w = worldAt(x);
+      for (let i = 0; i < n; i++) {
+        if (w.hazard === "L") put(x + i, floor, "L");
+        else { ground(x + i); put(x + i, floor - 1, w.hazard); }
+      }
+    };
+    ground(0, 10);
+    put(2, floor - 1, "P");
+    let x = 10;
+    while (x < width - 14) {
+      const d = hardAt(x), w = worldAt(x);
+      // harder: fewer flat breathers, more hazards
+      const weights = [0.22 - 0.14 * d, 0.2, 0.2 + 0.05 * d, 0.2, 0.18, 0.2 * d];
+      let r = rand() * weights.reduce((a, b) => a + b), kind = 0;
+      while (r > weights[kind]) r -= weights[kind++];
+      if (kind === 0) { // flat, with diamonds to hop for
+        const n = Math.max(3, 4 + pick(4) - Math.round(2 * d));
+        ground(x, n);
+        for (let i = 1; i < n - 1; i++) if (rand() < 0.35) put(x + i, floor - 2 - pick(2), "d");
+        x += n;
+      } else if (kind === 1) { // a gap
+        const n = 2 + pick(2);
+        if (rand() < 0.5) put(x + 1, floor - 3, "d");
+        ground(x + n, 3);
+        x += n + 3;
+      } else if (kind === 2) { // TNT / lava / spikes, wider when it's hard
+        ground(x, 2);
+        const n = 1 + pick(d > 0.5 ? 3 : 2);
+        hazard(x + 2, n);
+        if (rand() < 0.5) put(x + 2, floor - 3, "d");
+        ground(x + 2 + n, 3);
+        x += 2 + n + 3;
+      } else if (kind === 3) { // a step up and back down, maybe with a trap on top
+        const h = 1 + pick(2), n = 3 + pick(3);
+        ground(x, 2);
+        for (let i = 0; i < n; i++) for (let y = floor; y >= floor - h; y--) put(x + 2 + i, y, worldAt(x + 2 + i).ground);
+        if (d > 0.6 && n >= 4 && rand() < 0.5) {
+          put(x + 2 + (n >> 1), floor - h - 1, w.hazard === "L" ? "F" : w.hazard);
+        } else if (rand() < 0.6) put(x + 2 + (n >> 1), floor - h - 1, "d");
+        ground(x + 2 + n, 3);
+        x += 2 + n + 3;
+      } else if (kind === 4) { // a wide gap with a low platform in the middle: two jumps
+        ground(x, 2);
+        for (let i = 4; i < 8; i++) put(x + i, floor - 1, w.ground);
+        put(x + 5, floor - 2, "d");
+        ground(x + 10, 3);
+        x += 13;
+      } else { // two hazards close together (only once it's getting hard)
+        ground(x, 2);
+        const a = 1 + pick(2), b = 1 + pick(2);
+        hazard(x + 2, a);
+        ground(x + 2 + a, 3);
+        hazard(x + 5 + a, b);
+        ground(x + 5 + a + b, 3);
+        x += 8 + a + b;
+      }
+    }
+    ground(x, width - x);
+    return g;
+  };
+
+  const makeEndless = () => {
+    const rand = seeded(Math.floor(Math.random() * 1e9));
+    const worldAt = (x) => WORLDS[Math.floor(x / ZONE) % WORLDS.length];
+    const g = buildLevel(ENDLESS_W, worldAt, rand, (x) => Math.min(1, x / ENDLESS_HARDEST));
+    return { name: "♾️ Endless", rows: g.map((r) => r.join("")), bg: "overworld",
+      zones: WORLDS.map((w) => w.bg), zoneW: ZONE, endless: true };
+  };
+
+  // ---------- daily challenge ----------
+  const DAILY_KEY = "blockdash_daily_v1";
+  const ENDLESS_BEST_KEY = "blockdash_endless_best";
+  const TRAIL_KEY = "blockdash_trail";
+  const DAILY_COINS = 100;
+  const dayKey = (d = new Date()) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const yesterdayKey = () => { const d = new Date(); d.setDate(d.getDate() - 1); return dayKey(d); };
+  const daySeed = (k) => Number(k.replace(/-/g, ""));
+  const DAILY_TASKS = [
+    { text: "Grab 15 diamonds", goal: 15, stat: "diamond" },
+    { text: "Finish 2 levels", goal: 2, stat: "win" },
+    { text: "Run 300 blocks in one Endless run", goal: 300, stat: "endless", best: true },
+    { text: "Finish a level without dying", goal: 1, stat: "perfect" },
+    { text: "Beat a boss", goal: 1, stat: "boss" },
+  ];
+  const todayTask = () => DAILY_TASKS[daySeed(dayKey()) % DAILY_TASKS.length];
+
+  // A new day clears today's progress but keeps the streak and its rewards.
+  const loadDaily = () => {
+    let d = {};
+    try { d = JSON.parse(localStorage.getItem(DAILY_KEY) || "{}") || {}; } catch (e) { /* first day */ }
+    if (d.day !== dayKey()) Object.assign(d, { day: dayKey(), levelDone: false, taskDone: false, progress: 0 });
+    d.streak = d.streak || 0;
+    d.got = d.got || {};
+    return d;
+  };
+  const saveDaily = (d) => {
+    try { localStorage.setItem(DAILY_KEY, JSON.stringify(d)); } catch (e) { /* ignore */ }
+  };
+  // the streak only shows while it's still alive (done today or yesterday)
+  const liveStreak = (d) => (d.last === dayKey() || d.last === yesterdayKey() ? d.streak : 0);
+  const trailOn = () => {
+    try { return loadDaily().got[7] && localStorage.getItem(TRAIL_KEY) !== "0"; } catch (e) { return false; }
+  };
+
+  const dailyNote = (stat, n = 1) => {
+    const d = loadDaily(), t = todayTask();
+    if (d.taskDone || t.stat !== stat) return;
+    d.progress = t.best ? Math.max(d.progress, n) : d.progress + n;
+    if (d.progress >= t.goal) {
+      d.taskDone = true;
+      const b = loadBag();
+      saveBag(Object.assign(b, { coins: b.coins + DAILY_COINS }));
+      toast(`✅ Daily task done! +${DAILY_COINS} coins`);
+    }
+    saveDaily(d);
+  };
+
+  // Finishing today's daily level: coins, the streak, and streak rewards.
+  const dailyLevelDone = () => {
+    const d = loadDaily();
+    if (d.levelDone) return null;
+    d.levelDone = true;
+    d.streak = d.last === yesterdayKey() ? d.streak + 1 : 1;
+    d.last = dayKey();
+    const b = loadBag();
+    b.coins += DAILY_COINS;
+    const lines = [`+${DAILY_COINS} coins`];
+    if (d.streak >= 3 && !d.got[3]) { d.got[3] = true; b.mega += 10; lines.push("3-day reward: +10 megacoins"); }
+    if (d.streak >= 7 && !d.got[7]) { d.got[7] = true; lines.push("7-day reward: 🌈 rainbow trail!"); }
+    if (d.streak >= 30 && !d.got[30]) {
+      d.got[30] = true;
+      b.mega += 1000;
+      lines.push("30-day reward: +1000 megacoins and Daily Legend!");
+    }
+    saveBag(b);
+    saveDaily(d);
+    if (d.got[30]) window.BDBadges.earn("legend");
+    return { streak: d.streak, lines };
+  };
+
+  const makeDaily = () => {
+    const k = dayKey(), seed = daySeed(k), rand = seeded(seed);
+    const world = WORLDS[seed % WORLDS.length];
+    const W = 160;
+    const g = buildLevel(W, () => world, rand);
+    // two save points, on solid ground near a third and two thirds of the way
+    for (const at of [Math.floor(W / 3), Math.floor((2 * W) / 3)]) {
+      for (let x = at; x < W - 5; x++) {
+        if (isSolid(g[H - 1][x]) && g[H - 2][x] === AIR && g[H - 3][x] === AIR) { g[H - 2][x] = "C"; break; }
+      }
+    }
+    const label = new Date().toLocaleDateString(undefined, { month: "short", day: "numeric" });
+    return { name: `📅 Daily ${label}`, rows: g.map((r) => r.join("")), bg: world.bg, daily: k };
+  };
+
+  const showEndless = () => showPlay(makeEndless(), () => showMenu());
+
+  const dailyPanel = () => {
+    const panel = el("div", "panel");
+    panel.appendChild(el("h2", null, "♾️ Endless & 📅 Daily"));
+    const list = stack();
+    let best = 0;
+    try { best = Number(localStorage.getItem(ENDLESS_BEST_KEY)) || 0; } catch (e) { /* none */ }
+    const endless = el("div", "level-card");
+    endless.append(el("div", "name",
+      `♾️ Endless<span class="meta">The world changes every ${ZONE} blocks. No save points! · best ${best} blocks</span>`));
+    const goE = el("button", "green small", "▶ Play");
+    goE.onclick = () => showEndless();
+    endless.appendChild(goE);
+    list.appendChild(endless);
+
+    const d = loadDaily(), t = todayTask();
+    const daily = el("div", "level-card");
+    daily.append(el("div", "name",
+      `📅 Daily level<span class="meta">A new level every day · ${d.levelDone ? "done today ✓" : `+${DAILY_COINS} coins`}</span>`));
+    const goD = el("button", "green small", "▶ Play");
+    goD.onclick = () => showPlay(makeDaily(), () => showMenu());
+    daily.appendChild(goD);
+    list.appendChild(daily);
+    panel.appendChild(list);
+
+    const prog = t.best ? `${Math.min(d.progress, t.goal)}/${t.goal}` : `${Math.min(d.progress, t.goal)}/${t.goal}`;
+    panel.appendChild(el("p", null,
+      `✅ Daily task: <b>${t.text}</b> · ${d.taskDone ? "done ✓" : `${prog} · +${DAILY_COINS} coins`}`));
+    const streak = liveStreak(d);
+    const next = [[3, "10 megacoins"], [7, "🌈 rainbow trail"], [30, "Daily Legend + 1000 megacoins"]].find(([n]) => !d.got[n]);
+    panel.appendChild(el("p", "hint",
+      `🔥 Streak: <b>${streak} day${streak === 1 ? "" : "s"}</b> (finish the daily level each day)` +
+      (next ? ` · next reward at ${next[0]} days: ${next[1]}` : " · every streak reward collected!")));
+    return panel;
+  };
+
   // ---------- The Glitch: the secret boss ----------
   // A secret 6th level for Badge Masters, ending in The Glitch's arena.
   const GLITCH_LOOK_KEY = "blockdash_glitch_look";
@@ -948,6 +1197,16 @@
         row.appendChild(item);
       });
     panel.appendChild(row);
+    if (loadDaily().got[7]) {
+      const on = trailOn();
+      const tb = el("button", "small" + (on ? " green" : ""), on ? "🌈 Rainbow trail: on" : "🌈 Rainbow trail: off");
+      tb.style.marginTop = "8px";
+      tb.onclick = () => {
+        try { localStorage.setItem(TRAIL_KEY, on ? "0" : "1"); } catch (e) { /* ignore */ }
+        showMenu();
+      };
+      panel.appendChild(tb);
+    }
     if (window.BDBadges.has("glitch")) {
       const on = glitchLookOn();
       const fx = el("button", "small" + (on ? " green" : ""), on ? "🌀 Glitch effect: on" : "🌀 Glitch effect: off");
@@ -1162,7 +1421,7 @@
     petShop.appendChild(el("h2", null, "🐾 Pet shop"));
     petShop.appendChild(el("p", "hint",
       "A pet follows you through every level and makes its sound when you grab a diamond. Pick it on the title screen."));
-    for (const pt of allPets().filter((p) => p.key !== "petGlitch")) {
+    for (const pt of allPets().filter((p) => p.key !== "petGlitch" && p.key !== "petRock")) {
       const owned = pets.owned.includes(pt.key);
       const row = item(pt.key, pt.label, owned ? "Yours!" : "Follows you around", PET_COST, "coins",
         owned ? "Owned ✓" : "", () => {
@@ -1225,6 +1484,13 @@
     window.BDBadges.coins(loadBag().coins);
     if (PETS.every(([k]) => loadPets().owned.includes(k))) window.BDBadges.earn("pets");
     window.BDBadges.checkMaster();
+    // Beat The Glitch while an old saved copy of the badge code was loaded?
+    // That win never counted, so finishing "???" gives the rewards now.
+    if (!window.BDBadges.has("glitch")) {
+      let beaten = false;
+      try { beaten = bestKey(GLITCH_LEVEL) in (JSON.parse(localStorage.getItem(BEST_KEY) || "{}") || {}); } catch (e) { /* no scores */ }
+      if (beaten) window.BDBadges.earn("glitch");
+    }
     clear();
     const levels = loadLevels();
     const builtin = builtinLevels();
@@ -1249,9 +1515,13 @@
     badges.title = "Badges";
     badges.onclick = () => showBadges();
     head.appendChild(badges);
-    const fb = el("button", "small", "📬 Feedback");
-    fb.onclick = () => showFeedback();
-    head.appendChild(fb);
+    // Hidden until notes actually reach someone (it only saves in this
+    // browser for now). Add ?feedback to the address to see it.
+    if (new URLSearchParams(location.search).has("feedback")) {
+      const fb = el("button", "small", "📬 Feedback");
+      fb.onclick = () => showFeedback();
+      head.appendChild(fb);
+    }
     const home = el("a", "btn small", "← Pick Right");
     home.href = "index.html";
     head.appendChild(home);
@@ -1290,12 +1560,12 @@
           "across the whole run."));
       }
       root.appendChild(bp);
-      if (!editMode) root.append(heroPanel(), petPanel(), bagPanel());
+      if (!editMode) root.append(dailyPanel(), heroPanel(), petPanel(), bagPanel());
     }
     if (!editMode) return;
 
     // ---- levels saved in this browser ----
-    root.append(heroPanel(), petPanel(), bagPanel());
+    root.append(dailyPanel(), heroPanel(), petPanel(), bagPanel());
     const panel = el("div", "panel");
     panel.appendChild(el("h2", null, "My levels"));
 
@@ -2971,7 +3241,7 @@
     // True when the run beat the saved ghost. The very first run just
     // becomes the ghost: there's nothing to beat yet.
     const endRun = (finished) => {
-      if (!run || run.ended) return false;
+      if (!run || run.ended || level.endless) return false;
       run.ended = true;
       const r = { path: run.path, far: run.far, boss: run.boss, done: finished, t: runStep, at: Date.now() };
       const old = best;
@@ -2989,6 +3259,37 @@
       saveBag(Object.assign(b, { coins: b.coins + GHOST_BONUS }));
       toast(`👻 NEW BEST! You beat your ghost! +${GHOST_BONUS} coins`);
     };
+    // Endless: one death ends the run. Diamonds turn into coins either way.
+    let overShown = false;
+    const endlessOver = () => {
+      if (overShown) return;
+      overShown = true;
+      const dist = Math.floor(player.x);
+      let best = 0;
+      try { best = Number(localStorage.getItem(ENDLESS_BEST_KEY)) || 0; } catch (e) { /* none */ }
+      const record = dist > best;
+      if (record) { try { localStorage.setItem(ENDLESS_BEST_KEY, String(dist)); } catch (e) { /* ignore */ } }
+      const b = loadBag();
+      saveBag(Object.assign(b, { coins: b.coins + score }));
+      dailyNote("endless", dist);
+      const box = el("div", "overlay-msg");
+      box.innerHTML = `<div class="big">${record ? "🏆 NEW RECORD!" : "Game over!"}</div>` +
+        `<div>You ran <b>${dist}</b> blocks · best ${Math.max(dist, best)}</div>` +
+        `<div>+${score} coins from diamonds · you now have ${b.coins} coins</div>`;
+      const row = el("div", "row");
+      row.style.justifyContent = "center";
+      row.style.marginTop = "10px";
+      const again = el("button", "green small", "▶ Run again");
+      again.onclick = () => { stop(); showEndless(); };
+      const out = el("button", "small", "← Levels");
+      out.onclick = () => { stop(); onExit(); };
+      row.append(again, out);
+      box.appendChild(row);
+      msgSlot.innerHTML = "";
+      msgSlot.appendChild(box);
+      jumpBtn.disabled = true;
+    };
+
     const afterStep = () => {
       runStep++;
       lifeStep++;
@@ -3008,6 +3309,7 @@
     // checkpoint with the level as it was when you got there, so diamonds
     // grabbed before it stay grabbed.
     const reset = (fromStart) => {
+      overShown = false;
       flipT = 0;
       canvas.style.transform = ""; // The Glitch's screen shake
       if (fromStart || !checkpoint) {
@@ -3196,7 +3498,7 @@
       setPlats(true); // its platforms are always there (except when they flicker)
       const [x, top] = GLITCH_SPOTS[0];
       boss = {
-        glitch: true, hp: bossMax, x, top, mode: "phase", solidT: 0, broken: [], rain: [], clones: [], hist: [],
+        glitch: true, hp: GLITCH_HP, max: GLITCH_HP, fixT: 0, x, top, mode: "phase", solidT: 0, broken: [], rain: [], clones: [], hist: [],
         atkT: 3, hurtT: 0, introT: 2.5, fakeT: 0, shakeT: 0, cloneT: 0, rainT: 0, dropT: 0, rewindFx: 0,
         banner: "", bannerT: 0, last: "", gone: false,
       };
@@ -3209,8 +3511,9 @@
       for (let x = 1; x < ARENA_W - 1; x++) if (solidAt(x, H - 1)) cells.push([x, H - 1]);
       if (g.fakeT <= 0) for (const [x, y] of plats) cells.push([x, y]);
       const under = Math.floor(player.x + PLAYER_W / 2);
-      const pick = cells.filter(([x]) => Math.abs(x - under) > 1).sort(() => Math.random() - 0.5).slice(0, 3);
+      const pick = cells.filter(([x]) => Math.abs(x - under) > 1).sort(() => Math.random() - 0.5).slice(0, GLITCH_BLOCKS);
       g.broken = pick.map(([x, y]) => ({ x, y, fixed: false }));
+      g.fixT = GLITCH_FIX_TIME;
     };
 
     const glitchMove = () => {
@@ -3222,7 +3525,7 @@
 
     const glitchAttack = () => {
       const g = boss;
-      const anger = Math.round((1 - g.hp / bossMax) * (BOSS_HP - 1));
+      const anger = Math.round((1 - g.hp / g.max) * 4);
       g.atkT = [5, 4.5, 4, 3.5, 3][anger] || 3;
       const pool = ["rain", "fake", "screen", "clone", "rewind", "flip"].filter((a) => a !== g.last);
       const a = pool[Math.floor(Math.random() * pool.length)];
@@ -3306,6 +3609,12 @@
         if (g.broken.every((c) => c.fixed)) {
           g.mode = "solid";
           g.solidT = GLITCH_SOLID;
+        } else if (g.introT <= 0) {
+          g.fixT -= dt;
+          if (g.fixT <= 0) {
+            toast("⏰ Too slow! The blocks glitched again");
+            breakBlocks();
+          }
         }
       } else {
         g.solidT -= dt;
@@ -3597,8 +3906,12 @@
       const beatGhost = endRun(true);
       const M = window.BDMusic, B = window.BDBadges;
       B.cleared(bestKey(level), builtinLevels().map(bestKey));
-      // first, so its coins are in the bag before the bag is re-read below
+      // first, so their coins are in the bag before the bag is re-read below
       if (inBoss && level.glitch) B.earn("glitch");
+      const daily = level.daily && level.daily === dayKey() ? dailyLevelDone() : null;
+      dailyNote("win");
+      if (run && !run.deaths) dailyNote("perfect");
+      if (inBoss) dailyNote("boss");
       if (inBoss && !level.glitch) { B.earn("boss"); if (!sword) B.earn("bare"); }
       if (run && !run.deaths) B.earn("perfect");
       if (!M.playing) B.earn("silent");
@@ -3621,6 +3934,7 @@
       box.innerHTML =
         `<div class="big">${more || !chain ? "Level Complete!" : "You Finished!"}</div>` +
         (beatGhost ? `<div class="big" style="font-size:1.1rem">👻 NEW BEST! You beat your ghost! +${GHOST_BONUS} coins</div>` : "") +
+        (daily ? `<div class="big" style="font-size:1.1rem">📅 Daily level done! 🔥 ${daily.streak}-day streak · ${daily.lines.join(" · ")}</div>` : "") +
         `<div>Score: ${score} · Best: ${getBest(bestKey(level))}</div>` +
         `<div>+${score} coins${megas ? ` · +${megas} megacoins` : ""} · ` +
         `you now have ${bag.coins} coins${bag.mega ? ` and ${bag.mega} megacoins` : ""}</div>` +
@@ -3926,7 +4240,7 @@
         deadT += dt;
         if (deathKind === "burn" && deadT < 0.7 && Math.random() < 0.5) ember();
         if (deathKind === "poof" && !poofed && deadT >= POOF_AFTER) { poofed = true; puff(); }
-        if (deadT > 0.9) reset();
+        if (deadT > 0.9) { if (level.endless) endlessOver(); else reset(); }
         return;
       }
       if (state === "cut") { updateCut(dt); return; }
@@ -3941,7 +4255,12 @@
       }
       if (shieldT > 0) shieldT -= dt;
 
-      const speed = effect === "fast" ? SPEED_FAST : effect === "slow" ? SPEED_SLOW : SPEED_BASE;
+      let speed = effect === "fast" ? SPEED_FAST : effect === "slow" ? SPEED_SLOW : SPEED_BASE;
+      if (level.endless) {
+        const lap = lapSpeed(player.x);
+        speed *= lap;
+        if (lap > 1) tellOnce("lap" + lap, `⚡ FASTER! Speed +${Math.round((lap - 1) * 100)}%`);
+      }
 
       // horizontal — always forward, unless a Free move block handed you the controls
       const oldX = player.x;
@@ -4118,7 +4437,7 @@
             grid[y][x] = AIR;
             score += COIN_VALUE[ch] * megaTimes(x, y);
             scoreEl.textContent = "💎 " + score;
-            if (ch === "d") window.BDBadges.add("diamonds", megaTimes(x, y));
+            if (ch === "d") { window.BDBadges.add("diamonds", megaTimes(x, y)); dailyNote("diamond", megaTimes(x, y)); }
             if (petBase) window.BDMusic.sfx(PET_SOUND[petBase]);
           } else if (ch === "@") {
             grid[y][x] = AIR;
@@ -4206,13 +4525,15 @@
       camX = clamp(player.x - VIEW_COLS * 0.32, 0, Math.max(0, width - VIEW_COLS));
 
       const pct = clamp(Math.round((player.x / width) * 100), 0, 100);
-      fill.style.width = pct + "%";
-      pctEl.textContent = pct + "%";
+      fill.style.width = level.endless ? "0%" : pct + "%";
+      pctEl.textContent = level.endless ? "🏃 " + Math.floor(player.x) : pct + "%";
     };
 
     // --- rendering ---
     const drawBackground = () =>
-      Art.drawBackground(ctx, inBoss ? arenaBgOf(level) : bgOf(level), canvas.width, canvas.height, camX * TS, TS, time, effect);
+      Art.drawBackground(ctx, inBoss ? arenaBgOf(level)
+        : level.zones ? level.zones[Math.floor((camX + VIEW_COLS / 2) / level.zoneW) % level.zones.length]
+        : bgOf(level), canvas.width, canvas.height, camX * TS, TS, time, effect);
 
     // The ghost: you, tinted glowing blue on a scratch canvas, see-through.
     const ghostCv = el("canvas");
@@ -4281,12 +4602,32 @@
       ctx.restore();
     };
 
+    // the 7-day streak reward: a rainbow along where you've just been
+    const rainbow = trailOn();
+    const drawTrail = () => {
+      if (!rainbow || trail.length < 4) return;
+      const s = TS * 0.2;
+      for (let i = 0; i < trail.length; i += 2) {
+        ctx.fillStyle = `hsla(${(i * 12 + time * 240) % 360}, 90%, 60%, ${((i / trail.length) * 0.8).toFixed(2)})`;
+        ctx.fillRect((trail[i] + PLAYER_W / 2 - camX) * TS - s / 2, (trail[i + 1] + PLAYER_H * 0.65) * TS - s / 2, s, s);
+      }
+    };
+
     // The pet runs where you were a moment ago, so it jumps when you jump.
     const drawPet = () => {
       const sp = pet && Art.SPRITES[pet];
-      if (!sp || trail.length < 2) return;
+      if (!sp) return;
       const sw = sp.width || sp.naturalWidth, sh = sp.height || sp.naturalHeight;
       const h = TS * 0.6, w = (h * sw) / sh;
+      if (STILL_PETS.includes(petBase)) {
+        // sits on the start block of whatever you're playing (the boss arena too)
+        ctx.save();
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(sp, (spawn.x + 0.5 - camX) * TS - w / 2, (spawn.y + 1) * TS - h, w, h);
+        ctx.restore();
+        return;
+      }
+      if (trail.length < 2) return;
       const fly = FLYING_PETS.includes(petBase);
       const lift = fly ? TS * (0.55 + 0.08 * Math.sin(time * 6)) : 0;
       ctx.save();
@@ -4423,13 +4764,14 @@
       ctx.font = "bold 18px ui-monospace, monospace";
       ctx.textAlign = "right";
       ctx.fillStyle = "#ffffff";
-      const bx = canvas.width / 2 - bossMax * 32;
+      // ten chunks, so they're narrower than the TNT Mech's
+      const bx = canvas.width / 2 - g.max * 22;
       ctx.fillText("THE GLITCH", bx - 10, 14);
-      for (let i = 0; i < bossMax; i++) {
+      for (let i = 0; i < g.max; i++) {
         ctx.fillStyle = "#1c1c1c";
-        ctx.fillRect(bx + i * 64, 12, 60, 20);
+        ctx.fillRect(bx + i * 44, 12, 40, 20);
         ctx.fillStyle = i < g.hp ? "#ff2bd6" : "#4a4a4a";
-        ctx.fillRect(bx + i * 64 + 3, 15, 54, 14);
+        ctx.fillRect(bx + i * 44 + 3, 15, 34, 14);
       }
       ctx.textAlign = "center";
       ctx.font = "bold 20px ui-monospace, monospace";
@@ -4439,7 +4781,8 @@
       } else if (state === "run") {
         ctx.fillStyle = "#8ff09a";
         const done = g.broken.filter((c) => c.fixed).length;
-        ctx.fillText(`🛠 Stand on the glitched blocks to fix them: ${done}/${g.broken.length}`, canvas.width / 2, 44);
+        ctx.fillStyle = g.fixT < 5 ? "#ff6b6b" : "#8ff09a";
+        ctx.fillText(`🛠 Fix the glitched blocks: ${done}/${g.broken.length} · ⏰ ${Math.max(0, g.fixT).toFixed(0)}`, canvas.width / 2, 44);
       }
       if (flipT > 0) {
         ctx.fillStyle = "#ffd54a";
@@ -4680,6 +5023,7 @@
         }
       }
       drawGhost();
+      drawTrail();
       drawPet();
       if (state !== "dead") {
         const k = warp ? clamp((warp.t / WARP_TIME - 0.7) / 0.3, 0, 1) : 1;
