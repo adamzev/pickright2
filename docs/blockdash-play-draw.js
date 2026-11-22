@@ -6,12 +6,12 @@
 window.BDPlayDraw = (S, P, BD) => {
   "use strict";
   const {
-    AIR, arenaBgOf, Art, baseOf, bgOf, BLINK_TIME, blinkOn, BOSS_PX, BOSS_TOP, clamp,
-    crashBgOf, DOOR_SWING, drawCone, drawExplosion, drawPlayer, drawTile, el, FLOWED,
-    FLYING_PETS, GALAXY_H, GALAXY_W, GHOST_EVERY, GLITCH_COLORS, GLITCH_SIZE, GLITCH_STONE,
-    glitchLookOn, H, isDoor, isHidden, isLogged, isOpenDoor, isSolid, LOGGABLE, MOB_H, MOB_W,
-    noteKey, overOf, PLAYER_H, PLAYER_W, POOF_AFTER, STILL_PETS, SWORDS, trailOn, WARP_TIME,
-    WATCH_CYCLE
+    AIR, arenaBgOf, Art, baseOf, bgOf, BLINK_TIME, blinkOn, BOSS_PX, BOSS_TOP, CAT_LOOK,
+    clamp, crashBgOf, DOOR_SWING, drawCone, drawExplosion, drawPlayer, drawTile, el, FLOWED,
+    FLYING_PETS, GALAXY_H, GALAXY_LOOK, GALAXY_W, GHOST_EVERY, GLITCH_COLORS, GLITCH_SIZE,
+    GLITCH_STONE, glitchLookOn, H, isDoor, isHidden, isLogged, isOpenDoor, isSolid, LOGGABLE,
+    MOB_H, MOB_W, noteKey, overOf, PLAYER_H, PLAYER_W, POOF_AFTER, STILL_PETS, SWORDS,
+    trailOn, WARP_TIME, WATCH_CYCLE
   } = BD;
   const {
     bossMax, canvas, ctx, dragonAt, eyeOpen, hero, level, pet, petBase, showBoost, sword,
@@ -562,10 +562,12 @@ window.BDPlayDraw = (S, P, BD) => {
         const pw = PLAYER_W * TS * k, ph = PLAYER_H * TS * k;
         drawPlayer(ctx, (S.player.x + PLAYER_W / 2 - S.camX) * TS - pw / 2,
           (S.player.y + PLAYER_H / 2) * TS - ph / 2, pw, ph, S.rot, hero);
-        // the armor suit, worn over whatever look you have, until it breaks
+        // the armor, worn over your look until it breaks; cat-shaped on the
+        // cat and on the Galaxy skin
         if (S.armor > 0) {
           drawPlayer(ctx, (S.player.x + PLAYER_W / 2 - S.camX) * TS - pw / 2,
-            (S.player.y + PLAYER_H / 2) * TS - ph / 2, pw, ph, S.rot, "armorSuit");
+            (S.player.y + PLAYER_H / 2) * TS - ph / 2, pw, ph, S.rot,
+            hero === CAT_LOOK || hero === GALAXY_LOOK ? "armorCat" : "armorSuit");
         }
         if (window.BDBadges.has("master")) drawCrown(S.rot, pw, ph);
         if (glitchFx) drawGlitchFx(S.rot, pw, ph);

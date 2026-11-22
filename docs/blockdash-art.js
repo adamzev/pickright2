@@ -1390,6 +1390,32 @@ window.BDArt = (() => {
 ,
   ], { n: "#1a1850", N: "#2b2a7a", c: "#7ee8ff", p: "#8a3dff", "*": "#ffffff" });
 
+  // the same armor made for the cat look: a helmet with ear guards, a back
+  // plate with the galaxy gem, and four little boots
+  const armorCat = paintMap([
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "............c.c.",
+    "...........NN*NN",
+    "............nn.n",
+    "....nnnnnnnc....",
+    "....n*nppnnn....",
+    "....nnnnnnnn....",
+    "................",
+    ".....c.c.c.c....",
+  ], { n: "#1a1850", N: "#2b2a7a", c: "#7ee8ff", p: "#8a3dff", "*": "#ffffff" });
+
   // The Galactic Monstrosity, facing left: a hulking brute made of deep space,
   // leaning on two pillar arms, shoulders high and head sunk low, cracked
   // all over with glowing galaxy light.
@@ -1474,6 +1500,7 @@ window.BDArt = (() => {
     petGalaxy: petGalaxy,
     galaxyMonster: galaxyMonster,
     armorSuit: armorSuit,
+    armorCat: armorCat,
     petCat: petCat,
     petDog: petDog,
     petFrog: petFrog,
@@ -1638,6 +1665,7 @@ window.BDArt = (() => {
     { key: "playerGalaxy", label: "Galaxy skin" },
     { key: "galaxyMonster", label: "Galactic Monstrosity" },
     { key: "armorSuit", label: "Armor" },
+    { key: "armorCat", label: "Cat armor" },
     { key: "swordStone", label: "Stone sword" },
     { key: "swordIron", label: "Iron sword" },
     { key: "swordDiamond", label: "Diamond sword" },
