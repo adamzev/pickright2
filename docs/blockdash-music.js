@@ -711,6 +711,7 @@
   };
   const SFX = {
     glitch: blips,
+    galaxy: (t) => tone(t, 84, 0.3, { wave: "sine", gain: 0.15, slide: 96 }), // a spacey woo-oo
     cat: (t) => meow(t, 77, 0.35, 0.3),
     dog: (t) => bark(t, 64, 0.35),
     frog: (t) => ribbit(t, 57, 0.3),

@@ -7,9 +7,9 @@ window.BDPlayBosses = (S, P, BD) => {
   "use strict";
   const {
     AIR, ARENA_W, arenaBgOf, arenaGrid, BOSS_BODY, BOSS_HP, BOSS_PX, BOSS_STAGE, BOSS_TOP,
-    BOSS_X, BULLET_LIFE, clamp, CUT_END, findSpawn, GALAXY_SHOOT, GLITCH_BLOCKS,
-    GLITCH_COLORS, GLITCH_FIX_TIME, GLITCH_HP, GLITCH_SIZE, GLITCH_SOLID, GLITCH_SPOTS, H,
-    JUMP_V, PLAYER_H, PLAYER_W, RAIN_SPEED, toast
+    BOSS_X, BULLET_LIFE, clamp, crashArenaGrid, CUT_END, findSpawn, GALAXY_H, GALAXY_SHOOT,
+    GALAXY_W, GLITCH_BLOCKS, GLITCH_COLORS, GLITCH_FIX_TIME, GLITCH_HP, GLITCH_SIZE,
+    GLITCH_SOLID, GLITCH_SPOTS, H, JUMP_V, PLAYER_H, PLAYER_W, RAIN_SPEED, toast
   } = BD;
   const {
     bossMax, canvas, level, reset, setFree, strip
@@ -19,9 +19,10 @@ window.BDPlayBosses = (S, P, BD) => {
 
   // Walking into a Boss portal swaps the level for a one-screen arena. The
   // arena is set up as a save point, so dying restarts the fight, not the level.
-  const enterBoss = () => {
-    [S.template, S.looks] = strip(arenaGrid(level.arena, arenaBgOf(level)));
-    S.width = ARENA_W;
+  const enterBoss = () => enterArena(arenaGrid(level.arena, arenaBgOf(level)));
+  const enterArena = (g) => {
+    [S.template, S.looks] = strip(g);
+    S.width = g[0].length; // the crash arena can be longer than one screen
     S.spawn = findSpawn(S.template);
     S.checkpoint = { x: S.spawn.x, y: S.spawn.y, score: S.score, megas: S.megas, rods: S.rods, pearls: S.pearls, eyes: S.eyes, keys: S.keys, grid: S.template.map((r) => r.slice()) };
     S.inBoss = true;
@@ -29,12 +30,12 @@ window.BDPlayBosses = (S, P, BD) => {
     reset();
   };
 
-  // After the fake crash: the same arena as the Boss portal's, but with the
-  // Galactic Monstrosity in it instead of the TNT Mech.
+  // After the fake crash: the level's crash arena, with the Galactic
+  // Monstrosity in it instead of the TNT Mech.
   const enterCrash = () => {
     S.crash = true;
     S.flying = false;
-    enterBoss();
+    enterArena(crashArenaGrid(level.crashArena));
     S.attempts++; // the crash took you here, not a portal, so it is the same attempt either way
   };
 
@@ -114,12 +115,12 @@ window.BDPlayBosses = (S, P, BD) => {
 
   const startGalaxy = () => {
     setFree(true);
-    setPlats(true); // the arena's Boss platforms stay out the whole time
     // an arena with no End portal gets two beside the monster, one high, one low
     if (!S.grid.some((r) => r.includes("E"))) {
-      for (const [x, y] of [[ARENA_W - 6, 4], [ARENA_W - 6, H - 2]]) S.grid[y][x] = "E";
+      for (const [x, y] of [[S.width - 10, 4], [S.width - 10, H - 2]]) S.grid[y][x] = "E";
     }
-    S.boss = { galaxy: true, x: ARENA_W - 3.5, y: 4, t: 0, shootT: GALAXY_SHOOT };
+    // x is its middle; it's GALAXY_W wide and GALAXY_H tall, its top at y
+    S.boss = { galaxy: true, x: S.width - GALAXY_W / 2, y: 1, t: 0, shootT: GALAXY_SHOOT };
     P.tellOnce("galaxy", "🌌 The GALACTIC MONSTROSITY! Reach an End portal to escape!");
   };
 
@@ -127,14 +128,17 @@ window.BDPlayBosses = (S, P, BD) => {
   const updateGalaxy = (dt) => {
     const g = S.boss;
     g.t += dt;
-    g.y = 1 + (H - 5) * (0.5 + 0.5 * Math.sin(g.t * 0.8));
-    g.shootT -= dt;
+    // floats from near the top down to the floor and back
+    g.y = 0.3 + (H - 1 - GALAXY_H - 0.3) * (0.5 + 0.5 * Math.sin(g.t * 0.8));
+    // in a long crash arena it only starts shooting once it's on screen
+    if (g.x - GALAXY_W / 2 < S.camX + P.VIEW_COLS) g.shootT -= dt;
     if (g.shootT <= 0) {
       g.shootT = GALAXY_SHOOT;
       const y = clamp(S.player.y + PLAYER_H / 2, 0.5, H - 1.5);
-      S.bullets.push({ x: g.x - 1.6, y, a: Math.PI, life: 6, straight: true, ender: true, fromX: -1, fromY: -1 });
+      S.bullets.push({ x: g.x - GALAXY_W / 2, y, a: Math.PI, life: 6, straight: true, ender: true, fromX: -1, fromY: -1 });
     }
-    if (P.touches(g.x - 1.5, g.y, g.x + 1.5, g.y + 3)) { P.die("delete", true); return true; }
+    // a little forgiving at the edges, like the other mobs
+    if (P.touches(g.x - GALAXY_W / 2 + 0.3, g.y + 0.5, g.x + GALAXY_W / 2, g.y + GALAXY_H)) { P.die("delete", true); return true; }
     return false;
   };
 

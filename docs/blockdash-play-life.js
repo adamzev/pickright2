@@ -7,8 +7,8 @@ window.BDPlayLife = (S, P, BD) => {
   "use strict";
   const {
     bestKey, builtinLevels, dailyLevelDone, dailyNote, dayKey, el, GALAXY_KEY, galaxyWon,
-    getBest, GHOST_BONUS, H, loadBag, musicOf, PLAYER_H, PLAYER_W, saveBag, setBest,
-    SHIELD_TIME, toast
+    getBest, GHOST_BONUS, H, loadBag, loadPets, musicOf, PLAYER_H, PLAYER_W, saveBag,
+    savePets, setBest, SHIELD_TIME, toast
   } = BD;
   const {
     bag, chain, endRun, fromEditor, hasEyes, hasPearls, hasRods, jumpBtn, level, msgSlot,
@@ -65,8 +65,9 @@ window.BDPlayLife = (S, P, BD) => {
       S.armor--;
       showItems();
       S.shieldT = SHIELD_TIME;
-      toast("🪖 Your armor saved you!");
-      sparkle(S.player.x + PLAYER_W / 2, S.player.y + PLAYER_H / 2, ["#2b2a7a", "#7ee8ff", "#ffffff"]);
+      toast("🪖 Your armor saved you! It broke off");
+      // it cracks and falls off in starry pieces
+      explode(S.player.x + PLAYER_W / 2, S.player.y + PLAYER_H / 2, ["#1a1850", "#2b2a7a", "#7ee8ff", "#ffffff"]);
       return true;
     }
     if (bag.shields < 1) return false;
@@ -141,6 +142,12 @@ window.BDPlayLife = (S, P, BD) => {
     // escaping the Galactic Monstrosity: armor and the Galaxy skin, the first time
     const galaxyFirst = S.crash && !galaxyWon();
     if (galaxyFirst) { try { localStorage.setItem(GALAXY_KEY, "1"); } catch (e) { /* ignore */ } }
+    // and its mini version as a pet (given on any escape, for anyone who escaped before the pet existed)
+    let galaxyPet = false;
+    if (S.crash) {
+      const pets = loadPets();
+      if (!pets.owned.includes("petGalaxy")) { pets.owned.push("petGalaxy"); savePets(pets); galaxyPet = true; }
+    }
     if (S.run && !S.run.deaths) B.earn("perfect");
     if (!M.playing) B.earn("silent");
     if (petBase === "petDog" && M.playing === "woof") B.earn("goodboy");
@@ -161,7 +168,9 @@ window.BDPlayLife = (S, P, BD) => {
     const box = el("div", "overlay-msg");
     box.innerHTML =
       `<div class="big">${more || !chain ? "Level Complete!" : "You Finished!"}</div>` +
-      (galaxyFirst ? `<div class="big" style="font-size:1.1rem">🌌 You escaped! Unlocked: 🪖 Armor (survive 1 hit every level) and the Galaxy skin (pick it on the menu)</div>` : "") +
+      (galaxyFirst || galaxyPet ? `<div class="big" style="font-size:1.1rem">🌌 You escaped! Unlocked: ${[
+        galaxyFirst && "🪖 Armor (survive 1 hit every level)", galaxyFirst && "the Galaxy skin",
+        galaxyPet && "a mini Galactic Monstrosity pet"].filter(Boolean).join(", ")}. Pick them on the menu!</div>` : "") +
       (beatGhost ? `<div class="big" style="font-size:1.1rem">👻 NEW BEST! You beat your ghost! +${GHOST_BONUS} coins</div>` : "") +
       (daily ? `<div class="big" style="font-size:1.1rem">📅 Daily level done! 🔥 ${daily.streak}-day streak · ${daily.lines.join(" · ")}</div>` : "") +
       `<div>Score: ${S.score} · Best: ${getBest(bestKey(level))}</div>` +

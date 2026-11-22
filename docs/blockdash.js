@@ -104,10 +104,11 @@
   const WATER = "\u0189";
   const IRON = "\u018a";
   // The fake crash block: touch it and the game pretends to crash. Reload
-  // takes you to the level's arena, where the Galactic Monstrosity fires ender
-  // bullets until you escape through an End portal, which wins the level.
+  // takes you to the level's crash arena, where the Galactic Monstrosity fires
+  // ender bullets until you escape through an End portal, which wins the level.
   const CRASH = "\u018b";
   const GALAXY_SHOOT = 1; // seconds between ender bullets
+  const GALAXY_W = 7.5, GALAXY_H = 6; // the Galactic Monstrosity's size, in blocks: half the screen tall
   const ENDER_BULLET_SPEED = 6;
   const GALAXY_LOOK = "playerGalaxy"; // the skin you unlock by escaping
   const GALAXY_KEY = "blockdash_galaxy"; // "1" once you've escaped: armor and the skin are yours
@@ -151,7 +152,10 @@
   // The boss arena is drawn in the same editor as the level, with a slightly
   // different set of blocks: no portals, save points or note-carrying blocks
   // in the arena, and Boss platforms only there.
-  const LEVEL_ONLY = "KOMGCHR" + CRASH;
+  const LEVEL_ONLY = "KOMGECHR" + CRASH;
+  // the fake crash's arena: like the boss arena, but End portals (the way
+  // out) instead of Boss platforms
+  const CRASH_HIDE = LEVEL_ONLY.replace("E", "") + "J";
   const ARENA_ONLY = "J";
 
   const isSolid = (ch) => !!(tileOf(ch) && tileOf(ch).solid);
@@ -476,6 +480,25 @@
   const arenaGrid = (rows, bg) =>
     (Array.isArray(rows) && rows.length ? resizeGrid(rowsToGrid(rows.map(String)), ARENA_W) : defaultArena(bg));
 
+  // The fake crash's arena until someone draws their own: a floor, a start,
+  // stone steps and two End portals in front of the Galactic Monstrosity.
+  const defaultCrashArena = () => {
+    const g = Array.from({ length: H }, (_, y) => Array(ARENA_W).fill(y === H - 1 ? "e" : AIR));
+    g[H - 2][2] = "P";
+    for (const [x, y] of BOSS_PLATS) g[y][x] = "e";
+    g[4][ARENA_W - 10] = "E";
+    g[H - 2][ARENA_W - 10] = "E";
+    return g;
+  };
+  // It can be longer than the boss arena (never shorter): the monster waits at the far end.
+  const crashArenaGrid = (rows) => {
+    if (!Array.isArray(rows) || !rows.length) return defaultCrashArena();
+    const g = rowsToGrid(rows.map(String));
+    return resizeGrid(g, clamp(g[0].length, ARENA_W, 400));
+  };
+  // its background: The End unless it's been given another
+  const crashBgOf = (o) => (window.BDArt.BACKGROUNDS.some((b) => b.key === o.crashBg) ? o.crashBg : "end");
+
   const findSpawn = (g) => {
     const width = g[0].length;
     for (let y = 0; y < g.length; y++) {
@@ -569,6 +592,8 @@
     if (Object.keys(notes).length) o.notes = notes;
     if (Array.isArray(l.arena) && l.arena.length) o.arena = l.arena;
     if (arenaBgOf(l) !== bgOf(l)) o.arenaBg = l.arenaBg;
+    if (Array.isArray(l.crashArena) && l.crashArena.length) o.crashArena = l.crashArena;
+    if (crashBgOf(l) !== "end") o.crashBg = l.crashBg;
     // kept even when this browser has no art for it; it just plays as the usual player
     if (isMine(l.hero)) o.hero = l.hero;
     if (musicOf(l)) o.music = l.music;
@@ -594,6 +619,8 @@
       notes: cleanNotes(clean, o.notes),
       // only levels whose arena was drawn by hand carry one
       ...(Array.isArray(o.arena) && o.arena.length ? { arena: gridToRows(arenaGrid(o.arena)) } : {}),
+      ...(Array.isArray(o.crashArena) && o.crashArena.length ? { crashArena: gridToRows(crashArenaGrid(o.crashArena)) } : {}),
+      ...(crashBgOf(o) !== "end" ? { crashBg: o.crashBg } : {}),
     };
   };
 
@@ -649,7 +676,7 @@
   // ---------- share codes ----------
 
   const encodeLevel = (lvl) => {
-    const json = JSON.stringify({ n: lvl.name, r: lvl.rows, b: bgOf(lvl), x: cleanNotes(lvl.rows, lvl.notes), a: lvl.arena, ab: lvl.arenaBg, h: lvl.hero, m: musicOf(lvl) || undefined });
+    const json = JSON.stringify({ n: lvl.name, r: lvl.rows, b: bgOf(lvl), x: cleanNotes(lvl.rows, lvl.notes), a: lvl.arena, ab: lvl.arenaBg, c: lvl.crashArena, cb: lvl.crashBg, h: lvl.hero, m: musicOf(lvl) || undefined });
     const bytes = new TextEncoder().encode(json);
     let s = "";
     for (const b of bytes) s += String.fromCharCode(b);
@@ -661,7 +688,7 @@
     const bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0));
     const o = JSON.parse(new TextDecoder().decode(bytes));
     if (!o || !Array.isArray(o.r) || !o.r.length) throw new Error("bad code");
-    return { name: String(o.n || "Imported level"), rows: o.r.map(String), bg: o.b, notes: o.x, arena: o.a, arenaBg: o.ab, hero: o.h, music: o.m };
+    return { name: String(o.n || "Imported level"), rows: o.r.map(String), bg: o.b, notes: o.x, arena: o.a, arenaBg: o.ab, crashArena: o.c, crashBg: o.cb, hero: o.h, music: o.m };
   };
 
   // Art codes are much bigger than level codes, so each drawing is stored as
@@ -769,11 +796,12 @@
   // the pet rock there. Makes no sound (there's no "rock" sound) and never
   // moves from the start.
   PET_SOUND.petRock = "rock";
-  const FLYING_PETS = ["petParrot", "petDragon", "petGlitch"];
+  PET_SOUND.petGalaxy = "galaxy"; // for escaping the Galactic Monstrosity, like the Glitch pet
+  const FLYING_PETS = ["petParrot", "petDragon", "petGlitch", "petGalaxy"];
   const STILL_PETS = ["petRock"];
   const CAT_LOOK = "\ue934"; // the shipped black-cat player look
   const petBaseOf = (k) => (PET_SOUND[k] ? k : PET_SOUND[Art.baseOf(k)] ? Art.baseOf(k) : null);
-  const allPets = () => PETS.map(([key, label]) => ({ key, label })).concat([{ key: "petGlitch", label: "Glitch" }, { key: "petRock", label: "Sir Rock" }])
+  const allPets = () => PETS.map(([key, label]) => ({ key, label })).concat([{ key: "petGlitch", label: "Glitch" }, { key: "petGalaxy", label: "Galaxy" }, { key: "petRock", label: "Sir Rock" }])
     .concat(Art.customBlocks().filter((b) => PET_SOUND[b.base]).map((b) => ({ key: b.key, label: b.label })));
   const rockFound = () => {
     try { return localStorage.getItem("pickright_sir_rock") === "1"; } catch (e) { return false; }
@@ -1485,7 +1513,7 @@
     petShop.appendChild(el("h2", null, "🐾 Pet shop"));
     petShop.appendChild(el("p", "hint",
       "A pet follows you through every level and makes its sound when you grab a diamond. Pick it on the title screen."));
-    for (const pt of allPets().filter((p) => p.key !== "petGlitch" && p.key !== "petRock")) {
+    for (const pt of allPets().filter((p) => !["petGlitch", "petGalaxy", "petRock"].includes(p.key))) {
       const owned = pets.owned.includes(pt.key);
       const row = item(pt.key, pt.label, owned ? "Yours!" : "Follows you around", PET_COST, "coins",
         owned ? "Owned ✓" : "", () => {
@@ -1831,7 +1859,7 @@
       ["M", "Free move block — invisible when you play. The player stops auto-running and moves with ◀ ▶ until the next save point"],
       ["s", "More blocks — blocks you name and paint yourself. In the Art Studio press ＋ New block and pick something to start from: your block acts just like it (a blue slime still bounces). Find them under More blocks in the Level Maker"],
       ["J", "Boss platform — for the boss arena. Only appears while the boss says CLIMB UP, so build the way to its head out of these"],
-      ["E", "End portal — finish the level here. In the arena, it's the way out after a fake crash"],
+      ["E", "End portal — finish the level here. In the 🌌 Crash arena, it's the way out"],
       ["G", "Boss portal — use it instead of the End portal. Add Portal frames to keep it shut until they're filled. The TNT Mech boss is waiting: dodge its TNT rain, climb up and stomp its head, dodge its shooter arm. Five stomps wins, or fewer with a sword from the Shop"],
       ["B", "Bush — just decoration, safe to touch"],
       ["8", "Mega TNT — goes off when you come within a block of it, with a much bigger bang. Buy it in the Shop to place it"],
@@ -1850,7 +1878,7 @@
       [IRON, "Iron — a solid block to stand on and build with"],
       [GLITCH_STONE, "Glitchy stone — blinks on and off every second. When it's gone, you fall through!"],
       [GLITCH_IRON, "Glitchy iron — floats down slowly as soon as it's on screen. If it lands on you, it pushes you down"],
-      [CRASH, "Fake crash — invisible when you play. Touch it and the game pretends to crash! Reload, and you're in the arena with the Galactic Monstrosity. Escape through an End portal (put some in the arena) to win"],
+      [CRASH, "Fake crash — invisible when you play. Touch it and the game pretends to crash! Reload, and you're in the 🌌 Crash arena with the Galactic Monstrosity. Escape through an End portal to win"],
       [WATER, "Water — swim! You sink slowly; press jump to swim up, or jump out near the top. Lava touching water turns into stone"],
       ["P", "Start — where you spawn"],
     ].forEach(([ch, text]) => {
@@ -1862,8 +1890,7 @@
       const label = el("span", "hint", text);
       label.style.flex = "1";
       r.appendChild(label);
-      // the Art Studio paints square blocks; doors are two tall
-      if (editMode && !isDoor(ch) && ch !== KEY) {
+      if (editMode) {
         const paint = el("button", "small", "🎨");
         paint.title = "Repaint this block";
         paint.onclick = () => showArtStudio(ch);
@@ -1984,6 +2011,7 @@
     let img = Art.getPixels(key);
     let color = "#e5401f";
     let tool = "pen"; // pen | fill | erase | pick
+    let brush = 1; // how many pixels across Paint and Rub out cover
     let undoStack = [];
 
     const header = el("div", "row");
@@ -2052,8 +2080,11 @@
     };
     // not megas: a homemade block acts like its starting block, and the
     // rules only know megas by their own letters
+    // Nor doors, keys or the fake crash block: the rules know those only by
+    // their own letters, so a homemade copy wouldn't work.
     Art.SPRITE_INFO.filter((s) => s.key === "player" || s.key === "dirt" || PET_SOUND[s.key] ||
-      (TILES[s.key] && !TILES[s.key].over && !MEGA_BASE[s.key]))
+      (TILES[s.key] && !TILES[s.key].over && !MEGA_BASE[s.key] &&
+        !isDoor(s.key) && s.key !== KEY && s.key !== CRASH))
       .map((s) => [s.key, s.label])
       .concat(mine.map((b) => [b.key, b.label]), [["blank", "Blank"]])
       .forEach(([k, label]) => {
@@ -2134,6 +2165,20 @@
     addTool("pick", "💧 Grab colour");
     toolBtns.pen.classList.add("sel");
 
+    // Brush size, for Paint and Rub out: 1, 2 or 4 pixels across.
+    const brushBtns = {};
+    tools.appendChild(el("span", "hint", "Brush:"));
+    for (const [n, label] of [[1, "▪ 1"], [2, "◼ 2"], [4, "⬛ 4"]]) {
+      const b = el("button", "small tool-btn" + (n === brush ? " sel" : ""), label);
+      b.title = `Brush ${n} pixel${n > 1 ? "s" : ""} wide`;
+      b.onclick = () => {
+        brush = n;
+        Object.entries(brushBtns).forEach(([k, node]) => node.classList.toggle("sel", +k === brush));
+      };
+      brushBtns[n] = b;
+      tools.appendChild(b);
+    }
+
     const undoBtn = el("button", "small", "↶ Undo");
     undoBtn.onclick = () => {
       const prev = undoStack.pop();
@@ -2162,7 +2207,15 @@
       renderPreview();
       toast("Back to the original");
     };
-    tools.append(undoBtn, resetBtn, deleteBtn);
+    // a blank canvas, to draw something from scratch (Undo brings it back)
+    const eraseAllBtn = el("button", "small", "🧽 Erase all");
+    eraseAllBtn.onclick = () => {
+      pushUndo();
+      img.px = img.px.map(() => null);
+      commit();
+      toast("All erased! ↶ Undo brings it back");
+    };
+    tools.append(undoBtn, eraseAllBtn, resetBtn, deleteBtn);
     gridPanel.appendChild(tools);
     gridPanel.appendChild(el("p", "hint",
       "Tap or drag on the big grid to paint. <b>🪣 Fill</b> floods everything the " +
@@ -2344,13 +2397,20 @@
       renderPreview();
     };
 
-    const setPx = (x, y) => {
+    const setOne = (x, y) => {
       if (x < 0 || y < 0 || x >= img.w || y >= img.h) return false;
       const i = y * img.w + x;
       const want = tool === "erase" ? null : color;
       if (img.px[i] === want) return false;
       img.px[i] = want;
       return true;
+    };
+    // paints (or rubs out) a brush-sized square around the pixel
+    const setPx = (x, y) => {
+      const x0 = x - Math.floor((brush - 1) / 2), y0 = y - Math.floor((brush - 1) / 2);
+      let changed = false;
+      for (let dy = 0; dy < brush; dy++) for (let dx = 0; dx < brush; dx++) changed = setOne(x0 + dx, y0 + dy) || changed;
+      return changed;
     };
 
     const floodFill = (x, y) => {
@@ -2517,8 +2577,8 @@
     // Never pruned while editing, so Undo brings a block back with its note;
     // cleanNotes drops the leftovers whenever the level is saved or tested.
     const notes = existing ? cleanNotes(existing.rows, existing.notes) : {};
-    // `grid` is whichever of the level and its boss arena is on screen, and
-    // `other` is the one that isn't; switching just swaps them over.
+    // `grid` is whichever of the level, its boss arena and its crash arena is on
+    // screen; `parked` holds the other two until you switch to them.
     let editing = "level";
     // null = "same as the level", so changing the level's background carries
     // over until the arena is given one of its own
@@ -2526,12 +2586,19 @@
     let hero = existing && isMine(existing.hero) ? existing.hero : null;
     let music = musicOf(existing);
     window.BDMusic.level(music); // so you hear the level's song while building it
-    const shownBg = () => (editing === "arena" ? arenaBg || bg : bg);
-    let other = arenaGrid(existing && existing.arena, arenaBg || bg);
-    let arenaDrawn = !!(existing && existing.arena); // until it's opened, the level uses the default arena
-    const levelG = () => (editing === "level" ? grid : other);
-    const arenaG = () => (editing === "arena" ? grid : other);
-    const arenaRows = () => (arenaDrawn ? gridToRows(arenaG()) : undefined);
+    let crashBg = existing ? crashBgOf(existing) : "end";
+    const shownBg = () => (editing === "arena" ? arenaBg || bg : editing === "crash" ? crashBg : bg);
+    const parked = {
+      arena: arenaGrid(existing && existing.arena, arenaBg || bg),
+      crash: crashArenaGrid(existing && existing.crashArena),
+    };
+    // until it's opened, the level uses the default arena (and crash arena)
+    let arenaDrawn = !!(existing && existing.arena);
+    let crashDrawn = !!(existing && existing.crashArena);
+    const gridOf = (m) => (editing === m ? grid : parked[m]);
+    const levelG = () => gridOf("level");
+    const arenaRows = () => (arenaDrawn ? gridToRows(gridOf("arena")) : undefined);
+    const crashRows = () => (crashDrawn ? gridToRows(gridOf("crash")) : undefined);
     let stopSecs = STOP_DEFAULT;
     let dialogText = "";
     let slot = index;
@@ -2562,7 +2629,7 @@
     const autosave = () => {
       const all = loadLevels();
       const lvl = levelData({ name: (name || "").trim() || "Untitled", rows: gridToRows(levelG()), bg, notes,
-        arena: arenaRows(), arenaBg, hero, music });
+        arena: arenaRows(), arenaBg, crashArena: crashRows(), crashBg, hero, music });
       if (slot >= 0 && slot < all.length) all[slot] = lvl;
       else { all.push(lvl); slot = all.length - 1; }
       savedLabel.textContent = saveLevels(all) ? "✓ Saved" : "⚠ Not saved";
@@ -2572,7 +2639,7 @@
     const testBtn = el("button", "", "▶ Test");
     testBtn.onclick = () => {
       const lvl = { name: (nameInput.value || "Untitled").trim(), rows: gridToRows(levelG()), bg,
-        notes: cleanNotes(levelG(), notes), arena: arenaRows(), arenaBg, hero, music };
+        notes: cleanNotes(levelG(), notes), arena: arenaRows(), arenaBg, crashArena: crashRows(), crashBg, hero, music };
       showPlay(lvl, () => showEditor(lvl, slot), true);
     };
     nameRow.append(nameInput, testBtn, savedLabel);
@@ -2590,6 +2657,7 @@
         }
         // the buttons set the background of whichever one is being edited
         if (editing === "arena") arenaBg = b.key;
+        else if (editing === "crash") crashBg = b.key;
         else bg = b.key;
         showBg();
         autosave();
@@ -2635,21 +2703,23 @@
     const musicRow = el("div", "row");
     musicRow.style.marginTop = "8px";
     musicRow.appendChild(el("span", "hint", "Music:"));
-    const musicBtns = [[null, "Player's choice"]]
+    const musicPick = el("select", "music-pick");
+    [[null, "Player's choice"]]
       .concat(Object.entries(window.BDMusic.SONGS)
         .filter(([k]) => window.BDMusic.available(k) || k === music)
         .map(([k, sg]) => [k, `${sg.icon} ${sg.name}`]))
-      .map(([k, label]) => {
-        const btn = el("button", "small" + (k === music ? " green" : ""), label);
-        btn.onclick = () => {
-          music = k;
-          musicBtns.forEach(([mk, b]) => b.classList.toggle("green", mk === music));
-          window.BDMusic.level(music);
-          autosave();
-        };
-        musicRow.appendChild(btn);
-        return [k, btn];
+      .forEach(([k, label]) => {
+        const opt = el("option", null, label);
+        opt.value = k || "";
+        opt.selected = k === music;
+        musicPick.appendChild(opt);
       });
+    musicPick.onchange = () => {
+      music = musicPick.value || null;
+      window.BDMusic.level(music);
+      autosave();
+    };
+    musicRow.appendChild(musicPick);
     namePanel.appendChild(musicRow);
 
     // level <-> boss arena
@@ -2658,15 +2728,20 @@
     editRow.appendChild(el("span", "hint", "Editing:"));
     const levelTab = el("button", "small green", "🗺 Level");
     const arenaTab = el("button", "small", "💥 Boss arena");
+    const crashTab = el("button", "small", "🌌 Crash arena");
     const editHint = el("span", "hint", "");
     const setEditing = (m) => {
       if (m === editing) return;
-      [grid, other] = [other, grid];
+      parked[editing] = grid;
+      grid = parked[m];
+      delete parked[m];
       editing = m;
       if (m === "arena") arenaDrawn = true;
+      if (m === "crash") crashDrawn = true;
       undoStack.length = 0; // undo steps belong to the grid they were made on
       levelTab.classList.toggle("green", m === "level");
       arenaTab.classList.toggle("green", m === "arena");
+      crashTab.classList.toggle("green", m === "crash");
       showBg();
       refreshPalette();
       autosave();
@@ -2675,7 +2750,8 @@
     };
     levelTab.onclick = () => setEditing("level");
     arenaTab.onclick = () => setEditing("arena");
-    editRow.append(levelTab, arenaTab, editHint);
+    crashTab.onclick = () => setEditing("crash");
+    editRow.append(levelTab, arenaTab, crashTab, editHint);
     namePanel.appendChild(editRow);
     root.appendChild(namePanel);
 
@@ -2686,7 +2762,7 @@
     const palItems = {};
     // The player's own blocks share one palette button, so the palette stays
     // the same size however many they make; a tray under it picks which one.
-    const hiddenNow = () => (editing === "arena" ? LEVEL_ONLY : ARENA_ONLY);
+    const hiddenNow = () => (editing === "arena" ? LEVEL_ONLY : editing === "crash" ? CRASH_HIDE : ARENA_ONLY);
     // player looks aren't blocks; they're picked with Player look above
     const myBlocks = Art.customBlocks().filter((b) => b.base !== "player" && !PET_SOUND[b.base])
       .map((b) => ({ key: b.key, label: b.label, base: baseOf(b.key) }));
@@ -2837,7 +2913,11 @@
         ? "This is where the boss fight happens (reached through a Boss portal). The faded boss shows where it stands. " +
           "Boss platforms only appear during CLIMB UP; everything else is always there. " +
           "The Background buttons above now change the arena's background, not the level's."
-        : "";
+        : editing === "crash"
+          ? "This is where a Fake crash block sends you. The faded Galactic Monstrosity shows where it floats " +
+            "(up and down); put End portals in front of it as the way out. " +
+            "The Background buttons above now change this arena's background."
+          : "";
     };
     refreshPalette();
     root.appendChild(palPanel);
@@ -2931,7 +3011,7 @@
 
     const setWidth = (w) => {
       if (editing === "arena") { toast("The boss arena is always one screen wide"); return; }
-      w = clamp(w, 20, 400);
+      w = clamp(w, editing === "crash" ? ARENA_W : 20, 400);
       if (w === grid[0].length) return;
       pushUndo();
       grid = resizeGrid(grid, w);
@@ -2945,7 +3025,7 @@
     };
 
     const setHeight = (h) => {
-      if (editing === "arena") { toast("The boss arena is always one screen tall"); return; }
+      if (editing !== "level") { toast("Arenas are always one screen tall"); return; }
       h = clamp(h, H, MAX_H);
       const add = h - grid.length;
       if (!add) { toast(h === H ? "Levels can't be lower than one screen" : `Levels can be up to ${MAX_H} tall`); return; }
@@ -3094,6 +3174,11 @@
         ctx.globalAlpha = 0.45;
         Art.drawSprite(ctx, "boss", BOSS_X * TS, BOSS_TOP * TS, 24 * BOSS_PX * TS, 32 * BOSS_PX * TS);
         ctx.restore();
+      } else if (editing === "crash") {
+        ctx.save();
+        ctx.globalAlpha = 0.45;
+        Art.drawSprite(ctx, "galaxyMonster", (w - GALAXY_W) * TS, 2.5 * TS, GALAXY_W * TS, GALAXY_H * TS);
+        ctx.restore();
       }
 
       // what each Stop and Dialog block is set to
@@ -3164,20 +3249,21 @@
     AIR, ARENA_W, arenaBgOf, arenaGrid, Art, baseOf, bestKey, bgOf, BLAZE_DRIFT, BLAZE_MAX,
     BLAZE_REACH, BLAZE_SHOOT, blinkOn, BOSS_BODY, BOSS_HP, BOSS_PX, BOSS_SHOT_SPEED,
     BOSS_STAGE, BOSS_TOP, BOSS_X, BOUNCE_V, builtinLevels, BULLET_LIFE, BULLET_SPEED,
-    BULLET_TURN, CHASE_SPEED, clamp, COIN_VALUE, COYOTE, CRASH, CUT_END, dailyLevelDone,
-    dailyNote, dayKey, DOOR_SWING, drawCone, drawExplosion, drawPlayer, drawTile,
-    EFFECT_TIME, el, ENDER_AHEAD, ENDER_BULLET_SPEED, ENDER_NOTICE, FALL_ACCEL, FALL_MAX,
-    FALL_PUSH, findSpawn, FIREBALL_SPEED, FLOWED, FLY_THRUST, FLY_UP_V, FLYING_PETS,
-    GALAXY_KEY, GALAXY_SHOOT, galaxyWon, getBest, GHOST_BONUS, GHOST_EVERY, GLIDE_FALL,
-    GLITCH_BLOCKS, GLITCH_COLORS, GLITCH_EVERY, GLITCH_FIX_TIME, GLITCH_HOP, GLITCH_HP,
-    GLITCH_IRON, GLITCH_SIZE, GLITCH_SOLID, GLITCH_SPOTS, GLITCH_STONE, glitchLookOn,
-    GRAVITY, H, inCone, isDoor, isHidden, isHiddenTnt, isLava, isLogged, isOpenDoor, isSolid,
-    JUMP_BUFFER, JUMP_V, KEY, lapSpeed, LAVA_FALL, LAVA_RISE, loadBag, LOGGABLE, MEGA_BASE,
-    MEGA_BLAST, MEGA_BOUNCE_V, MEGATITE_PAYS, MOB_H, MOB_W, musicOf, nextToWater, noteKey,
-    overOf, PET_SOUND, PLAYER_H, PLAYER_W, POOF_AFTER, RAIN_SPEED, saveBag, setBest,
-    SHIELD_TIME, SHOOT_EVERY, SINK_MAX, SPAWN_EVERY, SPEED_BASE, SPEED_FAST, SPEED_SLOW,
-    STILL_PETS, STOP_DEFAULT, SWIM_V, SWORDS, TILES, toast, trailOn, WARP_TIME, WATCH_CYCLE,
-    WATCH_OPEN, WATER, WATER_GRAVITY, WATER_SLOW
+    BULLET_TURN, CHASE_SPEED, clamp, COIN_VALUE, COYOTE, CRASH, crashArenaGrid, crashBgOf,
+    CUT_END, dailyLevelDone, dailyNote, dayKey, DOOR_SWING, drawCone, drawExplosion,
+    drawPlayer, drawTile, EFFECT_TIME, el, ENDER_AHEAD, ENDER_BULLET_SPEED, ENDER_NOTICE,
+    FALL_ACCEL, FALL_MAX, FALL_PUSH, findSpawn, FIREBALL_SPEED, FLOWED, FLY_THRUST, FLY_UP_V,
+    FLYING_PETS, GALAXY_H, GALAXY_KEY, GALAXY_SHOOT, GALAXY_W, galaxyWon, getBest,
+    GHOST_BONUS, GHOST_EVERY, GLIDE_FALL, GLITCH_BLOCKS, GLITCH_COLORS, GLITCH_EVERY,
+    GLITCH_FIX_TIME, GLITCH_HOP, GLITCH_HP, GLITCH_IRON, GLITCH_SIZE, GLITCH_SOLID,
+    GLITCH_SPOTS, GLITCH_STONE, glitchLookOn, GRAVITY, H, inCone, isDoor, isHidden,
+    isHiddenTnt, isLava, isLogged, isOpenDoor, isSolid, JUMP_BUFFER, JUMP_V, KEY, lapSpeed,
+    LAVA_FALL, LAVA_RISE, loadBag, loadPets, LOGGABLE, MEGA_BASE, MEGA_BLAST, MEGA_BOUNCE_V,
+    MEGATITE_PAYS, MOB_H, MOB_W, musicOf, nextToWater, noteKey, overOf, PET_SOUND, PLAYER_H,
+    PLAYER_W, POOF_AFTER, RAIN_SPEED, saveBag, savePets, setBest, SHIELD_TIME, SHOOT_EVERY,
+    SINK_MAX, SPAWN_EVERY, SPEED_BASE, SPEED_FAST, SPEED_SLOW, STILL_PETS, STOP_DEFAULT,
+    SWIM_V, SWORDS, TILES, toast, trailOn, WARP_TIME, WATCH_CYCLE, WATCH_OPEN, WATER,
+    WATER_GRAVITY, WATER_SLOW
   };
 
   // `chain` links a level to the ones after it: { i, count, carried, playNext }.

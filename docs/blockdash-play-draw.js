@@ -7,10 +7,11 @@ window.BDPlayDraw = (S, P, BD) => {
   "use strict";
   const {
     AIR, arenaBgOf, Art, baseOf, bgOf, BLINK_TIME, blinkOn, BOSS_PX, BOSS_TOP, clamp,
-    DOOR_SWING, drawCone, drawExplosion, drawPlayer, drawTile, el, FLOWED, FLYING_PETS,
-    GHOST_EVERY, GLITCH_COLORS, GLITCH_SIZE, GLITCH_STONE, glitchLookOn, H, isDoor, isHidden,
-    isLogged, isOpenDoor, isSolid, LOGGABLE, MOB_H, MOB_W, noteKey, overOf, PLAYER_H,
-    PLAYER_W, POOF_AFTER, STILL_PETS, SWORDS, trailOn, WARP_TIME, WATCH_CYCLE
+    crashBgOf, DOOR_SWING, drawCone, drawExplosion, drawPlayer, drawTile, el, FLOWED,
+    FLYING_PETS, GALAXY_H, GALAXY_W, GHOST_EVERY, GLITCH_COLORS, GLITCH_SIZE, GLITCH_STONE,
+    glitchLookOn, H, isDoor, isHidden, isLogged, isOpenDoor, isSolid, LOGGABLE, MOB_H, MOB_W,
+    noteKey, overOf, PLAYER_H, PLAYER_W, POOF_AFTER, STILL_PETS, SWORDS, trailOn, WARP_TIME,
+    WATCH_CYCLE
   } = BD;
   const {
     bossMax, canvas, ctx, dragonAt, eyeOpen, hero, level, pet, petBase, showBoost, sword,
@@ -19,7 +20,7 @@ window.BDPlayDraw = (S, P, BD) => {
 
   // --- rendering ---
   const drawBackground = () =>
-    Art.drawBackground(ctx, S.inBoss ? arenaBgOf(level)
+    Art.drawBackground(ctx, S.inBoss ? (S.crash ? crashBgOf(level) : arenaBgOf(level))
       : level.zones ? level.zones[Math.floor((S.camX + VIEW_COLS / 2) / level.zoneW) % level.zones.length]
       : bgOf(level), canvas.width, canvas.height, S.camX * TS, TS, S.time, S.effect);
 
@@ -211,41 +212,17 @@ window.BDPlayDraw = (S, P, BD) => {
     }
   };
 
-  // The Galactic Monstrosity: a hulking shape cut out of deep space, full of
-  // stars, with two glowing eyes and a purple glow that pulses.
-  const GALAXY_STARS = [[0.4, 0.5], [2.3, 0.7], [1.2, 1.1], [0.7, 2.2], [2.5, 1.9], [1.7, 2.6], [0.3, 1.6], [2.0, 0.3]];
+  // The Galactic Monstrosity, with a purple glow that pulses behind it.
   const drawGalaxy = () => {
     const g = S.boss;
-    const x0 = (g.x - 1.5 - S.camX) * TS, y0 = g.y * TS, w = TS * 3, h = TS * 3;
+    const w = TS * GALAXY_W, h = TS * GALAXY_H;
+    const x0 = (g.x - S.camX) * TS - w / 2, y0 = g.y * TS;
     ctx.save();
-    ctx.globalAlpha = 0.25 + 0.15 * Math.sin(S.time * 3);
+    ctx.globalAlpha = 0.22 + 0.12 * Math.sin(S.time * 3);
     ctx.fillStyle = "#b46bff";
-    ctx.fillRect(x0 - TS * 0.3, y0 - TS * 0.3, w + TS * 0.6, h + TS * 0.6);
-    ctx.globalAlpha = 1;
-    ctx.fillStyle = "#0d0b33";
-    ctx.fillRect(x0, y0, w, h);
-    ctx.fillStyle = "#1a1850";
-    ctx.fillRect(x0 + TS * 0.2, y0 + TS * 0.2, w - TS * 0.4, h - TS * 0.4);
-    // stars that twinkle
-    GALAXY_STARS.forEach(([sx, sy], i) => {
-      ctx.globalAlpha = 0.5 + 0.5 * Math.sin(S.time * 4 + i * 1.7);
-      ctx.fillStyle = "#ffffff";
-      ctx.fillRect(x0 + sx * TS, y0 + sy * TS, TS * 0.12, TS * 0.12);
-    });
-    ctx.globalAlpha = 1;
-    // eyes, looking your way
-    ctx.fillStyle = "#ff5cf0";
-    ctx.fillRect(x0 + TS * 0.55, y0 + TS * 0.8, TS * 0.55, TS * 0.35);
-    ctx.fillRect(x0 + TS * 1.9, y0 + TS * 0.8, TS * 0.55, TS * 0.35);
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(x0 + TS * 0.55, y0 + TS * 0.85, TS * 0.18, TS * 0.18);
-    ctx.fillRect(x0 + TS * 1.9, y0 + TS * 0.85, TS * 0.18, TS * 0.18);
-    // the mouth it shoots from
-    ctx.fillStyle = "#05031a";
-    ctx.fillRect(x0 + TS * 0.4, y0 + TS * 1.9, TS * 2.2, TS * 0.5);
-    ctx.fillStyle = "#7ee8ff";
-    for (let i = 0; i < 5; i++) ctx.fillRect(x0 + TS * (0.5 + i * 0.44), y0 + TS * 1.9, TS * 0.2, TS * 0.18);
+    ctx.fillRect(x0 - TS * 0.25, y0 - TS * 0.25, w + TS * 0.5, h + TS * 0.5);
     ctx.restore();
+    Art.drawSprite(ctx, "galaxyMonster", x0, y0, w, h);
   };
 
   const drawGalaxyHud = () => {
@@ -585,6 +562,11 @@ window.BDPlayDraw = (S, P, BD) => {
         const pw = PLAYER_W * TS * k, ph = PLAYER_H * TS * k;
         drawPlayer(ctx, (S.player.x + PLAYER_W / 2 - S.camX) * TS - pw / 2,
           (S.player.y + PLAYER_H / 2) * TS - ph / 2, pw, ph, S.rot, hero);
+        // the armor suit, worn over whatever look you have, until it breaks
+        if (S.armor > 0) {
+          drawPlayer(ctx, (S.player.x + PLAYER_W / 2 - S.camX) * TS - pw / 2,
+            (S.player.y + PLAYER_H / 2) * TS - ph / 2, pw, ph, S.rot, "armorSuit");
+        }
         if (window.BDBadges.has("master")) drawCrown(S.rot, pw, ph);
         if (glitchFx) drawGlitchFx(S.rot, pw, ph);
         // sword in hand for the boss fight
