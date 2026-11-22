@@ -7,17 +7,18 @@ window.BDPlayPhysics = (S, P, BD) => {
   "use strict";
   const {
     AIR, baseOf, blinkOn, BOSS_X, BOUNCE_V, clamp, COIN_VALUE, COYOTE, CRASH, dailyNote,
-    EFFECT_TIME, FLY_THRUST, FLY_UP_V, GLIDE_FALL, GLITCH_STONE, GRAVITY, H, isDoor,
-    isHiddenTnt, isLava, isSolid, JUMP_BUFFER, JUMP_V, KEY, lapSpeed, MEGA_BASE, MEGA_BLAST,
-    MEGA_BOUNCE_V, MEGATITE_PAYS, noteKey, PET_SOUND, PLAYER_H, PLAYER_W, POOF_AFTER,
-    SINK_MAX, SPEED_BASE, SPEED_FAST, SPEED_SLOW, STOP_DEFAULT, SWIM_V, TILES, toast,
-    WARP_TIME, WATER, WATER_GRAVITY, WATER_SLOW
+    EFFECT_TIME, ELEVATOR, FLY_THRUST, FLY_UP_V, GLIDE_FALL, GLITCH_STONE, GRAVITY, H,
+    isDoor, isHiddenTnt, isLava, isSolid, JUMP_BUFFER, JUMP_V, KEY, lapSpeed, MEGA_BASE,
+    MEGA_BLAST, MEGA_BOUNCE_V, MEGATITE_PAYS, noteKey, PET_SOUND, PLAYER_H, PLAYER_W,
+    POOF_AFTER, PUSH, SHOVE, SHOVE_DIST, SINK_MAX, SPEED_BASE, SPEED_FAST, SPEED_SLOW,
+    STOP_DEFAULT, SWIM_V, TELEPORT, TILES, toast, WARP_TIME, WATER, WATER_GRAVITY,
+    WATER_SLOW
   } = BD;
   const {
     blink, boom, die, ember, endCut, endlessOver, enterBoss, fill, gotRod, level, megaAt,
-    megaEl, megaTimes, notes, pctEl, petBase, puff, reset, scoreEl, setBoost, setFree,
-    showItems, sparkle, tellOnce, updateBoss, updateBossDown, updateCut, updateHazards,
-    VIEW_COLS, win
+    megaEl, megaTimes, moveBlock, notes, pctEl, petBase, puff, reset, scoreEl, setBoost,
+    setFree, showItems, sparkle, tellOnce, updateBoss, updateBossDown, updateCut,
+    updateHazards, VIEW_COLS, win
   } = P;
 
   // Open any shut door you've reached (from either side). A door's letter
@@ -74,6 +75,17 @@ window.BDPlayPhysics = (S, P, BD) => {
       }
     }
     doJump();
+  };
+
+  const isPushy = (ch) => baseOf(ch) === PUSH || baseOf(ch) === SHOVE;
+  // Run into a Push block and it moves one square ahead of you (if there's
+  // room); a Shove block starts sliding. Returns whether it moved.
+  const pushBlock = (x, y, dir) => {
+    if (baseOf(S.grid[y][x]) === SHOVE) {
+      if (!S.slides.some((s) => s.x === x && s.y === y)) S.slides.push({ x, y, dir, left: SHOVE_DIST });
+      return false; // it slides off on its own; you bump it and stop this step
+    }
+    return moveBlock(x, y, x + dir, y);
   };
 
   // Does the player, at (px, py), overlap this falling glitchy iron?
@@ -167,8 +179,11 @@ window.BDPlayPhysics = (S, P, BD) => {
     // horizontal — always forward, unless a Free move block handed you the controls
     const oldX = S.player.x;
     const dir = S.free ? ((S.moveR ? 1 : 0) - (S.moveL ? 1 : 0)) * (S.flipT > 0 ? -1 : 1) : 1;
+    // riding a Fall elevator down, you wait on it (unless you're in Free move)
+    const onElevator = !S.free && S.fallers.some((f) => f.elevator &&
+      S.player.x < f.x + 1 && S.player.x + PLAYER_W > f.x && Math.abs(S.player.y + PLAYER_H - f.y) < 0.1);
     if (S.stopT > 0) S.stopT -= dt;
-    else S.player.x += dir * speed * dt;
+    else if (!onElevator) S.player.x += dir * speed * dt;
     if (S.knock) {
       // the shove from stomping the boss, fading out over about half a second
       S.player.x += S.knock * dt;
@@ -199,6 +214,9 @@ window.BDPlayPhysics = (S, P, BD) => {
         S.player.vy = 0;
         S.player.onGround = true;
         S.rot = 0;
+      } else if (isPushy(S.grid[hitRow][rightCol])) {
+        // a Push or Shove block: it moves (or you just stop), never a crash
+        if (!pushBlock(rightCol, hitRow, 1)) S.player.x = oldX;
       } else {
         S.player.x = oldX;
         // ran straight into a wall — only deadly when you can't stop yourself
@@ -208,7 +226,10 @@ window.BDPlayPhysics = (S, P, BD) => {
     if (S.player.x < oldX) {
       const leftCol = Math.floor(S.player.x);
       for (let y = y0; y <= y1; y++) {
-        if (solidAt(leftCol, y)) { S.player.x = oldX; break; }
+        if (solidAt(leftCol, y)) {
+          if (!(isPushy(S.grid[y][leftCol]) && pushBlock(leftCol, y, -1))) S.player.x = oldX;
+          break;
+        }
       }
     }
     // Falling glitchy iron is solid too: run into its side and it's a wall.
@@ -262,6 +283,10 @@ window.BDPlayPhysics = (S, P, BD) => {
             S.player.vy = 0;
             S.player.onGround = true;
             S.rot = 0;
+            if (baseOf(S.grid[footRow][x]) === ELEVATOR && !solidAt(x, footRow + 1)) {
+              S.fallers.push({ x, y: footRow, vy: 0, ch: S.grid[footRow][x], elevator: true });
+              S.grid[footRow][x] = AIR;
+            }
           }
           break;
         }
@@ -325,6 +350,11 @@ window.BDPlayPhysics = (S, P, BD) => {
         }
       }
     }
+    // the teleport you just arrived on works again once you've stepped off it
+    if (S.tpSkip) {
+      const [tx, ty] = S.tpSkip.split(",").map(Number);
+      if (!(tx >= ix0 && tx <= ix1 && ty >= iy0 && ty <= iy1)) S.tpSkip = null;
+    }
     for (let y = iy0; y <= iy1; y++) {
       for (let x = ix0; x <= ix1; x++) {
         if (x < 0 || x >= S.width || y < 0 || y >= S.grid.length) continue;
@@ -342,6 +372,9 @@ window.BDPlayPhysics = (S, P, BD) => {
           S.state = "talk";
           S.holding = false;
           continue;
+        }
+        if (ch === TELEPORT && S.tpSkip !== noteKey(x, y)) {
+          if (blink(x, y, TELEPORT)) return;
         }
         if (ch === CRASH) {
           S.grid[y][x] = AIR;

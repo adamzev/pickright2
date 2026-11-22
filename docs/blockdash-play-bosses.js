@@ -7,9 +7,10 @@ window.BDPlayBosses = (S, P, BD) => {
   "use strict";
   const {
     AIR, ARENA_W, arenaBgOf, arenaGrid, BOSS_BODY, BOSS_HP, BOSS_PX, BOSS_STAGE, BOSS_TOP,
-    BOSS_X, BULLET_LIFE, clamp, crashArenaGrid, CUT_END, findSpawn, GALAXY_H, GALAXY_SHOOT,
-    GALAXY_W, GLITCH_BLOCKS, GLITCH_COLORS, GLITCH_FIX_TIME, GLITCH_HP, GLITCH_SIZE,
-    GLITCH_SOLID, GLITCH_SPOTS, H, JUMP_V, PLAYER_H, PLAYER_W, RAIN_SPEED, toast
+    BOSS_X, BULLET_LIFE, clamp, crashArenaGrid, CUT_END, ENDER_BULLET_SPEED, findSpawn,
+    GALAXY_H, GALAXY_SHOOT, GALAXY_W, GLITCH_BLOCKS, GLITCH_COLORS, GLITCH_FIX_TIME,
+    GLITCH_HP, GLITCH_SIZE, GLITCH_SOLID, GLITCH_SPOTS, H, JUMP_V, PLAYER_H, PLAYER_W,
+    RAIN_SPEED, toast
   } = BD;
   const {
     bossMax, canvas, level, reset, setFree, strip
@@ -130,12 +131,13 @@ window.BDPlayBosses = (S, P, BD) => {
     g.t += dt;
     // floats from near the top down to the floor and back
     g.y = 0.3 + (H - 1 - GALAXY_H - 0.3) * (0.5 + 0.5 * Math.sin(g.t * 0.8));
-    // in a long crash arena it only starts shooting once it's on screen
-    if (g.x - GALAXY_W / 2 < S.camX + P.VIEW_COLS) g.shootT -= dt;
+    g.shootT -= dt;
     if (g.shootT <= 0) {
       g.shootT = GALAXY_SHOOT;
       const y = clamp(S.player.y + PLAYER_H / 2, 0.5, H - 1.5);
-      S.bullets.push({ x: g.x - GALAXY_W / 2, y, a: Math.PI, life: 6, straight: true, ender: true, fromX: -1, fromY: -1 });
+      // they last long enough to cross the whole arena, however long it is
+      const life = (S.width + 2) / ENDER_BULLET_SPEED;
+      S.bullets.push({ x: g.x - GALAXY_W / 2, y, a: Math.PI, life, straight: true, ender: true, fromX: -1, fromY: -1 });
     }
     // a little forgiving at the edges, like the other mobs
     if (P.touches(g.x - GALAXY_W / 2 + 0.3, g.y + 0.5, g.x + GALAXY_W / 2, g.y + GALAXY_H)) { P.die("delete", true); return true; }

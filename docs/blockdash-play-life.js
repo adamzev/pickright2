@@ -7,8 +7,8 @@ window.BDPlayLife = (S, P, BD) => {
   "use strict";
   const {
     bestKey, builtinLevels, dailyLevelDone, dailyNote, dayKey, el, GALAXY_KEY, galaxyWon,
-    getBest, GHOST_BONUS, H, loadBag, loadPets, musicOf, PLAYER_H, PLAYER_W, saveBag,
-    savePets, setBest, SHIELD_TIME, toast
+    getBest, GHOST_BONUS, H, loadBag, loadPets, musicOf, noteKey, PLAYER_H, PLAYER_W,
+    saveBag, savePets, setBest, SHIELD_TIME, toast
   } = BD;
   const {
     bag, chain, endRun, fromEditor, hasEyes, hasPearls, hasRods, jumpBtn, level, msgSlot,
@@ -217,15 +217,22 @@ window.BDPlayLife = (S, P, BD) => {
 
   // Jump to the nearest Blink further right. Only forward, so Blinks
   // can't be used to loop back and farm gems.
-  const blink = (fromX, fromY) => {
+  // the nearest square of this block further right than fromX, or null
+  const nextAhead = (tile, fromX, fromY) => {
     let best = null, bestD = Infinity;
     for (let y = 0; y < S.grid.length; y++) {
       for (let x = fromX + 1; x < S.width; x++) {
-        if (S.grid[y][x] !== "I") continue;
+        if (S.grid[y][x] !== tile) continue;
         const d = (x - fromX) ** 2 + (y - fromY) ** 2;
         if (d < bestD) { bestD = d; best = { x, y }; }
       }
     }
+    return best;
+  };
+
+  // tile: "I" for Blink, or the Auto teleport
+  const blink = (fromX, fromY, tile = "I") => {
+    const best = nextAhead(tile, fromX, fromY);
     if (!best) return false;
     sparkle(S.player.x + PLAYER_W / 2, S.player.y + PLAYER_H / 2, ["#b46bff", "#f4f0ff"]);
     S.player.x = best.x + (1 - PLAYER_W) / 2;
@@ -234,10 +241,13 @@ window.BDPlayLife = (S, P, BD) => {
     // The game holds still while the camera glides over, so the jump is
     // easy on the eyes and you're never dropped straight into danger.
     S.warp = { t: 0, from: S.camX };
+    // arriving on an Auto teleport mustn't send you straight on to the next one
+    if (tile !== "I") S.tpSkip = noteKey(best.x, best.y);
     return true;
   };
 
   return {
+    nextAhead,
     blink, boom, die, ember, explode, fakeCrash, gotRod, puff, sparkle, win
   };
 };

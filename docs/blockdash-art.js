@@ -861,6 +861,136 @@ window.BDArt = (() => {
     "................",
   ], { P: "#2a1240", p: "#7a2fd0", w: "#f4f0ff", t: "#b46bff" });
 
+  // teleports, elevators and the pushing puzzle
+  const autoTeleport = paintMap([
+    "....ffffffff....",
+    "....fvvvvvvf....",
+    "....fvvvvvvf....",
+    "....fwvvvvvf....",
+    "ffffVVVVVVVVffff",
+    "fvvvVVVVVVVVvvvf",
+    "fvvvVVwwwwVVwvvf",
+    "fvvvVVwVVwVVvvvf",
+    "fvvvVVwVVwVVvvvf",
+    "fvvwVVwwwwVVvvvf",
+    "fvvvVVVVVVVVvvvf",
+    "ffffVVVVVVVVffff",
+    "....fvvvvvwf....",
+    "....fvvvvvvf....",
+    "....fvvvvvvf....",
+    "....ffffffff....",
+  ], { f: "#2a1240", v: "#7a2fd0", V: "#b46bff", w: "#f4f0ff" });
+  // the Fall block: carries you down when you stand on it
+  const fallBlock = paintMap([
+    "kkkkkkkkkkkkkkkk",
+    "kmmmmmmmmmmmmmmk",
+    "kmmmmmyyyymmmmmk",
+    "kmmmmmyyyymmmmmk",
+    "kmmmmmyyyymmmmmk",
+    "kmmmmmyyyymmmmmk",
+    "kmmmmmyyyymmmmmk",
+    "kmmyyyyyyyyyymmk",
+    "kmmmyyyyyyyymmmk",
+    "kmmmmyyyyyymmmmk",
+    "kmmmmmyyyymmmmmk",
+    "kmmmmmmyymmmmmmk",
+    "kmmmmmmmmmmmmmmk",
+    "kMMMMMMMMMMMMMMk",
+    "kMMMMMMMMMMMMMMk",
+    "kkkkkkkkkkkkkkkk",
+  ], { k: "#3a3a44", m: "#8c8c9a", M: "#6f6f7c", y: "#ffd54a" });
+  // the Elevator: the cage from the designer's drawing (always moving)
+  const fallElevator = paintMap([
+    "kkkkkkkkkkkkkkkk",
+    "kmmmmkmmmmkmmmmk",
+    "kmmmmkmmmmkmmmmk",
+    "kmmmmkmmmmkmmmmk",
+    "kmmmmkmmmmkmmmmk",
+    "kkkkkkkkkkkkkkkk",
+    "kmmmmkmmmmkmmmmk",
+    "kmmmmkmmmmkmmmmk",
+    "kmmmmkyyyykmmmmk",
+    "kmmmmkyyyykmmmmk",
+    "kmmmmkyyyykmmmmk",
+    "kmmmmyyyyyymmmmk",
+    "kmmmmkyyyykmmmmk",
+    "kmmmmkmyymkmmmmk",
+    "kmmmmkmmmmkmmmmk",
+    "kkkkkkkkkkkkkkkk",
+  ], { k: "#3a3a44", m: "#9a9aa8", y: "#ffd54a" });
+  const pushBlock = paintMap([
+    "dddddddddddddddd",
+    "dDDDDDDDDDDDDDDd",
+    "dwwwwwwwwwwwwwwd",
+    "dwwwwwwwwwwwwwwd",
+    "dwwwwwwwwwwwwwwd",
+    "dwwwwwwwwawwwwwd",
+    "dwwwwwwwwaawwwwd",
+    "dwwaaaaaaaaawwwd",
+    "dwwaaaaaaaaawwwd",
+    "dwwwwwwwwaawwwwd",
+    "dwwwwwwwwawwwwwd",
+    "dwwwwwwwwwwwwwwd",
+    "dwwwwwwwwwwwwwwd",
+    "dwwwwwwwwwwwwwwd",
+    "dDDDDDDDDDDDDDDd",
+    "dddddddddddddddd",
+  ], { w: "#c08a4a", d: "#6b4421", D: "#8a5a2c", a: "#fff4dc" });
+  const shoveBlock = paintMap([
+    "dddddddddddddddd",
+    "dDDDDDDDDDDDDDDd",
+    "dwwwwwwwwwwwwwwd",
+    "dwwwwwwwwwwwwwwd",
+    "dwwwwwwwwwwwwwwd",
+    "dwwawwwwawwwwwwd",
+    "dwwaawwwaawwwwwd",
+    "dwwaaawwaaawwwwd",
+    "dwwaaawwaaawwwwd",
+    "dwwaawwwaawwwwwd",
+    "dwwawwwwawwwwwwd",
+    "dwwwwwwwwwwwwwwd",
+    "dwwwwwwwwwwwwwwd",
+    "dwwwwwwwwwwwwwwd",
+    "dDDDDDDDDDDDDDDd",
+    "dddddddddddddddd",
+  ], { w: "#d07a3a", d: "#6b3a14", D: "#9a5a24", a: "#fff4dc" });
+  const enterBlock = paintMap([
+    "rrrrrrrrrrrrrrrr",
+    "rrrrrrrrrrrrrrrr",
+    "rr............rr",
+    "rr.rr.....rr..rr",
+    "rr.rr.....rr..rr",
+    "rr............rr",
+    "rr............rr",
+    "rr............rr",
+    "rr............rr",
+    "rr............rr",
+    "rr.rr.....rr..rr",
+    "rr.rr.....rr..rr",
+    "rr............rr",
+    "rr............rr",
+    "rrrrrrrrrrrrrrrr",
+    "rrrrrrrrrrrrrrrr",
+  ], { r: "#ff8a3d" });
+  const enterDone = paintMap([
+    "GGGGGGGGGGGGGGGG",
+    "GggggggggggggggG",
+    "GggggggggggggggG",
+    "GggggggggggggggG",
+    "GgggggggggggwggG",
+    "GggggggggggwwggG",
+    "GgggggggggwwgggG",
+    "GggwgggggwwggggG",
+    "GggwwgggwwgggggG",
+    "GgggwwgwwggggggG",
+    "GggggwwwgggggggG",
+    "GgggggwggggggggG",
+    "GggggggggggggggG",
+    "GggggggggggggggG",
+    "GggggggggggggggG",
+    "GGGGGGGGGGGGGGGG",
+  ], { g: "#4fbf5a", G: "#2a7a33", w: "#ffffff" });
+
   const water = paintMap([
     "bbbbbbbbbbbbbbbb",
     "bbbbbbbbbbbbbbbb",
@@ -1575,6 +1705,13 @@ window.BDArt = (() => {
     "\u0189": water,
     "\u018a": iron,
     "\u018b": fakeCrash,
+    "\u018c": autoTeleport,
+    "\u018d": fallBlock,
+    "\u018e": pushBlock,
+    "\u018f": shoveBlock,
+    "\u0190": enterBlock,
+    "\u0191": enterDone,
+    "\u0192": fallElevator,
     enderBullet: enderBullet,
     swordStone: swordStone,
     swordIron: swordIron,
@@ -1661,6 +1798,13 @@ window.BDArt = (() => {
     { key: "\u0188", label: "Glitchy iron" },
     { key: "\u0189", label: "Water" },
     { key: "\u018b", label: "Fake crash block" },
+    { key: "\u018c", label: "Auto teleport" },
+    { key: "\u018d", label: "Fall block" },
+    { key: "\u0192", label: "Elevator" },
+    { key: "\u018e", label: "Push block" },
+    { key: "\u018f", label: "Shove block" },
+    { key: "\u0190", label: "Enter" },
+    { key: "\u0191", label: "Enter (done)" },
     { key: "enderBullet", label: "Ender bullet" },
     { key: "playerGalaxy", label: "Galaxy skin" },
     { key: "galaxyMonster", label: "Galactic Monstrosity" },
@@ -1999,6 +2143,15 @@ window.BDArt = (() => {
     if (sh > sw) {
       const w = size * sw / sh;
       return blit(ctx, sp, x + (size - w) / 2, y, w, size);
+    }
+    if (ch === "\u018c") {
+      blit(ctx, sp, x, y, size, size);
+      ctx.save();
+      ctx.globalAlpha = 0.2 + 0.15 * Math.sin(time * 5);
+      ctx.fillStyle = "#f4f0ff";
+      ctx.fillRect(x + size * 0.3, y + size * 0.3, size * 0.4, size * 0.4);
+      ctx.restore();
+      return;
     }
     if (ch === "\u0189") {
       // see-through, with a slow shimmer drifting along

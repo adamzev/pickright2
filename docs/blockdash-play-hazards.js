@@ -6,12 +6,13 @@
 window.BDPlayHazards = (S, P, BD) => {
   "use strict";
   const {
-    AIR, baseOf, BLAZE_DRIFT, BLAZE_MAX, BLAZE_REACH, BLAZE_SHOOT, BOSS_SHOT_SPEED,
-    BULLET_LIFE, BULLET_SPEED, BULLET_TURN, CHASE_SPEED, clamp, ENDER_AHEAD,
-    ENDER_BULLET_SPEED, ENDER_NOTICE, FALL_ACCEL, FALL_MAX, FALL_PUSH, FIREBALL_SPEED,
-    FLOWED, GLITCH_EVERY, GLITCH_HOP, GLITCH_IRON, GRAVITY, H, inCone, isSolid, JUMP_V,
-    LAVA_FALL, LAVA_RISE, LOGGABLE, MOB_H, MOB_W, nextToWater, PLAYER_H, PLAYER_W,
-    SHOOT_EVERY, SPAWN_EVERY, WATCH_CYCLE, WATCH_OPEN
+    AIR, baseOf, BLAZE_DRIFT, BLAZE_MAX, BLAZE_REACH, BLAZE_SHOOT, BLOCK_STEP,
+    BOSS_SHOT_SPEED, BULLET_LIFE, BULLET_SPEED, BULLET_TURN, CHASE_SPEED, clamp, ENDER_AHEAD,
+    ENDER_BULLET_SPEED, ENDER_NOTICE, ENTER, ENTER_DONE, FALL_ACCEL, FALL_MAX, FALL_PUSH,
+    FIREBALL_SPEED, FLOWED, GLITCH_EVERY, GLITCH_HOP, GLITCH_IRON, GRAVITY, H, inCone,
+    isSolid, JUMP_V, LAVA_FALL, LAVA_RISE, LIFT, LOGGABLE, MOB_H, MOB_W, nextToWater,
+    noteKey, PLAYER_H, PLAYER_W, PUSH, SHOOT_EVERY, SHOVE, SPAWN_EVERY, TELEPORT,
+    WATCH_CYCLE, WATCH_OPEN
   } = BD;
   const {
     die, explode, gotRod, sparkle, VIEW_COLS
@@ -233,11 +234,65 @@ window.BDPlayHazards = (S, P, BD) => {
     }
     S.mobs = S.mobs.filter((m) => !m.gone);
     updateFallers(dt);
+    updateBlocks(dt);
     return false;
   };
 
-  // Glitchy iron: once its column is on screen and there's nothing under it,
-  // it lifts out of the grid and falls. It lands as a block again on the
+  // ----- Push and Shove blocks, and Enters -----
+
+  const isPushy = (ch) => baseOf(ch) === PUSH || baseOf(ch) === SHOVE;
+  // Can a pushed or falling block go into this square?
+  const roomAt = (x, y) => {
+    if (x < 0 || x >= S.width || y < 0 || y >= S.grid.length) return false;
+    const ch = S.grid[y][x];
+    if (ch !== AIR && baseOf(ch) !== ENTER) return false;
+    // not into you
+    const p = S.player;
+    return !(x < p.x + PLAYER_W && x + 1 > p.x && y < p.y + PLAYER_H && y + 1 > p.y);
+  };
+  // Moves a block one square. Into an Enter, it fills it: the Enter turns
+  // green, and when the last one does, you win.
+  const moveBlock = (x, y, nx, ny) => {
+    if (!roomAt(nx, ny)) return false;
+    const ch = S.grid[y][x];
+    S.grid[y][x] = AIR;
+    if (baseOf(S.grid[ny][nx]) === ENTER) {
+      S.grid[ny][nx] = ENTER_DONE;
+      sparkle(nx + 0.5, ny + 0.5, ["#4fbf5a", "#b6ffb0", "#ffffff"]);
+      S.entersLeft--;
+      if (S.entersLeft <= 0) { P.tellOnce("enters", "✅ Every Enter is green!"); P.win(); }
+      return true;
+    }
+    S.grid[ny][nx] = ch;
+    return true;
+  };
+
+  // Every BLOCK_STEP: sliding Shove blocks move on, and Push and Shove blocks
+  // on screen with nothing under them drop a square.
+  const updateBlocks = (dt) => {
+    S.blockT += dt;
+    if (S.blockT < BLOCK_STEP) return;
+    S.blockT -= BLOCK_STEP;
+    for (const s of S.slides) {
+      if (s.left > 0 && isPushy(S.grid[s.y][s.x]) && moveBlock(s.x, s.y, s.x + s.dir, s.y)) {
+        s.x += s.dir;
+        s.left--;
+      } else s.left = 0;
+    }
+    S.slides = S.slides.filter((s) => s.left > 0);
+    const x0 = Math.max(0, Math.floor(S.camX) - 2);
+    const x1 = Math.min(S.width - 1, Math.ceil(S.camX + VIEW_COLS) + 2);
+    for (let x = x0; x <= x1; x++) {
+      for (let y = S.grid.length - 2; y >= 0; y--) {
+        if (!isPushy(S.grid[y][x]) || !roomAt(x, y + 1)) continue;
+        const slide = S.slides.find((s) => s.x === x && s.y === y);
+        if (moveBlock(x, y, x, y + 1) && slide) slide.y++; // a sliding block keeps sliding after a drop
+      }
+    }
+  };
+
+  // Glitchy iron and Elevators: once the column is on screen and there's
+  // nothing under it, it lifts out of the grid and falls. It lands as a block again on the
   // first solid square below, or drops out of the level.
   const updateFallers = (dt) => {
     const x0 = Math.max(0, Math.floor(S.camX) - 1);
@@ -246,9 +301,10 @@ window.BDPlayHazards = (S, P, BD) => {
       if (!onScreen(x)) continue;
       for (let y = S.grid.length - 1; y >= 0; y--) {
         const ch = S.grid[y][x];
-        if (baseOf(ch) !== GLITCH_IRON || P.solidAt(x, y + 1)) continue;
+        const kind = baseOf(ch);
+        if ((kind !== GLITCH_IRON && kind !== LIFT) || P.solidAt(x, y + 1)) continue;
         S.grid[y][x] = AIR;
-        S.fallers.push({ x, y, vy: 0, ch });
+        S.fallers.push({ x, y, vy: 0, ch, elevator: kind === LIFT });
       }
     }
     const p = S.player;
@@ -269,6 +325,23 @@ window.BDPlayHazards = (S, P, BD) => {
       // standing on it? you ride it down
       const riding = overX && Math.abs(p.y + PLAYER_H - f.y) < 0.05 && p.vy >= 0;
       if (riding) p.y += ny - f.y;
+      // into an Auto teleport: it (and you, if you're riding it) zooms to the next one ahead
+      const ty = Math.floor(ny + 0.5);
+      const tKey = noteKey(f.x, ty);
+      if (S.grid[ty] && S.grid[ty][f.x] === TELEPORT && f.tpSkip !== tKey) {
+        const to = P.nextAhead(TELEPORT, f.x, ty);
+        if (to) {
+          if (riding) {
+            p.x += to.x - f.x;
+            p.y = to.y - PLAYER_H;
+            S.warp = { t: 0, from: S.camX };
+          }
+          f.x = to.x;
+          f.y = to.y;
+          f.tpSkip = noteKey(to.x, to.y);
+          continue;
+        }
+      }
       const row = Math.floor(ny) + 1;
       if (ny > Math.floor(ny) && P.solidAt(f.x, row)) {
         const at = Math.floor(ny);
@@ -283,6 +356,7 @@ window.BDPlayHazards = (S, P, BD) => {
   };
 
   return {
+    moveBlock,
     eyeOpen, touches, updateHazards
   };
 };

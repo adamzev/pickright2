@@ -84,6 +84,13 @@
     "\u0189": { name: "Water" },
     "\u018a": { name: "Iron", solid: true },
     "\u018b": { name: "Fake crash", hidden: true },
+    "\u018c": { name: "Auto teleport" },
+    "\u018d": { name: "Fall block", solid: true },
+    "\u018e": { name: "Push block", solid: true },
+    "\u018f": { name: "Shove block", solid: true },
+    "\u0190": { name: "Enter" },
+    "\u0191": { name: "Enter (done)", solid: true }, // only ever made in play
+    "\u0192": { name: "Elevator", solid: true },
   };
   const KEY = "\u0186";
   const DOORS = ["\u0180", "\u0181", "\u0182", "\u0183", "\u0184", "\u0185"];
@@ -111,6 +118,22 @@
   const GALAXY_W = 7.5, GALAXY_H = 6; // the Galactic Monstrosity's size, in blocks: half the screen tall
   const ENDER_BULLET_SPEED = 6;
   const GALAXY_LOOK = "playerGalaxy"; // the skin you unlock by escaping
+  // Auto teleport: touch one and you zoom to the nearest one further ahead
+  // (no jump needed, unlike Blink). Falling blocks riding into one go too.
+  const TELEPORT = "\u018c";
+  // Fall block: stand on it and it carries you down, then stops.
+  const ELEVATOR = "\u018d";
+  // Elevator: like the Fall block but always on: it starts down by itself as
+  // soon as it's on screen, rider or not, and stops at the bottom (or zooms
+  // on through an Auto teleport). You wait on it while it moves.
+  const LIFT = "\u0192";
+  // Push and Shove blocks: run into one and a Push block slides ahead of you
+  // (and you stop, not explode, if it's stuck); a Shove block slides up to
+  // SHOVE_DIST blocks by itself. Both fall down holes. Push one into an Enter
+  // and the Enter turns green; when every Enter is green, you win.
+  const PUSH = "\u018e", SHOVE = "\u018f", ENTER = "\u0190", ENTER_DONE = "\u0191";
+  const SHOVE_DIST = 4;
+  const BLOCK_STEP = 0.06; // seconds for a pushed, shoved or dropping block to move one square
   const GALAXY_KEY = "blockdash_galaxy"; // "1" once you've escaped: armor and the skin are yours
   const galaxyWon = () => {
     try { return localStorage.getItem(GALAXY_KEY) === "1"; } catch (e) { return false; }
@@ -147,7 +170,7 @@
   const MEGA_PICK = "~"; // likewise, the palette button that opens the mega blocks
 
   const PALETTE = ["g", "s", "p", "n", "k", "e", "m", "t", "T", "h", "A", "L", "U", "D", "F", "S", "Z",
-    "W", "Y", "V", "Q", "N", "I", "C", "d", "+", "$", "@", "r", "9", "o", "H", "R", "b", "%", "w", "f", "K", "O", "M", "E", "G", "J", "B", IRON, GLITCH_STONE, GLITCH_IRON, WATER, CRASH, ...DOORS, KEY, MEGA_PICK, MINE, "P", ERASER];
+    "W", "Y", "V", "Q", "N", "I", "C", "d", "+", "$", "@", "r", "9", "o", "H", "R", "b", "%", "w", "f", "K", "O", "M", "E", "G", "J", "B", IRON, GLITCH_STONE, GLITCH_IRON, WATER, CRASH, TELEPORT, ELEVATOR, LIFT, PUSH, SHOVE, ENTER, ...DOORS, KEY, MEGA_PICK, MINE, "P", ERASER];
 
   // The boss arena is drawn in the same editor as the level, with a slightly
   // different set of blocks: no portals, save points or note-carrying blocks
@@ -1879,6 +1902,12 @@
       [GLITCH_STONE, "Glitchy stone — blinks on and off every second. When it's gone, you fall through!"],
       [GLITCH_IRON, "Glitchy iron — floats down slowly as soon as it's on screen. If it lands on you, it pushes you down"],
       [CRASH, "Fake crash — invisible when you play. Touch it and the game pretends to crash! Reload, and you're in the 🌌 Crash arena with the Galactic Monstrosity. Escape through an End portal to win"],
+      [TELEPORT, "Auto teleport — touch it and you zoom to the next one ahead. A falling block that drops into one zooms ahead too"],
+      [ELEVATOR, "Fall block — stand on it and it carries you down until it lands"],
+      [LIFT, "Elevator — goes down by itself as soon as it's on screen, and stops at the bottom. Hop on to ride it down. It zooms through Auto teleports"],
+      [PUSH, "Push block — run into it to push it along in front of you. If it's stuck you just stop. It falls down holes"],
+      [SHOVE, "Shove block — run into it and it slides 4 blocks by itself. It falls down holes"],
+      [ENTER, "Enter — push a Push or Shove block into it and it turns green. When every Enter is green, you win!"],
       [WATER, "Water — swim! You sink slowly; press jump to swim up, or jump out near the top. Lava touching water turns into stone"],
       ["P", "Start — where you spawn"],
     ].forEach(([ch, text]) => {
@@ -3247,23 +3276,24 @@
   // blockdash.js's own names that the play files (blockdash-play-*.js) use
   const BD = {
     AIR, ARENA_W, arenaBgOf, arenaGrid, Art, baseOf, bestKey, bgOf, BLAZE_DRIFT, BLAZE_MAX,
-    BLAZE_REACH, BLAZE_SHOOT, blinkOn, BOSS_BODY, BOSS_HP, BOSS_PX, BOSS_SHOT_SPEED,
-    BOSS_STAGE, BOSS_TOP, BOSS_X, BOUNCE_V, builtinLevels, BULLET_LIFE, BULLET_SPEED,
-    BULLET_TURN, CAT_LOOK, CHASE_SPEED, clamp, COIN_VALUE, COYOTE, CRASH, crashArenaGrid,
-    crashBgOf, CUT_END, dailyLevelDone, dailyNote, dayKey, DOOR_SWING, drawCone,
-    drawExplosion, drawPlayer, drawTile, EFFECT_TIME, el, ENDER_AHEAD, ENDER_BULLET_SPEED,
-    ENDER_NOTICE, FALL_ACCEL, FALL_MAX, FALL_PUSH, findSpawn, FIREBALL_SPEED, FLOWED,
-    FLY_THRUST, FLY_UP_V, FLYING_PETS, GALAXY_H, GALAXY_KEY, GALAXY_LOOK, GALAXY_SHOOT,
-    GALAXY_W, galaxyWon, getBest, GHOST_BONUS, GHOST_EVERY, GLIDE_FALL, GLITCH_BLOCKS,
-    GLITCH_COLORS, GLITCH_EVERY, GLITCH_FIX_TIME, GLITCH_HOP, GLITCH_HP, GLITCH_IRON,
-    GLITCH_SIZE, GLITCH_SOLID, GLITCH_SPOTS, GLITCH_STONE, glitchLookOn, GRAVITY, H, inCone,
-    isDoor, isHidden, isHiddenTnt, isLava, isLogged, isOpenDoor, isSolid, JUMP_BUFFER,
-    JUMP_V, KEY, lapSpeed, LAVA_FALL, LAVA_RISE, loadBag, loadPets, LOGGABLE, MEGA_BASE,
-    MEGA_BLAST, MEGA_BOUNCE_V, MEGATITE_PAYS, MOB_H, MOB_W, musicOf, nextToWater, noteKey,
-    overOf, PET_SOUND, PLAYER_H, PLAYER_W, POOF_AFTER, RAIN_SPEED, saveBag, savePets,
-    setBest, SHIELD_TIME, SHOOT_EVERY, SINK_MAX, SPAWN_EVERY, SPEED_BASE, SPEED_FAST,
-    SPEED_SLOW, STILL_PETS, STOP_DEFAULT, SWIM_V, SWORDS, TILES, toast, trailOn, WARP_TIME,
-    WATCH_CYCLE, WATCH_OPEN, WATER, WATER_GRAVITY, WATER_SLOW
+    BLAZE_REACH, BLAZE_SHOOT, blinkOn, BLOCK_STEP, BOSS_BODY, BOSS_HP, BOSS_PX,
+    BOSS_SHOT_SPEED, BOSS_STAGE, BOSS_TOP, BOSS_X, BOUNCE_V, builtinLevels, BULLET_LIFE,
+    BULLET_SPEED, BULLET_TURN, CAT_LOOK, CHASE_SPEED, clamp, COIN_VALUE, COYOTE, CRASH,
+    crashArenaGrid, crashBgOf, CUT_END, dailyLevelDone, dailyNote, dayKey, DOOR_SWING,
+    drawCone, drawExplosion, drawPlayer, drawTile, EFFECT_TIME, el, ELEVATOR, ENDER_AHEAD,
+    ENDER_BULLET_SPEED, ENDER_NOTICE, ENTER, ENTER_DONE, FALL_ACCEL, FALL_MAX, FALL_PUSH,
+    findSpawn, FIREBALL_SPEED, FLOWED, FLY_THRUST, FLY_UP_V, FLYING_PETS, GALAXY_H,
+    GALAXY_KEY, GALAXY_LOOK, GALAXY_SHOOT, GALAXY_W, galaxyWon, getBest, GHOST_BONUS,
+    GHOST_EVERY, GLIDE_FALL, GLITCH_BLOCKS, GLITCH_COLORS, GLITCH_EVERY, GLITCH_FIX_TIME,
+    GLITCH_HOP, GLITCH_HP, GLITCH_IRON, GLITCH_SIZE, GLITCH_SOLID, GLITCH_SPOTS,
+    GLITCH_STONE, glitchLookOn, GRAVITY, H, inCone, isDoor, isHidden, isHiddenTnt, isLava,
+    isLogged, isOpenDoor, isSolid, JUMP_BUFFER, JUMP_V, KEY, lapSpeed, LAVA_FALL, LAVA_RISE,
+    LIFT, loadBag, loadPets, LOGGABLE, MEGA_BASE, MEGA_BLAST,
+    MEGA_BOUNCE_V, MEGATITE_PAYS, MOB_H, MOB_W, musicOf, nextToWater, noteKey, overOf,
+    PET_SOUND, PLAYER_H, PLAYER_W, POOF_AFTER, PUSH, RAIN_SPEED, saveBag, savePets, setBest,
+    SHIELD_TIME, SHOOT_EVERY, SHOVE, SHOVE_DIST, SINK_MAX, SPAWN_EVERY, SPEED_BASE,
+    SPEED_FAST, SPEED_SLOW, STILL_PETS, STOP_DEFAULT, SWIM_V, SWORDS, TELEPORT, TILES, toast,
+    trailOn, WARP_TIME, WATCH_CYCLE, WATCH_OPEN, WATER, WATER_GRAVITY, WATER_SLOW
   };
 
   // `chain` links a level to the ones after it: { i, count, carried, playNext }.
@@ -3409,7 +3439,7 @@
       watchers: [], mobs: [], runT: 0, warp: null, free: false, moveL: false, moveR: false,
       stopT: 0, talk: null, talkAt: 0, poofed: false, inBoss: false, boss: null,
       introSeen: false, cutT: 0, downT: 0, knock: 0, plats: [], flipT: 0, fallers: [], camY: 0,
-      crash: false, armor: galaxyWon() ? 1 : 0,
+      crash: false, armor: galaxyWon() ? 1 : 0, slides: [], blockT: 0, tpSkip: null, entersLeft: 0,
     });
 
     const showItems = () => {
@@ -3601,6 +3631,10 @@
         }
       }
       quench(S.grid);
+      S.slides = [];
+      S.blockT = 0;
+      S.tpSkip = null;
+      S.entersLeft = S.grid.reduce((n, row) => n + row.filter((ch) => baseOf(ch) === ENTER).length, 0);
       for (const m of S.movers) if (S.grid[m.tip][m.x] === "s") m.done = true;
       S.player = {
         x: at.x + 0.15,
