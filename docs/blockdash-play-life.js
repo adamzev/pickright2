@@ -6,8 +6,9 @@
 window.BDPlayLife = (S, P, BD) => {
   "use strict";
   const {
-    bestKey, builtinLevels, dailyLevelDone, dailyNote, dayKey, el, getBest, GHOST_BONUS, H,
-    loadBag, PLAYER_H, PLAYER_W, saveBag, setBest, SHIELD_TIME, toast
+    bestKey, builtinLevels, dailyLevelDone, dailyNote, dayKey, el, GALAXY_KEY, galaxyWon,
+    getBest, GHOST_BONUS, H, loadBag, musicOf, PLAYER_H, PLAYER_W, saveBag, setBest,
+    SHIELD_TIME, toast
   } = BD;
   const {
     bag, chain, endRun, fromEditor, hasEyes, hasPearls, hasRods, jumpBtn, level, msgSlot,
@@ -60,6 +61,14 @@ window.BDPlayLife = (S, P, BD) => {
   // used up for good straight away, even if you then quit the level.
   const shielded = () => {
     if (S.shieldT > 0) return true;
+    if (S.armor > 0) {
+      S.armor--;
+      showItems();
+      S.shieldT = SHIELD_TIME;
+      toast("🪖 Your armor saved you!");
+      sparkle(S.player.x + PLAYER_W / 2, S.player.y + PLAYER_H / 2, ["#2b2a7a", "#7ee8ff", "#ffffff"]);
+      return true;
+    }
     if (bag.shields < 1) return false;
     bag.shields--;
     saveBag(Object.assign(loadBag(), { shields: bag.shields }));
@@ -68,6 +77,25 @@ window.BDPlayLife = (S, P, BD) => {
     toast("🛡 Your shield saved you!");
     sparkle(S.player.x + PLAYER_W / 2, S.player.y + PLAYER_H / 2, ["#3f7fd6", "#9cc4ff", "#ffffff"]);
     return true;
+  };
+
+  // A grey, ordinary-looking error page over the whole screen, with the music
+  // off. Reload takes you to the arena and the Galactic Monstrosity.
+  const fakeCrash = () => {
+    S.state = "crash";
+    S.holding = false;
+    window.BDMusic.level(null);
+    const page = el("div", "fake-crash");
+    page.innerHTML = "<h1>Game crashed :(</h1><p>Sorry, looks like we had a problem.</p>";
+    const reload = el("button", null, "Reload");
+    reload.onclick = () => {
+      page.remove();
+      window.BDMusic.level(musicOf(level));
+      S.state = "run";
+      P.enterCrash();
+    };
+    page.appendChild(reload);
+    document.body.appendChild(page);
   };
 
   const die = (kind = "boom", byMob = false) => {
@@ -108,8 +136,11 @@ window.BDPlayLife = (S, P, BD) => {
     const daily = level.daily && level.daily === dayKey() ? dailyLevelDone() : null;
     dailyNote("win");
     if (S.run && !S.run.deaths) dailyNote("perfect");
-    if (S.inBoss) dailyNote("boss");
-    if (S.inBoss && !level.glitch) { B.earn("boss"); if (!sword) B.earn("bare"); }
+    if (S.inBoss && !S.crash) dailyNote("boss");
+    if (S.inBoss && !level.glitch && !S.crash) { B.earn("boss"); if (!sword) B.earn("bare"); }
+    // escaping the Galactic Monstrosity: armor and the Galaxy skin, the first time
+    const galaxyFirst = S.crash && !galaxyWon();
+    if (galaxyFirst) { try { localStorage.setItem(GALAXY_KEY, "1"); } catch (e) { /* ignore */ } }
     if (S.run && !S.run.deaths) B.earn("perfect");
     if (!M.playing) B.earn("silent");
     if (petBase === "petDog" && M.playing === "woof") B.earn("goodboy");
@@ -130,6 +161,7 @@ window.BDPlayLife = (S, P, BD) => {
     const box = el("div", "overlay-msg");
     box.innerHTML =
       `<div class="big">${more || !chain ? "Level Complete!" : "You Finished!"}</div>` +
+      (galaxyFirst ? `<div class="big" style="font-size:1.1rem">🌌 You escaped! Unlocked: 🪖 Armor (survive 1 hit every level) and the Galaxy skin (pick it on the menu)</div>` : "") +
       (beatGhost ? `<div class="big" style="font-size:1.1rem">👻 NEW BEST! You beat your ghost! +${GHOST_BONUS} coins</div>` : "") +
       (daily ? `<div class="big" style="font-size:1.1rem">📅 Daily level done! 🔥 ${daily.streak}-day streak · ${daily.lines.join(" · ")}</div>` : "") +
       `<div>Score: ${S.score} · Best: ${getBest(bestKey(level))}</div>` +
@@ -197,6 +229,6 @@ window.BDPlayLife = (S, P, BD) => {
   };
 
   return {
-    blink, boom, die, ember, explode, gotRod, puff, sparkle, win
+    blink, boom, die, ember, explode, fakeCrash, gotRod, puff, sparkle, win
   };
 };

@@ -7,9 +7,9 @@ window.BDPlayBosses = (S, P, BD) => {
   "use strict";
   const {
     AIR, ARENA_W, arenaBgOf, arenaGrid, BOSS_BODY, BOSS_HP, BOSS_PX, BOSS_STAGE, BOSS_TOP,
-    BOSS_X, BULLET_LIFE, clamp, CUT_END, findSpawn, GLITCH_BLOCKS, GLITCH_COLORS,
-    GLITCH_FIX_TIME, GLITCH_HP, GLITCH_SIZE, GLITCH_SOLID, GLITCH_SPOTS, H, JUMP_V, PLAYER_H,
-    PLAYER_W, RAIN_SPEED, toast
+    BOSS_X, BULLET_LIFE, clamp, CUT_END, findSpawn, GALAXY_SHOOT, GLITCH_BLOCKS,
+    GLITCH_COLORS, GLITCH_FIX_TIME, GLITCH_HP, GLITCH_SIZE, GLITCH_SOLID, GLITCH_SPOTS, H,
+    JUMP_V, PLAYER_H, PLAYER_W, RAIN_SPEED, toast
   } = BD;
   const {
     bossMax, canvas, level, reset, setFree, strip
@@ -29,7 +29,17 @@ window.BDPlayBosses = (S, P, BD) => {
     reset();
   };
 
+  // After the fake crash: the same arena as the Boss portal's, but with the
+  // Galactic Monstrosity in it instead of the TNT Mech.
+  const enterCrash = () => {
+    S.crash = true;
+    S.flying = false;
+    enterBoss();
+    S.attempts++; // the crash took you here, not a portal, so it is the same attempt either way
+  };
+
   const startBoss = () => {
+    if (S.crash) { startGalaxy(); return; }
     if (level.glitch) { startGlitch(); return; }
     setFree(true);
     S.boss = { hp: bossMax, stage: -1, t: 0, spawnT: 0, hurtT: 0, x: BOSS_X, rain: [], gone: false };
@@ -96,6 +106,36 @@ window.BDPlayBosses = (S, P, BD) => {
     // the boss strides out from deep in the smoke to its spot
     S.boss.x = BOSS_X + 3 * (1 - clamp((S.cutT - 2.8) / 1.6, 0, 1));
     if (S.cutT >= CUT_END) endCut();
+  };
+
+  // ----- the Galactic Monstrosity -----
+  // It floats up and down at the far end of the arena, firing ender bullets
+  // straight across at your height. You can't beat it: get to an End portal.
+
+  const startGalaxy = () => {
+    setFree(true);
+    setPlats(true); // the arena's Boss platforms stay out the whole time
+    // an arena with no End portal gets two beside the monster, one high, one low
+    if (!S.grid.some((r) => r.includes("E"))) {
+      for (const [x, y] of [[ARENA_W - 6, 4], [ARENA_W - 6, H - 2]]) S.grid[y][x] = "E";
+    }
+    S.boss = { galaxy: true, x: ARENA_W - 3.5, y: 4, t: 0, shootT: GALAXY_SHOOT };
+    P.tellOnce("galaxy", "🌌 The GALACTIC MONSTROSITY! Reach an End portal to escape!");
+  };
+
+  // Returns true if you died this step.
+  const updateGalaxy = (dt) => {
+    const g = S.boss;
+    g.t += dt;
+    g.y = 1 + (H - 5) * (0.5 + 0.5 * Math.sin(g.t * 0.8));
+    g.shootT -= dt;
+    if (g.shootT <= 0) {
+      g.shootT = GALAXY_SHOOT;
+      const y = clamp(S.player.y + PLAYER_H / 2, 0.5, H - 1.5);
+      S.bullets.push({ x: g.x - 1.6, y, a: Math.PI, life: 6, straight: true, ender: true, fromX: -1, fromY: -1 });
+    }
+    if (P.touches(g.x - 1.5, g.y, g.x + 1.5, g.y + 3)) { P.die("delete", true); return true; }
+    return false;
   };
 
   // ----- The Glitch -----
@@ -267,6 +307,7 @@ window.BDPlayBosses = (S, P, BD) => {
 
   // Returns true if the player died or the fight ended this step.
   const updateBoss = (dt) => {
+    if (S.boss.galaxy) return updateGalaxy(dt);
     if (S.boss.glitch) return updateGlitch(dt);
     const b = S.boss;
     if (b.hurtT > 0) b.hurtT -= dt;
@@ -368,6 +409,7 @@ window.BDPlayBosses = (S, P, BD) => {
   };
 
   return {
-    dragonAt, endCut, enterBoss, startBoss, updateBoss, updateBossDown, updateCut
+    dragonAt, endCut, enterBoss, enterCrash, startBoss, updateBoss, updateBossDown,
+    updateCut
   };
 };

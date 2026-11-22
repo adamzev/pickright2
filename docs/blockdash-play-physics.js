@@ -6,7 +6,7 @@
 window.BDPlayPhysics = (S, P, BD) => {
   "use strict";
   const {
-    AIR, baseOf, blinkOn, BOSS_X, BOUNCE_V, clamp, COIN_VALUE, COYOTE, dailyNote,
+    AIR, baseOf, blinkOn, BOSS_X, BOUNCE_V, clamp, COIN_VALUE, COYOTE, CRASH, dailyNote,
     EFFECT_TIME, FLY_THRUST, FLY_UP_V, GLIDE_FALL, GLITCH_STONE, GRAVITY, H, isDoor,
     isHiddenTnt, isLava, isSolid, JUMP_BUFFER, JUMP_V, KEY, lapSpeed, MEGA_BASE, MEGA_BLAST,
     MEGA_BOUNCE_V, MEGATITE_PAYS, noteKey, PET_SOUND, PLAYER_H, PLAYER_W, POOF_AFTER,
@@ -75,6 +75,10 @@ window.BDPlayPhysics = (S, P, BD) => {
     }
     doJump();
   };
+
+  // Does the player, at (px, py), overlap this falling glitchy iron?
+  const overlapsFaller = (f, px, py) =>
+    px < f.x + 1 && px + PLAYER_W > f.x && py < f.y + 1 && py + PLAYER_H > f.y;
 
   // Is this square water? Whether you're swimming goes by the middle of you;
   // whether you're at the surface, by the square at the top of you.
@@ -207,6 +211,20 @@ window.BDPlayPhysics = (S, P, BD) => {
         if (solidAt(leftCol, y)) { S.player.x = oldX; break; }
       }
     }
+    // Falling glitchy iron is solid too: run into its side and it's a wall.
+    // Only just clipping its top steps you up onto it, as with any block.
+    for (const f of S.fallers) {
+      if (!overlapsFaller(f, S.player.x, S.player.y)) continue;
+      if (S.player.vy >= 0 && S.player.y + PLAYER_H - f.y < 0.35) {
+        S.player.y = f.y - PLAYER_H;
+        S.player.vy = 0;
+        S.player.onGround = true;
+        S.rot = 0;
+      } else {
+        S.player.x = oldX;
+        if (!S.free) { die(); return; }
+      }
+    }
 
     // vertical
     if (wet && !S.flying) S.player.vy = Math.min(S.player.vy + WATER_GRAVITY * dt, SINK_MAX);
@@ -256,6 +274,19 @@ window.BDPlayPhysics = (S, P, BD) => {
           S.player.vy = 0;
           break;
         }
+      }
+    }
+
+    for (const f of S.fallers) {
+      if (!overlapsFaller(f, S.player.x, S.player.y)) continue;
+      if (S.player.vy >= 0 && S.player.y + PLAYER_H - f.y < 0.5) {
+        S.player.y = f.y - PLAYER_H;
+        S.player.vy = 0;
+        S.player.onGround = true;
+        S.rot = 0;
+      } else if (S.player.vy < 0 && f.y + 1 - S.player.y < 0.5) {
+        S.player.y = f.y + 1;
+        S.player.vy = 0;
       }
     }
 
@@ -311,6 +342,11 @@ window.BDPlayPhysics = (S, P, BD) => {
           S.state = "talk";
           S.holding = false;
           continue;
+        }
+        if (ch === CRASH) {
+          S.grid[y][x] = AIR;
+          P.fakeCrash();
+          return;
         }
         if (ch === "O") {
           S.grid[y][x] = AIR;

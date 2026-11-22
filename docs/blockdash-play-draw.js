@@ -211,7 +211,53 @@ window.BDPlayDraw = (S, P, BD) => {
     }
   };
 
+  // The Galactic Monstrosity: a hulking shape cut out of deep space, full of
+  // stars, with two glowing eyes and a purple glow that pulses.
+  const GALAXY_STARS = [[0.4, 0.5], [2.3, 0.7], [1.2, 1.1], [0.7, 2.2], [2.5, 1.9], [1.7, 2.6], [0.3, 1.6], [2.0, 0.3]];
+  const drawGalaxy = () => {
+    const g = S.boss;
+    const x0 = (g.x - 1.5 - S.camX) * TS, y0 = g.y * TS, w = TS * 3, h = TS * 3;
+    ctx.save();
+    ctx.globalAlpha = 0.25 + 0.15 * Math.sin(S.time * 3);
+    ctx.fillStyle = "#b46bff";
+    ctx.fillRect(x0 - TS * 0.3, y0 - TS * 0.3, w + TS * 0.6, h + TS * 0.6);
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = "#0d0b33";
+    ctx.fillRect(x0, y0, w, h);
+    ctx.fillStyle = "#1a1850";
+    ctx.fillRect(x0 + TS * 0.2, y0 + TS * 0.2, w - TS * 0.4, h - TS * 0.4);
+    // stars that twinkle
+    GALAXY_STARS.forEach(([sx, sy], i) => {
+      ctx.globalAlpha = 0.5 + 0.5 * Math.sin(S.time * 4 + i * 1.7);
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(x0 + sx * TS, y0 + sy * TS, TS * 0.12, TS * 0.12);
+    });
+    ctx.globalAlpha = 1;
+    // eyes, looking your way
+    ctx.fillStyle = "#ff5cf0";
+    ctx.fillRect(x0 + TS * 0.55, y0 + TS * 0.8, TS * 0.55, TS * 0.35);
+    ctx.fillRect(x0 + TS * 1.9, y0 + TS * 0.8, TS * 0.55, TS * 0.35);
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(x0 + TS * 0.55, y0 + TS * 0.85, TS * 0.18, TS * 0.18);
+    ctx.fillRect(x0 + TS * 1.9, y0 + TS * 0.85, TS * 0.18, TS * 0.18);
+    // the mouth it shoots from
+    ctx.fillStyle = "#05031a";
+    ctx.fillRect(x0 + TS * 0.4, y0 + TS * 1.9, TS * 2.2, TS * 0.5);
+    ctx.fillStyle = "#7ee8ff";
+    for (let i = 0; i < 5; i++) ctx.fillRect(x0 + TS * (0.5 + i * 0.44), y0 + TS * 1.9, TS * 0.2, TS * 0.18);
+    ctx.restore();
+  };
+
+  const drawGalaxyHud = () => {
+    ctx.fillStyle = "#e2dcf2";
+    ctx.font = "bold 22px ui-monospace, monospace";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    ctx.fillText("🌌 GALACTIC MONSTROSITY · get to a portal!", canvas.width / 2, 12);
+  };
+
   const drawBoss = () => {
+    if (S.boss.galaxy) { drawGalaxy(); return; }
     if (S.boss.glitch) { drawGlitch(); return; }
     const b = S.boss;
     const px = TS * BOSS_PX;
@@ -292,6 +338,7 @@ window.BDPlayDraw = (S, P, BD) => {
   };
 
   const drawBossHud = () => {
+    if (S.boss.galaxy) { drawGalaxyHud(); return; }
     if (S.boss.glitch) { drawGlitchHud(); return; }
     const b = S.boss;
     ctx.textBaseline = "top";
@@ -455,6 +502,10 @@ window.BDPlayDraw = (S, P, BD) => {
       drawTile(ctx, f.ch, (f.x - S.camX) * TS, f.y * TS, TS, S.time, false);
     }
     for (const b of S.bullets) {
+      if (b.ender) {
+        drawTile(ctx, "enderBullet", (b.x - S.camX) * TS - TS * 0.4, b.y * TS - TS / 2, TS, S.time, false);
+        continue;
+      }
       const bs = TS * 0.55;
       ctx.save();
       ctx.translate((b.x - S.camX) * TS, b.y * TS);

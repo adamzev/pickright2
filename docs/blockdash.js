@@ -82,6 +82,8 @@
     "\u0187": { name: "Glitchy stone", solid: true },
     "\u0188": { name: "Glitchy iron", solid: true },
     "\u0189": { name: "Water" },
+    "\u018a": { name: "Iron", solid: true },
+    "\u018b": { name: "Fake crash", hidden: true },
   };
   const KEY = "\u0186";
   const DOORS = ["\u0180", "\u0181", "\u0182", "\u0183", "\u0184", "\u0185"];
@@ -100,6 +102,18 @@
   // Water: you sink slowly, each jump press is a swim stroke up, and you keep
   // running forward, just slower. Near the surface a press jumps you out.
   const WATER = "\u0189";
+  const IRON = "\u018a";
+  // The fake crash block: touch it and the game pretends to crash. Reload
+  // takes you to the level's arena, where the Galactic Monstrosity fires ender
+  // bullets until you escape through an End portal, which wins the level.
+  const CRASH = "\u018b";
+  const GALAXY_SHOOT = 1; // seconds between ender bullets
+  const ENDER_BULLET_SPEED = 6;
+  const GALAXY_LOOK = "playerGalaxy"; // the skin you unlock by escaping
+  const GALAXY_KEY = "blockdash_galaxy"; // "1" once you've escaped: armor and the skin are yours
+  const galaxyWon = () => {
+    try { return localStorage.getItem(GALAXY_KEY) === "1"; } catch (e) { return false; }
+  };
   const WATER_GRAVITY = 15; // blocks a second, every second (out of water it's GRAVITY)
   const SINK_MAX = 3;
   const SWIM_V = 6.5;
@@ -132,12 +146,12 @@
   const MEGA_PICK = "~"; // likewise, the palette button that opens the mega blocks
 
   const PALETTE = ["g", "s", "p", "n", "k", "e", "m", "t", "T", "h", "A", "L", "U", "D", "F", "S", "Z",
-    "W", "Y", "V", "Q", "N", "I", "C", "d", "+", "$", "@", "r", "9", "o", "H", "R", "b", "%", "w", "f", "K", "O", "M", "E", "G", "J", "B", GLITCH_STONE, GLITCH_IRON, WATER, ...DOORS, KEY, MEGA_PICK, MINE, "P", ERASER];
+    "W", "Y", "V", "Q", "N", "I", "C", "d", "+", "$", "@", "r", "9", "o", "H", "R", "b", "%", "w", "f", "K", "O", "M", "E", "G", "J", "B", IRON, GLITCH_STONE, GLITCH_IRON, WATER, CRASH, ...DOORS, KEY, MEGA_PICK, MINE, "P", ERASER];
 
   // The boss arena is drawn in the same editor as the level, with a slightly
   // different set of blocks: no portals, save points or note-carrying blocks
   // in the arena, and Boss platforms only there.
-  const LEVEL_ONLY = "KOMGECHR";
+  const LEVEL_ONLY = "KOMGCHR" + CRASH;
   const ARENA_ONLY = "J";
 
   const isSolid = (ch) => !!(tileOf(ch) && tileOf(ch).solid);
@@ -736,6 +750,7 @@
   const pickedHero = () => {
     let k = null;
     try { k = localStorage.getItem(HERO_KEY); } catch (e) { /* the usual player */ }
+    if (k === GALAXY_LOOK && galaxyWon()) return k;
     return window.BDArt.baseOf(k) === "player" ? k : null;
   };
 
@@ -1221,6 +1236,7 @@
     const row = el("div", "row");
     const picked = pickedHero();
     [[null, "Usual"]]
+      .concat(galaxyWon() ? [[GALAXY_LOOK, "Galaxy"]] : [])
       .concat(window.BDArt.customBlocks().filter((b) => b.base === "player").map((b) => [b.key, b.label]))
       .forEach(([k, label]) => {
         const item = el("div", "pal-item" + (k === picked ? " sel" : ""));
@@ -1815,7 +1831,7 @@
       ["M", "Free move block — invisible when you play. The player stops auto-running and moves with ◀ ▶ until the next save point"],
       ["s", "More blocks — blocks you name and paint yourself. In the Art Studio press ＋ New block and pick something to start from: your block acts just like it (a blue slime still bounces). Find them under More blocks in the Level Maker"],
       ["J", "Boss platform — for the boss arena. Only appears while the boss says CLIMB UP, so build the way to its head out of these"],
-      ["E", "End portal — finish the level here"],
+      ["E", "End portal — finish the level here. In the arena, it's the way out after a fake crash"],
       ["G", "Boss portal — use it instead of the End portal. Add Portal frames to keep it shut until they're filled. The TNT Mech boss is waiting: dodge its TNT rain, climb up and stomp its head, dodge its shooter arm. Five stomps wins, or fewer with a sword from the Shop"],
       ["B", "Bush — just decoration, safe to touch"],
       ["8", "Mega TNT — goes off when you come within a block of it, with a much bigger bang. Buy it in the Shop to place it"],
@@ -1831,8 +1847,10 @@
       ["\u0184", "Mechanical door — opens by itself when you get within a couple of blocks"],
       ["\u0185", "Upgraded door — locked! It only opens if you're carrying a key, and uses the key up. Without one it's a wall"],
       ["\u0186", "Key — opens one Upgraded door. Keys only work in the level you find them in"],
+      [IRON, "Iron — a solid block to stand on and build with"],
       [GLITCH_STONE, "Glitchy stone — blinks on and off every second. When it's gone, you fall through!"],
       [GLITCH_IRON, "Glitchy iron — floats down slowly as soon as it's on screen. If it lands on you, it pushes you down"],
+      [CRASH, "Fake crash — invisible when you play. Touch it and the game pretends to crash! Reload, and you're in the arena with the Galactic Monstrosity. Escape through an End portal (put some in the arena) to win"],
       [WATER, "Water — swim! You sink slowly; press jump to swim up, or jump out near the top. Lava touching water turns into stone"],
       ["P", "Start — where you spawn"],
     ].forEach(([ch, text]) => {
@@ -3146,19 +3164,20 @@
     AIR, ARENA_W, arenaBgOf, arenaGrid, Art, baseOf, bestKey, bgOf, BLAZE_DRIFT, BLAZE_MAX,
     BLAZE_REACH, BLAZE_SHOOT, blinkOn, BOSS_BODY, BOSS_HP, BOSS_PX, BOSS_SHOT_SPEED,
     BOSS_STAGE, BOSS_TOP, BOSS_X, BOUNCE_V, builtinLevels, BULLET_LIFE, BULLET_SPEED,
-    BULLET_TURN, CHASE_SPEED, clamp, COIN_VALUE, COYOTE, CUT_END, dailyLevelDone, dailyNote,
-    dayKey, DOOR_SWING, drawCone, drawExplosion, drawPlayer, drawTile, EFFECT_TIME, el,
-    ENDER_AHEAD, ENDER_NOTICE, FALL_ACCEL, FALL_MAX, FALL_PUSH, findSpawn, FIREBALL_SPEED,
-    FLOWED, FLY_THRUST, FLY_UP_V, FLYING_PETS, getBest, GHOST_BONUS, GHOST_EVERY, GLIDE_FALL,
+    BULLET_TURN, CHASE_SPEED, clamp, COIN_VALUE, COYOTE, CRASH, CUT_END, dailyLevelDone,
+    dailyNote, dayKey, DOOR_SWING, drawCone, drawExplosion, drawPlayer, drawTile,
+    EFFECT_TIME, el, ENDER_AHEAD, ENDER_BULLET_SPEED, ENDER_NOTICE, FALL_ACCEL, FALL_MAX,
+    FALL_PUSH, findSpawn, FIREBALL_SPEED, FLOWED, FLY_THRUST, FLY_UP_V, FLYING_PETS,
+    GALAXY_KEY, GALAXY_SHOOT, galaxyWon, getBest, GHOST_BONUS, GHOST_EVERY, GLIDE_FALL,
     GLITCH_BLOCKS, GLITCH_COLORS, GLITCH_EVERY, GLITCH_FIX_TIME, GLITCH_HOP, GLITCH_HP,
     GLITCH_IRON, GLITCH_SIZE, GLITCH_SOLID, GLITCH_SPOTS, GLITCH_STONE, glitchLookOn,
     GRAVITY, H, inCone, isDoor, isHidden, isHiddenTnt, isLava, isLogged, isOpenDoor, isSolid,
     JUMP_BUFFER, JUMP_V, KEY, lapSpeed, LAVA_FALL, LAVA_RISE, loadBag, LOGGABLE, MEGA_BASE,
-    MEGA_BLAST, MEGA_BOUNCE_V, MEGATITE_PAYS, MOB_H, MOB_W, nextToWater, noteKey, overOf,
-    PET_SOUND, PLAYER_H, PLAYER_W, POOF_AFTER, RAIN_SPEED, saveBag, setBest, SHIELD_TIME,
-    SHOOT_EVERY, SINK_MAX, SPAWN_EVERY, SPEED_BASE, SPEED_FAST, SPEED_SLOW, STILL_PETS,
-    STOP_DEFAULT, SWIM_V, SWORDS, TILES, toast, trailOn, WARP_TIME, WATCH_CYCLE, WATCH_OPEN,
-    WATER, WATER_GRAVITY, WATER_SLOW
+    MEGA_BLAST, MEGA_BOUNCE_V, MEGATITE_PAYS, MOB_H, MOB_W, musicOf, nextToWater, noteKey,
+    overOf, PET_SOUND, PLAYER_H, PLAYER_W, POOF_AFTER, RAIN_SPEED, saveBag, setBest,
+    SHIELD_TIME, SHOOT_EVERY, SINK_MAX, SPAWN_EVERY, SPEED_BASE, SPEED_FAST, SPEED_SLOW,
+    STILL_PETS, STOP_DEFAULT, SWIM_V, SWORDS, TILES, toast, trailOn, WARP_TIME, WATCH_CYCLE,
+    WATCH_OPEN, WATER, WATER_GRAVITY, WATER_SLOW
   };
 
   // `chain` links a level to the ones after it: { i, count, carried, playNext }.
@@ -3243,10 +3262,12 @@
     const keysEl = el("span", "score", "🔑 0");
     const hasKeys = has(KEY, "\u0185");
     const shieldEl = el("span", "score", "🛡 " + bag.shields);
+    const armorEl = el("span", "score", "");
     const sword = swordAtHome() ? 0 : bag.sword;
     const bossMax = sword ? SWORDS[sword].hits : BOSS_HP;
     hud.append(scoreEl, ...(hasMega ? [megaEl] : []), ...(hasRods ? [rodsEl] : []), ...(hasPearls ? [pearlsEl] : []),
-      ...(hasEyes ? [eyesEl] : []), ...(hasKeys ? [keysEl] : []), ...(bag.shields ? [shieldEl] : []), pctEl, attEl);
+      ...(hasEyes ? [eyesEl] : []), ...(hasKeys ? [keysEl] : []), ...(bag.shields ? [shieldEl] : []),
+      ...(galaxyWon() ? [armorEl] : []), pctEl, attEl);
     panel.appendChild(hud);
 
     if (chain && chain.count > 1) {
@@ -3302,6 +3323,7 @@
       watchers: [], mobs: [], runT: 0, warp: null, free: false, moveL: false, moveR: false,
       stopT: 0, talk: null, talkAt: 0, poofed: false, inBoss: false, boss: null,
       introSeen: false, cutT: 0, downT: 0, knock: 0, plats: [], flipT: 0, fallers: [], camY: 0,
+      crash: false, armor: galaxyWon() ? 1 : 0,
     });
 
     const showItems = () => {
@@ -3309,6 +3331,7 @@
       pearlsEl.textContent = "🔮 " + S.pearls;
       eyesEl.textContent = "👁 " + S.eyes;
       keysEl.textContent = "🔑 " + S.keys;
+      armorEl.textContent = "🪖 " + S.armor;
     };
 
     // toasts for things you stand in for many frames: once per attempt
@@ -3434,6 +3457,7 @@
     // checkpoint with the level as it was when you got there, so diamonds
     // grabbed before it stay grabbed.
     const reset = (fromStart) => {
+      if (S.state === "crash") return; // pressing R can't get you out of the crash screen
       overShown = false;
       S.flipT = 0;
       canvas.style.transform = ""; // The Glitch's screen shake
@@ -3446,6 +3470,8 @@
       if (fromStart) {
         S.checkpoint = null;
         S.inBoss = false;
+        S.crash = false;
+        S.armor = galaxyWon() ? 1 : 0;
         S.introSeen = false;
         ({ template: S.template, width: S.width, spawn: S.spawn, looks: S.looks } = home);
       }

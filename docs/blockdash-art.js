@@ -802,6 +802,65 @@ window.BDArt = (() => {
     "dddddddddddddddd",
   ], { d: "#6f7078", I: "#d6d8de", i: "#a9acb5", o: "#4a4c55", ...GLITCH_PAINT });
 
+  const iron = paintMap([
+    "dddddddddddddddd",
+    "dIIIIIIIIIIIIIId",
+    "dIoIIIIIIIIIIoId",
+    "dIIIIIIIIIIIIIId",
+    "dIIiiiiiiiiiiIId",
+    "dIIiIIIIIIIIiIId",
+    "dIIiIIIIIIIIiIId",
+    "dIIiIIIIIIIIiIId",
+    "dIIiIIIIIIIIiIId",
+    "dIIiIIIIIIIIiIId",
+    "dIIiiiiiiiiiiIId",
+    "dIIIIIIIIIIIIIId",
+    "dIIIIIIIIIIIIIId",
+    "dIoIIIIIIIIIIoId",
+    "dIIIIIIIIIIIIIId",
+    "dddddddddddddddd",
+  ], { d: "#6f7078", I: "#d6d8de", i: "#a9acb5", o: "#4a4c55" });
+
+  // the fake crash block's look in the Level Maker (it's invisible in play)
+  const fakeCrash = paintMap([
+    "kkkkkkkkkkkkkkkk",
+    "kggggggggggggggk",
+    "kggggggggggggggk",
+    "kgggkggggggkgggk",
+    "kgggkggggggkgggk",
+    "kgggkggggggkgggk",
+    "kggggggggggggggk",
+    "kggggggggggggggk",
+    "kggggggggggggggk",
+    "kgggggkkkkgggggk",
+    "kggggkggggkggggk",
+    "kgggkggggggkgggk",
+    "kggggggggggggggk",
+    "kggggggggggggggk",
+    "kggggggggggggggk",
+    "kkkkkkkkkkkkkkkk",
+  ], { k: "#3a3a44", g: "#d9d9de" });
+
+  // the Galactic Monstrosity's ender bullet: a purple block with a tail
+  const enderBullet = paintMap([
+    "................",
+    "................",
+    "................",
+    "................",
+    "....PPPP........",
+    "...PppppP.......",
+    "...PpwppPttttt..",
+    "...PppppPttttttt",
+    "...PppppPttttt..",
+    "...PppppP.......",
+    "....PPPP........",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+  ], { P: "#2a1240", p: "#7a2fd0", w: "#f4f0ff", t: "#b46bff" });
+
   const water = paintMap([
     "bbbbbbbbbbbbbbbb",
     "bbbbbbbbbbbbbbbb",
@@ -1207,6 +1266,15 @@ window.BDArt = (() => {
   ];
 
   const player = paintMap(PLAYER_MAP, PLAYER_LEGEND);
+  // the Galaxy skin, for escaping the Galactic Monstrosity: deep space with stars
+  const STARS = [[1, 6], [3, 9], [6, 5], [10, 7], [13, 9], [17, 6]];
+  const playerGalaxy = paintMap(PLAYER_MAP.map((row, y) =>
+    [...row].map((ch, x) => (STARS.some(([sy, sx]) => sy === y && sx === x) && "Aa".includes(ch) ? "*" : ch)).join("")), {
+    ...PLAYER_LEGEND,
+    O: "#05031a", A: "#2b2a7a", a: "#1a1850", s: "#0d0b33",
+    E: "#ff5cf0", e: "#ffffff", X: "#8a3dff", x: "#5a1fb8", G: "#7ee8ff", g: "#3fa9c9", B: "#0a0820",
+    "*": "#ffffff",
+  });
 
   // ---------- sprite registry ----------
   // Every drawable is looked up here, so any of it can be swapped for a PNG.
@@ -1383,6 +1451,9 @@ window.BDArt = (() => {
     "\u0187": glitchStone,
     "\u0188": glitchIron,
     "\u0189": water,
+    "\u018a": iron,
+    "\u018b": fakeCrash,
+    enderBullet: enderBullet,
     swordStone: swordStone,
     swordIron: swordIron,
     swordDiamond: swordDiamond,
@@ -1392,6 +1463,7 @@ window.BDArt = (() => {
     P: spawnMark,
     cloud: cloud,
     player: player,
+    playerGalaxy: playerGalaxy,
     explosion1: explosion1,
     explosion2: explosion2,
   };

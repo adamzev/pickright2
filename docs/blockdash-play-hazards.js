@@ -7,11 +7,11 @@ window.BDPlayHazards = (S, P, BD) => {
   "use strict";
   const {
     AIR, baseOf, BLAZE_DRIFT, BLAZE_MAX, BLAZE_REACH, BLAZE_SHOOT, BOSS_SHOT_SPEED,
-    BULLET_LIFE, BULLET_SPEED, BULLET_TURN, CHASE_SPEED, clamp, ENDER_AHEAD, ENDER_NOTICE,
-    FALL_ACCEL, FALL_MAX, FALL_PUSH, FIREBALL_SPEED, FLOWED, GLITCH_EVERY, GLITCH_HOP,
-    GLITCH_IRON, GRAVITY, H, inCone, isSolid, JUMP_V, LAVA_FALL, LAVA_RISE, LOGGABLE, MOB_H,
-    MOB_W, nextToWater, PLAYER_H, PLAYER_W, SHOOT_EVERY, SPAWN_EVERY, WATCH_CYCLE,
-    WATCH_OPEN
+    BULLET_LIFE, BULLET_SPEED, BULLET_TURN, CHASE_SPEED, clamp, ENDER_AHEAD,
+    ENDER_BULLET_SPEED, ENDER_NOTICE, FALL_ACCEL, FALL_MAX, FALL_PUSH, FIREBALL_SPEED,
+    FLOWED, GLITCH_EVERY, GLITCH_HOP, GLITCH_IRON, GRAVITY, H, inCone, isSolid, JUMP_V,
+    LAVA_FALL, LAVA_RISE, LOGGABLE, MOB_H, MOB_W, nextToWater, PLAYER_H, PLAYER_W,
+    SHOOT_EVERY, SPAWN_EVERY, WATCH_CYCLE, WATCH_OPEN
   } = BD;
   const {
     die, explode, gotRod, sparkle, VIEW_COLS
@@ -86,14 +86,14 @@ window.BDPlayHazards = (S, P, BD) => {
       while (diff > Math.PI) diff -= Math.PI * 2;
       while (diff < -Math.PI) diff += Math.PI * 2;
       if (!b.straight) b.a += clamp(diff, -BULLET_TURN * dt, BULLET_TURN * dt);
-      const sp = b.straight ? BOSS_SHOT_SPEED : BULLET_SPEED;
+      const sp = b.ender ? ENDER_BULLET_SPEED : b.straight ? BOSS_SHOT_SPEED : BULLET_SPEED;
       b.x += Math.cos(b.a) * sp * dt;
       b.y += Math.sin(b.a) * sp * dt;
       b.life -= dt;
       const cx = Math.floor(b.x), cy = Math.floor(b.y);
       if ((cx !== b.fromX || cy !== b.fromY) && P.solidAt(cx, cy)) b.life = 0;
       if (b.life > 0 && touches(b.x - 0.2, b.y - 0.2, b.x + 0.2, b.y + 0.2)) {
-        die("boom", !!b.straight); // the boss's stars count as a mob hit, a Shooter block's don't
+        die(b.ender ? "delete" : "boom", !!b.straight); // the bosses' shots count as a mob hit, a Shooter block's don't
         return true;
       }
     }
@@ -266,6 +266,9 @@ window.BDPlayHazards = (S, P, BD) => {
         f.vy = 0;
         p.vy = Math.max(p.vy, FALL_PUSH);
       }
+      // standing on it? you ride it down
+      const riding = overX && Math.abs(p.y + PLAYER_H - f.y) < 0.05 && p.vy >= 0;
+      if (riding) p.y += ny - f.y;
       const row = Math.floor(ny) + 1;
       if (ny > Math.floor(ny) && P.solidAt(f.x, row)) {
         const at = Math.floor(ny);
