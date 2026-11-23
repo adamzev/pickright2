@@ -7,11 +7,13 @@ window.BDPlayDraw = (S, P, BD) => {
   "use strict";
   const {
     AIR, arenaBgOf, Art, baseOf, bgOf, BLINK_TIME, blinkOn, BOSS_PX, BOSS_TOP, CAT_LOOK,
-    clamp, crashBgOf, DOOR_SWING, drawCone, drawExplosion, drawPlayer, drawTile, el, FLOWED,
-    FLYING_PETS, GALAXY_H, GALAXY_LOOK, GALAXY_W, GHOST_EVERY, GLITCH_COLORS, GLITCH_SIZE,
-    GLITCH_STONE, glitchLookOn, H, isDoor, isHidden, isLogged, isOpenDoor, isSolid, LOGGABLE,
-    MOB_H, MOB_W, noteKey, overOf, PLAYER_H, PLAYER_W, POOF_AFTER, STILL_PETS, SWORDS,
-    trailOn, WARP_TIME, WATCH_CYCLE
+    clamp, crashBgOf, DOOR_SWING, drawBackLayer, drawCone, drawExplosion, drawPlayer,
+    drawTile, el, ELEV_DOOR, ELEV_DOOR_OPEN, FLOWED, FLYING_PETS, GALAXY_H, GALAXY_LOOK,
+    GALAXY_W, GHOST_EVERY, GLITCH_COLORS, GLITCH_SIZE, GLITCH_STONE, glitchLookOn, H,
+    HEALTH_MAX, isDoor, isHidden, isLogged, isOpenDoor, isSolid, isWire, LAMP, LOGGABLE,
+    MOB_H, MOB_W, noteKey, overOf, PLAINS_PORTAL, PLAYER_H, PLAYER_W, POOF_AFTER, SKELETON,
+    SLIME_MOB, STILL_PETS, SWORDS, TNT_SOLDIER, trailOn, WARP_TIME, WATCH_CYCLE, WIRE, WIRES,
+    ZOMBIE_HP, ZOMBIE_LIVES
   } = BD;
   const {
     bossMax, canvas, ctx, dragonAt, eyeOpen, hero, level, pet, petBase, showBoost, sword,
@@ -20,7 +22,8 @@ window.BDPlayDraw = (S, P, BD) => {
 
   // --- rendering ---
   const drawBackground = () =>
-    Art.drawBackground(ctx, S.inBoss ? (S.crash ? crashBgOf(level) : arenaBgOf(level))
+    Art.drawBackground(ctx, S.zombie && S.zombie.phase !== "flash" ? "overworld" // the plains
+      : S.inBoss ? (S.crash ? crashBgOf(level) : arenaBgOf(level))
       : level.zones ? level.zones[Math.floor((S.camX + VIEW_COLS / 2) / level.zoneW) % level.zones.length]
       : bgOf(level), canvas.width, canvas.height, S.camX * TS, TS, S.time, S.effect);
 
@@ -233,6 +236,56 @@ window.BDPlayDraw = (S, P, BD) => {
     ctx.fillText("🌌 GALACTIC MONSTROSITY · get to a portal!", canvas.width / 2, 12);
   };
 
+  // The Zombie trap: the portal in the sky, the zombie, and your 4 health bars.
+  const drawZombie = () => {
+    const z = S.zombie;
+    if (z.phase === "flash") return;
+    // the portal grows open, then shrinks away once the zombie's beaten
+    const open = z.phase === "fly" ? 0 : z.phase === "portal" ? Math.min(1, z.t / 0.6) : z.phase === "won" ? Math.max(0, 1 - z.t / 0.8) : 1;
+    if (open > 0) {
+      const size = TS * 2.4 * open;
+      ctx.save();
+      ctx.translate((PLAINS_PORTAL.x + 0.5 - S.camX) * TS, (PLAINS_PORTAL.y + 0.5) * TS);
+      ctx.rotate(S.time * 2);
+      drawTile(ctx, "\u018c", -size / 2, -size / 2, size, S.time, false);
+      ctx.restore();
+    }
+    // the zombie drops out of the portal at the end of the intro
+    let zx = z.x, zy = z.y;
+    if (z.phase === "portal") {
+      const k = Math.max(0, (z.t - 0.6) / 0.5);
+      if (k <= 0) return;
+      zy = PLAINS_PORTAL.y + k * 0.5;
+    }
+    if (z.phase === "won") return;
+    if (z.hurtT > 0 && Math.floor(z.hurtT * 20) % 2) return; // blinks when stomped
+    Art.drawSprite(ctx, "zombie", (zx - S.camX) * TS - TS * 0.1, zy * TS, TS * (MOB_W + 0.2), TS * MOB_H);
+    // your health: four bars above your head
+    if (z.phase === "fight") {
+      const bx = (S.player.x + PLAYER_W / 2 - S.camX) * TS - TS * 0.62, by = (S.player.y - 0.45) * TS;
+      for (let i = 0; i < ZOMBIE_LIVES; i++) {
+        ctx.fillStyle = "#1b1b22";
+        ctx.fillRect(bx + i * TS * 0.32, by, TS * 0.28, TS * 0.22);
+        ctx.fillStyle = i < z.lives ? (z.invT > 0 && i === z.lives ? "#ffffff" : "#ff4a4a") : "#4a2a2a";
+        ctx.fillRect(bx + i * TS * 0.32 + 2, by + 2, TS * 0.28 - 4, TS * 0.22 - 4);
+      }
+    }
+  };
+  const drawZombieHud = () => {
+    const z = S.zombie;
+    if (z.phase === "flash") {
+      ctx.fillStyle = `rgba(255, 30, 30, ${(0.55 * (1 - Math.abs(z.t / 0.3 - 1))).toFixed(3)})`;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+    if (z.phase === "fight") {
+      ctx.fillStyle = "#e2dcf2";
+      ctx.font = "bold 22px ui-monospace, monospace";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "top";
+      ctx.fillText("🧟 ZOMBIE " + "▮".repeat(z.hp) + "▯".repeat(ZOMBIE_HP - z.hp), canvas.width / 2, 12);
+    }
+  };
+
   const drawBoss = () => {
     if (S.boss.galaxy) { drawGalaxy(); return; }
     if (S.boss.glitch) { drawGlitch(); return; }
@@ -395,10 +448,11 @@ window.BDPlayDraw = (S, P, BD) => {
     const endX = Math.min(S.width - 1, Math.ceil(S.camX + VIEW_COLS) + 1);
     const startY = Math.max(0, Math.floor(S.camY) - 1);
     const endY = Math.min(S.grid.length - 1, Math.ceil(S.camY + H) + 1);
+    if (P.backGrid && !S.inBoss) drawBackLayer(ctx, P.backGrid, startX, endX, startY, endY, TS, -S.camX * TS, S.time);
     for (let x = startX; x <= endX; x++) {
       for (let y = startY; y <= endY; y++) {
         const ch = S.grid[y][x];
-        if (isDoor(ch)) {
+        if (isDoor(ch) || baseOf(ch) === ELEV_DOOR || ch === ELEV_DOOR_OPEN) {
           Art.drawSprite(ctx, ch, (x - S.camX) * TS, (y - 1) * TS, TS, TS * 2);
         } else if (isOpenDoor(ch)) {
           const t = clamp((S.time - (S.doorT[noteKey(x, y)] || 0)) / DOOR_SWING, 0, 1);
@@ -432,6 +486,8 @@ window.BDPlayDraw = (S, P, BD) => {
         } else if (ch !== AIR && ch !== "P" && !isHidden(ch)) {
           let key = ch === FLOWED ? "L" : overOf(ch) || ch;
           if (ch === "W" && !eyeOpen({ x, ph: (x * 0.37) % WATCH_CYCLE })) key = "watcherClosed";
+          // powered wires glow and powered lamps light up
+          if ((isWire(ch) || ch === LAMP) && S.powered.has(noteKey(x, y))) key = ch === LAMP ? "lampOn" : "wireOn" + WIRES.indexOf(baseOf(ch));
           // still the block it started as (not blown up, switched on or grown over)? use its own look
           const own = S.looks[noteKey(x, y)];
           if (own && key === ch && baseOf(own) === ch) key = own;
@@ -475,8 +531,10 @@ window.BDPlayDraw = (S, P, BD) => {
         drawTile(ctx, own && baseOf(own) === there ? own : there, (m.x - S.camX) * TS, next * TS, TS, S.time, false);
       }
     }
+    for (const r of S.risers) drawTile(ctx, r.ch, (r.x - S.camX) * TS, r.y * TS, TS, S.time, false);
     for (const f of S.fallers) {
-      drawTile(ctx, f.ch, (f.x - S.camX) * TS, f.y * TS, TS, S.time, false);
+      if (f.tall) Art.drawSprite(ctx, f.ch, (f.x - S.camX) * TS, (f.y - 1) * TS, TS, TS * 2);
+      else drawTile(ctx, f.ch, (f.x - S.camX) * TS, f.y * TS, TS, S.time, false);
     }
     for (const b of S.bullets) {
       if (b.ender) {
@@ -491,6 +549,26 @@ window.BDPlayDraw = (S, P, BD) => {
       ctx.restore();
     }
 
+    for (const c of S.critters) {
+      Art.drawSprite(ctx, c.ch, (c.x - S.camX) * TS, c.y * TS, c.w * TS, c.h * TS);
+      if (c.kind === TNT_SOLDIER && c.fuse > 0 && Math.floor(c.fuse * 10) % 2 === 0) {
+        // fizzing: it flashes white faster and faster
+        ctx.save();
+        ctx.globalAlpha = 0.6;
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect((c.x - S.camX) * TS, c.y * TS, c.w * TS, c.h * TS);
+        ctx.restore();
+      }
+    }
+    for (const a of S.arrows) {
+      const ax = (a.x - S.camX) * TS, ay = a.y * TS;
+      ctx.fillStyle = "#8a6a3a";
+      ctx.fillRect(ax - TS * 0.3, ay - 2, TS * 0.6, 4);
+      ctx.fillStyle = "#c9c9d6";
+      ctx.fillRect(a.dir > 0 ? ax + TS * 0.3 : ax - TS * 0.4, ay - 4, TS * 0.1, 8);
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(a.dir > 0 ? ax - TS * 0.32 : ax + TS * 0.24, ay - 5, TS * 0.08, 10);
+    }
     for (const m of S.mobs) {
       // a corrupted watcher flickers sideways now and then
       const jit = m.kind === "Q" && Math.sin(S.time * 37 + m.x) > 0.8 ? TS * 0.12 : 0;
@@ -506,6 +584,7 @@ window.BDPlayDraw = (S, P, BD) => {
     }
 
     if (S.boss) drawBoss();
+    if (S.zombie) drawZombie();
 
     for (const bz of S.blazes) {
       const bs = TS * 0.8;
@@ -570,6 +649,16 @@ window.BDPlayDraw = (S, P, BD) => {
             hero === CAT_LOOK || hero === GALAXY_LOOK ? "armorCat" : "armorSuit");
         }
         if (window.BDBadges.has("master")) drawCrown(S.rot, pw, ph);
+        // your health bars, once a Slime, arrow or TNT Soldier has hurt you
+        if (!S.zombie && S.hp < HEALTH_MAX) {
+          const bx = (S.player.x + PLAYER_W / 2 - S.camX) * TS - TS * 0.62, by = (S.player.y - 0.45) * TS;
+          for (let i = 0; i < HEALTH_MAX; i++) {
+            ctx.fillStyle = "#1b1b22";
+            ctx.fillRect(bx + i * TS * 0.32, by, TS * 0.28, TS * 0.22);
+            ctx.fillStyle = i < S.hp ? "#ff4a4a" : "#4a2a2a";
+            ctx.fillRect(bx + i * TS * 0.32 + 2, by + 2, TS * 0.28 - 4, TS * 0.22 - 4);
+          }
+        }
         if (glitchFx) drawGlitchFx(S.rot, pw, ph);
         // sword in hand for the boss fight
         if (S.inBoss && sword) {
@@ -617,6 +706,7 @@ window.BDPlayDraw = (S, P, BD) => {
     }
 
     if (S.boss) drawBossHud();
+    if (S.zombie) drawZombieHud();
 
     if (S.state === "run" && (S.stopT > 0 || (S.free && !S.boss))) {
       const y = 16 + (S.effect ? 36 : 0) + (S.flying ? 36 : 0);

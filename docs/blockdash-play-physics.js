@@ -6,19 +6,19 @@
 window.BDPlayPhysics = (S, P, BD) => {
   "use strict";
   const {
-    AIR, baseOf, blinkOn, BOSS_X, BOUNCE_V, clamp, COIN_VALUE, COYOTE, CRASH, dailyNote,
-    EFFECT_TIME, ELEVATOR, FLY_THRUST, FLY_UP_V, GLIDE_FALL, GLITCH_STONE, GRAVITY, H,
-    isDoor, isHiddenTnt, isLava, isSolid, JUMP_BUFFER, JUMP_V, KEY, lapSpeed, MEGA_BASE,
-    MEGA_BLAST, MEGA_BOUNCE_V, MEGATITE_PAYS, noteKey, PET_SOUND, PLAYER_H, PLAYER_W,
-    POOF_AFTER, PUSH, SHOVE, SHOVE_DIST, SINK_MAX, SPEED_BASE, SPEED_FAST, SPEED_SLOW,
-    STOP_DEFAULT, SWIM_V, TELEPORT, TILES, toast, WARP_TIME, WATER, WATER_GRAVITY,
-    WATER_SLOW
+    AIR, baseOf, blinkOn, BOSS_X, BOUNCE_V, BUTTON, BUTTON_ON, clamp, COIN_VALUE, COYOTE,
+    CRASH, dailyNote, EFFECT_TIME, ELEV_DOOR, ELEVATOR, FLY_THRUST, FLY_UP_V, GLIDE_FALL,
+    GLITCH_STONE, GRAVITY, H, isDoor, isHiddenTnt, isLava, isSolid, JUMP_BUFFER, JUMP_V, KEY,
+    lapSpeed, LEVER, LEVER_ON, MEGA_BASE, MEGA_BLAST, MEGA_BOUNCE_V, MEGATITE_PAYS, noteKey,
+    PET_SOUND, PLAYER_H, PLAYER_W, POOF_AFTER, PUSH, SHOVE, SHOVE_DIST, SINK_MAX, SPEED_BASE,
+    SPEED_FAST, SPEED_SLOW, STOP_DEFAULT, SWIM_V, TELEPORT, TILES, toast, WARP_TIME, WATER,
+    WATER_GRAVITY, WATER_SLOW
   } = BD;
   const {
     blink, boom, die, ember, endCut, endlessOver, enterBoss, fill, gotRod, level, megaAt,
     megaEl, megaTimes, moveBlock, notes, pctEl, petBase, puff, reset, scoreEl, setBoost,
     setFree, showItems, sparkle, tellOnce, updateBoss, updateBossDown, updateCut,
-    updateHazards, VIEW_COLS, win
+    updateHazards, updatePower, VIEW_COLS, win
   } = P;
 
   // Open any shut door you've reached (from either side). A door's letter
@@ -27,7 +27,8 @@ window.BDPlayPhysics = (S, P, BD) => {
     const y0 = Math.floor(S.player.y), y1 = Math.floor(S.player.y + PLAYER_H - 0.01);
     for (let x = Math.floor(S.player.x - 3); x <= Math.floor(S.player.x + PLAYER_W + 3); x++) {
       if (x < 0 || x >= S.width) continue;
-      for (let y = y0; y <= Math.min(S.grid.length - 1, y1 + 1); y++) {
+      // above the top of the level there's nothing to open (and no row to look in)
+      for (let y = Math.max(0, y0); y <= Math.min(S.grid.length - 1, y1 + 1); y++) {
         const ch = S.grid[y][x];
         if (!isDoor(ch) || y - 1 > y1 || y < y0) continue;
         const gap = x >= S.player.x + PLAYER_W ? x - (S.player.x + PLAYER_W) : S.player.x - (x + 1);
@@ -53,7 +54,7 @@ window.BDPlayPhysics = (S, P, BD) => {
       const inside = b && x < b.x1 && x + 1 > b.x0 && y < b.y1 && y + 1 > b.y0;
       return blinkOn(S.runT) && !inside;
     }
-    return isSolid(ch) || (y + 1 < S.grid.length && isDoor(S.grid[y + 1][x]));
+    return isSolid(ch) || (y + 1 < S.grid.length && (isDoor(S.grid[y + 1][x]) || baseOf(S.grid[y + 1][x]) === ELEV_DOOR));
   };
 
   // A fresh press while touching a Blink teleports instead of jumping.
@@ -89,8 +90,10 @@ window.BDPlayPhysics = (S, P, BD) => {
   };
 
   // Does the player, at (px, py), overlap this falling glitchy iron?
+  // (a falling Elevator door is two squares tall: its top is a square above f.y)
+  const topOf = (f) => (f.tall ? f.y - 1 : f.y);
   const overlapsFaller = (f, px, py) =>
-    px < f.x + 1 && px + PLAYER_W > f.x && py < f.y + 1 && py + PLAYER_H > f.y;
+    px < f.x + 1 && px + PLAYER_W > f.x && py < f.y + 1 && py + PLAYER_H > topOf(f);
 
   // Is this square water? Whether you're swimming goes by the middle of you;
   // whether you're at the surface, by the square at the top of you.
@@ -100,8 +103,13 @@ window.BDPlayPhysics = (S, P, BD) => {
   };
   const swimming = () => waterAt(S.player.x + PLAYER_W / 2, S.player.y + PLAYER_H / 2);
 
+  // standing on a moving elevator (Elevator, Fall block or Elevator door)?
+  const onMovingElevator = () => S.fallers.concat(S.risers).some((f) => f.elevator &&
+    S.player.x < f.x + 1 && S.player.x + PLAYER_W > f.x && Math.abs(S.player.y + PLAYER_H - topOf(f)) < 0.1);
+
   const doJump = () => {
     if (S.state !== "run" || S.stopT > 0) return;
+    if (onMovingElevator()) return; // holding jump speeds the elevator up instead (see the falling blocks)
     if (swimming() && !S.flying) {
       // a stroke up, or a full jump out when your head's already out of the water
       const surface = !waterAt(S.player.x + PLAYER_W / 2, S.player.y);
@@ -154,6 +162,7 @@ window.BDPlayPhysics = (S, P, BD) => {
       return;
     }
     if (S.state === "cut") { updateCut(dt); return; }
+    if (S.state === "zombie") { P.updateZombieIntro(dt); return; }
     if (S.state === "bossdown") { updateBossDown(dt); return; }
     if (S.state !== "run") return;
 
@@ -179,9 +188,16 @@ window.BDPlayPhysics = (S, P, BD) => {
     // horizontal — always forward, unless a Free move block handed you the controls
     const oldX = S.player.x;
     const dir = S.free ? ((S.moveR ? 1 : 0) - (S.moveL ? 1 : 0)) * (S.flipT > 0 ? -1 : 1) : 1;
+    // Holding jump on an elevator speeds it up; once it lands, that held jump
+    // stops counting (press again to jump), so you don't leap into the doorway.
+    const riding = onMovingElevator();
+    if (S.wasRiding && !riding) S.holding = false;
+    S.wasRiding = riding;
     // riding a Fall elevator down, you wait on it (unless you're in Free move)
-    const onElevator = !S.free && S.fallers.some((f) => f.elevator &&
-      S.player.x < f.x + 1 && S.player.x + PLAYER_W > f.x && Math.abs(S.player.y + PLAYER_H - f.y) < 0.1);
+    const onElevator = !S.free && (S.fallers.concat(S.risers).some((f) => f.elevator &&
+      S.player.x < f.x + 1 && S.player.x + PLAYER_W > f.x && Math.abs(S.player.y + PLAYER_H - topOf(f)) < 0.1) ||
+      // landed, but its Elevator door hasn't opened yet: wait for it
+      S.doorsLanded.some((d) => Math.abs(d.x + 0.5 - (S.player.x + PLAYER_W / 2)) < 3 && Math.abs(d.y - S.player.y) < 3));
     if (S.stopT > 0) S.stopT -= dt;
     else if (!onElevator) S.player.x += dir * speed * dt;
     if (S.knock) {
@@ -191,7 +207,7 @@ window.BDPlayPhysics = (S, P, BD) => {
       if (Math.abs(S.knock) < 0.5) S.knock = 0;
     }
     if (S.player.x < 0) S.player.x = 0;
-    if (S.inBoss) S.player.x = Math.min(S.player.x, S.width - PLAYER_W);
+    if (S.inBoss || S.zombie) S.player.x = Math.min(S.player.x, S.width - PLAYER_W);
     const y0 = Math.floor(S.player.y + 0.02);
     const y1 = Math.floor(S.player.y + PLAYER_H - 0.02);
     const rightCol = Math.floor(S.player.x + PLAYER_W);
@@ -234,10 +250,10 @@ window.BDPlayPhysics = (S, P, BD) => {
     }
     // Falling glitchy iron is solid too: run into its side and it's a wall.
     // Only just clipping its top steps you up onto it, as with any block.
-    for (const f of S.fallers) {
+    for (const f of S.fallers.concat(S.risers)) {
       if (!overlapsFaller(f, S.player.x, S.player.y)) continue;
-      if (S.player.vy >= 0 && S.player.y + PLAYER_H - f.y < 0.35) {
-        S.player.y = f.y - PLAYER_H;
+      if (S.player.vy >= 0 && S.player.y + PLAYER_H - topOf(f) < 0.35) {
+        S.player.y = topOf(f) - PLAYER_H;
         S.player.vy = 0;
         S.player.onGround = true;
         S.rot = 0;
@@ -302,10 +318,10 @@ window.BDPlayPhysics = (S, P, BD) => {
       }
     }
 
-    for (const f of S.fallers) {
+    for (const f of S.fallers.concat(S.risers)) {
       if (!overlapsFaller(f, S.player.x, S.player.y)) continue;
-      if (S.player.vy >= 0 && S.player.y + PLAYER_H - f.y < 0.5) {
-        S.player.y = f.y - PLAYER_H;
+      if (S.player.vy >= 0 && S.player.y + PLAYER_H - topOf(f) < 0.5) {
+        S.player.y = topOf(f) - PLAYER_H;
         S.player.vy = 0;
         S.player.onGround = true;
         S.rot = 0;
@@ -373,7 +389,13 @@ window.BDPlayPhysics = (S, P, BD) => {
           S.holding = false;
           continue;
         }
-        if (ch === TELEPORT && S.tpSkip !== noteKey(x, y)) {
+        if (ch === BUTTON || ch === LEVER) {
+          S.grid[y][x] = ch === BUTTON ? BUTTON_ON : LEVER_ON;
+          sparkle(x + 0.5, y + 0.5, ["#ff5a4a", "#ffd54a", "#ffffff"]);
+          updatePower();
+        }
+        // (riding an elevator, you don't use teleports yourself: it takes you through)
+        if (ch === TELEPORT && S.tpSkip !== noteKey(x, y) && !onMovingElevator()) {
           if (blink(x, y, TELEPORT)) return;
         }
         if (ch === CRASH) {
@@ -489,6 +511,8 @@ window.BDPlayPhysics = (S, P, BD) => {
 
     if (updateHazards(dt)) return;
     if (S.boss && updateBoss(dt)) return;
+    if (S.zombie && S.zombie.phase !== "flash" && P.updateZombie(dt)) return;
+    if (S.zombieQueued && !S.zombie) { P.startZombie(); return; }
 
     if (S.player.y > S.grid.length + 1) {
       die();

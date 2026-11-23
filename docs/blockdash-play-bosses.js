@@ -9,8 +9,9 @@ window.BDPlayBosses = (S, P, BD) => {
     AIR, ARENA_W, arenaBgOf, arenaGrid, BOSS_BODY, BOSS_HP, BOSS_PX, BOSS_STAGE, BOSS_TOP,
     BOSS_X, BULLET_LIFE, clamp, crashArenaGrid, CUT_END, ENDER_BULLET_SPEED, findSpawn,
     GALAXY_H, GALAXY_SHOOT, GALAXY_W, GLITCH_BLOCKS, GLITCH_COLORS, GLITCH_FIX_TIME,
-    GLITCH_HP, GLITCH_SIZE, GLITCH_SOLID, GLITCH_SPOTS, H, JUMP_V, PLAYER_H, PLAYER_W,
-    RAIN_SPEED, toast
+    GLITCH_HP, GLITCH_SIZE, GLITCH_SOLID, GLITCH_SPOTS, GRAVITY, H, JUMP_V, MOB_H, MOB_W,
+    PLAINS_PORTAL, plainsGrid, PLAYER_H, PLAYER_W, RAIN_SPEED, toast, ZOMBIE_HP,
+    ZOMBIE_LIVES, ZOMBIE_SPEED
   } = BD;
   const {
     bossMax, canvas, level, reset, setFree, strip
@@ -312,6 +313,113 @@ window.BDPlayBosses = (S, P, BD) => {
   };
 
   // Returns true if the player died or the fight ended this step.
+  // ----- the Zombie trap -----
+  // The level is put aside (exactly as it is) while you're in the plains,
+  // and brought back afterwards.
+  const WORLD = ["grid", "template", "looks", "width", "movers", "shooters", "bullets", "spawners", "blazes", "critters", "arrows",
+    "fireballs", "watchers", "mobs", "plats", "fallers", "slides", "doorsLanded", "powered", "camX", "camY", "free"];
+  const startZombie = () => {
+    S.zombieQueued = false;
+    const back = {};
+    for (const k of WORLD) back[k] = S[k];
+    back.player = { ...S.player };
+    S.zombie = { phase: "flash", t: 0, back, lives: ZOMBIE_LIVES, hp: ZOMBIE_HP, x: PLAINS_PORTAL.x, y: PLAINS_PORTAL.y, vy: 0,
+      hurtT: 0, invT: 0, out: false };
+    S.state = "zombie";
+    S.holding = false;
+  };
+  const toPlains = () => {
+    // the level's own plains (drawn in the Level Maker's 🌾 Plains arena tab), or the ready-made one
+    [S.template, S.looks] = strip(plainsGrid(level.plains));
+    S.grid = S.template.map((r) => r.slice());
+    S.width = ARENA_W;
+    const at = findSpawn(S.grid);
+    for (const k of ["movers", "shooters", "bullets", "spawners", "blazes", "fireballs", "watchers", "mobs", "plats", "fallers", "slides", "doorsLanded", "critters", "arrows"]) S[k] = [];
+    S.powered = new Set();
+    S.player.x = at.x + (1 - PLAYER_W) / 2;
+    S.player.y = at.y + (1 - PLAYER_H);
+    S.player.vy = 0;
+    S.camY = 0;
+    setFree(true);
+  };
+  const backToLevel = () => {
+    const z = S.zombie;
+    for (const k of WORLD) S[k] = z.back[k];
+    S.player = z.back.player;
+    S.player.vy = 0;
+    setFree(z.back.free);
+    S.zombie = null;
+    S.state = "run";
+  };
+
+  // The intro, step by step: red flash, a swoop over to the plains, the
+  // portal opening, the zombie dropping out. Then the fight is on.
+  const updateZombieIntro = (dt) => {
+    const z = S.zombie;
+    z.t += dt;
+    if (z.phase === "flash" && z.t >= 0.6) { toPlains(); z.phase = "fly"; z.t = 0; S.camX = -P.VIEW_COLS; }
+    else if (z.phase === "fly") {
+      const k = Math.min(1, z.t / 0.9);
+      S.camX = -P.VIEW_COLS * (1 - k) * (1 - k);
+      if (k >= 1) { S.camX = 0; z.phase = "portal"; z.t = 0; }
+    } else if (z.phase === "portal" && z.t >= 1.1) {
+      z.phase = "fight";
+      z.out = true;
+      S.state = "run";
+      P.tellOnce("zombie", "🧟 A ZOMBIE! Stomp it 3 times!");
+    }
+  };
+
+  // Returns true if the fight ended this step (won, or you ran out of hits).
+  const updateZombie = (dt) => {
+    const z = S.zombie, p = S.player;
+    if (z.hurtT > 0) z.hurtT -= dt;
+    if (z.invT > 0) z.invT -= dt;
+    if (z.phase === "won") {
+      z.t += dt;
+      if (z.t > 1.4) { backToLevel(); P.tellOnce("zombieWon", "🧟 Zombie beaten! Back to the level"); }
+      return true;
+    }
+    // walk at you, falling onto the ground
+    const dir = p.x + PLAYER_W / 2 < z.x + MOB_W / 2 ? -1 : 1;
+    const nx = z.x + dir * ZOMBIE_SPEED * dt;
+    const col = Math.floor(dir > 0 ? nx + MOB_W : nx);
+    let blocked = false;
+    for (let y = Math.floor(z.y + 0.05); y <= Math.floor(z.y + MOB_H - 0.05); y++) if (P.solidAt(col, y)) blocked = true;
+    if (!blocked) z.x = clamp(nx, 0, S.width - MOB_W);
+    else if (z.vy === 0) z.vy = -14; // hop up a hill (high enough for one block)
+    z.vy = Math.min(z.vy + GRAVITY * dt, 20);
+    let ny = z.y + z.vy * dt;
+    const feet = Math.floor(ny + MOB_H);
+    if (z.vy > 0 && [Math.floor(z.x + 0.05), Math.floor(z.x + MOB_W - 0.05)].some((x) => P.solidAt(x, feet))) {
+      ny = feet - MOB_H;
+      z.vy = 0;
+    }
+    z.y = ny;
+    // you and the zombie
+    if (P.touches(z.x, z.y, z.x + MOB_W, z.y + MOB_H)) {
+      if (p.vy > 0 && p.y + PLAYER_H < z.y + 0.6) {
+        // stomped!
+        p.vy = -JUMP_V * 0.8;
+        if (z.hurtT <= 0) {
+          z.hp--;
+          z.hurtT = 0.5;
+          P.explode(z.x + MOB_W / 2, z.y + 0.3, ["#6bbf4a", "#3d7a2a", "#c9c9d6"]);
+          if (z.hp <= 0) { z.phase = "won"; z.t = 0; z.out = false; return true; }
+        }
+      } else if (z.invT <= 0) {
+        // it got you: one bar gone, a shove away, and a moment to recover
+        z.lives--;
+        z.invT = 1.2;
+        S.knock = dir * 14;
+        p.vy = -8;
+        P.sparkle(p.x + PLAYER_W / 2, p.y + PLAYER_H / 2, ["#ff5a4a", "#ffffff"]);
+        if (z.lives <= 0) { backToLevel(); P.die("boom", false); return true; }
+      }
+    }
+    return false;
+  };
+
   const updateBoss = (dt) => {
     if (S.boss.galaxy) return updateGalaxy(dt);
     if (S.boss.glitch) return updateGlitch(dt);
@@ -415,7 +523,7 @@ window.BDPlayBosses = (S, P, BD) => {
   };
 
   return {
-    dragonAt, endCut, enterBoss, enterCrash, startBoss, updateBoss, updateBossDown,
-    updateCut
+    dragonAt, endCut, enterBoss, enterCrash, startBoss, startZombie, updateBoss,
+    updateBossDown, updateCut, updateZombie, updateZombieIntro
   };
 };

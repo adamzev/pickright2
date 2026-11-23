@@ -991,6 +991,575 @@ window.BDArt = (() => {
     "GGGGGGGGGGGGGGGG",
   ], { g: "#4fbf5a", G: "#2a7a33", w: "#ffffff" });
 
+  // decorations: walls you run past, a window and a torch
+  const decoStone = paintMap([
+    "ssssssskssssssss",
+    "slssssskslssssss",
+    "ssssssskssssssss",
+    "kkkkkkkkkkkkkkkk",
+    "sssskssssssskssl",
+    "ssslkssssslsksss",
+    "ssssksssssssksss",
+    "kkkkkkkkkkkkkkkk",
+    "ssssssskssssssss",
+    "sssslssksssslsss",
+    "ssssssskssssssss",
+    "kkkkkkkkkkkkkkkk",
+    "sssskssssssskssl",
+    "slssksssssssksss",
+    "sssskssssslsksss",
+    "kkkkkkkkkkkkkkkk",
+  ], { s: "#7a7a84", l: "#8f8f99", k: "#55555e" });
+  // wooden planks
+  const decoWood = paintMap([
+    "wwwwwwwwwwwwwwww",
+    "wWwwwwwwwwwWwwww",
+    "wwwwwwdwwwwwwwww",
+    "kkkkkkkkkkkkkkkk",
+    "wwwwwwwwwwwwwwww",
+    "wwwwdwwwwwwwwWww",
+    "wwwwwwwwwwwwwwww",
+    "kkkkkkkkkkkkkkkk",
+    "wwWwwwwwwwwwwwww",
+    "wwwwwwwwwdwwwwww",
+    "wwwwwwwwwwwwwwww",
+    "kkkkkkkkkkkkkkkk",
+    "wwwwwwwwwwwwwwww",
+    "wwwwwWwwwwwwwdww",
+    "wwwwwwwwwwwwwwww",
+    "kkkkkkkkkkkkkkkk",
+  ], { w: "#9a6a38", W: "#b07c44", d: "#7a5028", k: "#5a3a1c" });
+  // a window
+  const decoWindow = paintMap([
+    "ffffffffffffffff",
+    "fggggggffggggggf",
+    "fgGggggffggggggf",
+    "fggGgggffggggggf",
+    "fggggggffggggggf",
+    "fggggggffggggggf",
+    "fggggggffggggggf",
+    "ffffffffffffffff",
+    "ffffffffffffffff",
+    "fggggggffggggggf",
+    "fgGggggffggggggf",
+    "fggGgggffggggggf",
+    "fggggggffggggggf",
+    "fggggggffggggggf",
+    "fggggggffggggggf",
+    "ffffffffffffffff",
+  ], { f: "#6b4421", g: "#a8d8f0", G: "#e6f6ff" });
+  // a torch (its flame flickers)
+  const decoTorch = paintMap([
+    "................",
+    "................",
+    ".......yy.......",
+    "......yooy......",
+    "......yooy......",
+    ".......oo.......",
+    ".......ww.......",
+    ".......ww.......",
+    ".......ww.......",
+    ".......ww.......",
+    ".......ww.......",
+    ".......ww.......",
+    ".......ww.......",
+    ".......ww.......",
+    "................",
+    "................",
+  ], { y: "#ffd54a", o: "#ff8a3d", w: "#7a5028" });
+
+  // power: wires in four colours, all in the designer's own wire design (a
+  // solid bar, lighter along the top and bottom edges), dark when off and
+  // bright when on. Red is his exact colours; the others follow it.
+  const WIRE_ROWS = [
+    "AAAAAAAAAAAAAAAA",
+    "AAAAAAAAAAAAAAAA",
+    "BBBBBBBBBBBBBBBB",
+    "BBBBBBBBBBBBBBBB",
+    "BBBBBBBBBBBBBBBB",
+    "BBBBBBBBBBBBBBBB",
+    "BBBBBBBBBBBBBBBB",
+    "BBBBBBBBBBBBBBBB",
+    "BBBBBBBBBBBBBBBB",
+    "BBBBBBBBBBBBBBBB",
+    "BBBBBBBBBBBBBBBB",
+    "BBBBBBBBBBBBBBBB",
+    "BBBBBBBBBBBBBBBB",
+    "BBBBBBBBBBBBBBBB",
+    "AAAAAAAAAAAAAAAA",
+    "AAAAAAAAAAAAAAAA",
+  ];
+  const wireRed = paintMap(WIRE_ROWS, { A: "#8a2a22", B: "#7a1410" });
+  const wireRedOn = paintMap(WIRE_ROWS, { A: "#ff5a4a", B: "#ff6b3d" });
+  const wireGreen = paintMap(WIRE_ROWS, { A: "#2a7a2e", B: "#1a5a1e" });
+  const wireGreenOn = paintMap(WIRE_ROWS, { A: "#6dff7a", B: "#8aff5a" });
+  const wireBlue = paintMap(WIRE_ROWS, { A: "#2a4a9a", B: "#183478" });
+  const wireBlueOn = paintMap(WIRE_ROWS, { A: "#5ab4ff", B: "#6ac8ff" });
+  const wirePurple = paintMap(WIRE_ROWS, { A: "#6a2a9a", B: "#4e1478" });
+  const wirePurpleOn = paintMap(WIRE_ROWS, { A: "#d08aff", B: "#e09aff" });
+  // a button on the floor
+  const button = paintMap([
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "....bBBBBBBb....",
+    "....bbbbbbbb....",
+    "....bbbbbbbb....",
+    "..ssssssssssss..",
+    "..ssssssssssss..",
+  ], { b: "#c0392b", B: "#e74c3c", s: "#6f6f7c" });
+  // a pressed button
+  const buttonOn = paintMap([
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "....bBBBBBBb....",
+    "..ssssssssssss..",
+    "..ssssssssssss..",
+  ], { b: "#2a7a33", B: "#4fbf5a", s: "#6f6f7c" });
+  // a lever, off
+  const lever = paintMap([
+    "................",
+    "................",
+    "................",
+    "................",
+    "....kk..........",
+    "....kk..........",
+    "......w.........",
+    "......w.........",
+    ".......w........",
+    ".......w........",
+    "........w.......",
+    "...SSSSSSSSSS...",
+    "...ssssssssss...",
+    "...ssssssssss...",
+    "...ssssssssss...",
+    "...ssssssssss...",
+  ], { s: "#6f6f7c", S: "#8c8c9a", w: "#7a5028", k: "#c0392b" });
+  // a lever, on
+  const leverOn = paintMap([
+    "................",
+    "................",
+    "................",
+    "................",
+    ".........kk.....",
+    ".........kk.....",
+    ".........w......",
+    ".........w......",
+    "........w.......",
+    "........w.......",
+    ".......w........",
+    "...SSSSSSSSSS...",
+    "...ssssssssss...",
+    "...ssssssssss...",
+    "...ssssssssss...",
+    "...ssssssssss...",
+  ], { s: "#6f6f7c", S: "#8c8c9a", w: "#7a5028", k: "#4fbf5a" });
+  // a lamp, off
+  const lamp = paintMap([
+    "ffffffffffffffff",
+    "ffffffffffffffff",
+    "ffggggggggggggff",
+    "ffggggggggggggff",
+    "ffggGGggggggggff",
+    "ffggGGgggGGgggff",
+    "ffgggggggGGgggff",
+    "ffggggggggggggff",
+    "ffggggggggggggff",
+    "ffggggGGggggggff",
+    "ffggggGGgggGGgff",
+    "ffgggggggggGGgff",
+    "ffgggGGgggggggff",
+    "ffgggGGgggggggff",
+    "ffffffffffffffff",
+    "ffffffffffffffff",
+  ], { f: "#5a3a1c", g: "#6a5a3a", G: "#7a6a48" });
+  // a lamp, lit
+  const lampOn = paintMap([
+    "ffffffffffffffff",
+    "ffffffffffffffff",
+    "ffggggggggggggff",
+    "ffggggggggggggff",
+    "ffggGGggggggggff",
+    "ffggGGgggGGgggff",
+    "ffgggggggGGgggff",
+    "ffggggggggggggff",
+    "ffggggggggggggff",
+    "ffggggGGggggggff",
+    "ffggggGGgggGGgff",
+    "ffgggggggggGGgff",
+    "ffgggGGgggggggff",
+    "ffgggGGgggggggff",
+    "ffffffffffffffff",
+    "ffffffffffffffff",
+  ], { f: "#5a3a1c", g: "#ffd54a", G: "#fff4b0" });
+
+  // the Elevator door, shut (two blocks tall, with a yellow light on top)
+  const elevDoor = paintMap([
+    "ffffyyyyyyyyffff",
+    "ffffyyyyyyyyffff",
+    "ffmmmmmkkmmmmmff",
+    "ffmllllkkllllmff",
+    "ffmmmmmkkmmmmmff",
+    "ffmmmmmkkmmmmmff",
+    "ffmmmmmkkmmmmmff",
+    "ffmmmmmkkmmmmmff",
+    "ffmmmmmkkmmmmmff",
+    "ffmmmmmkkmmmmmff",
+    "ffmmmmmkkmmmmmff",
+    "ffmmmmmkkmmmmmff",
+    "ffmmmmmkkmmmmmff",
+    "ffmmmmmkkmmmmmff",
+    "ffmmmmmkkmmmmmff",
+    "ffmmmyykkyymmmff",
+    "ffmmmyykkyymmmff",
+    "ffmmmyykkyymmmff",
+    "ffmmmmmkkmmmmmff",
+    "ffmmmmmkkmmmmmff",
+    "ffmmmmmkkmmmmmff",
+    "ffmmmmmkkmmmmmff",
+    "ffmmmmmkkmmmmmff",
+    "ffmmmmmkkmmmmmff",
+    "ffmmmmmkkmmmmmff",
+    "ffmmmmmkkmmmmmff",
+    "ffmmmmmkkmmmmmff",
+    "ffmmmmmkkmmmmmff",
+    "ffmmmmmkkmmmmmff",
+    "ffmmmmmkkmmmmmff",
+    "ffmmmmmkkmmmmmff",
+    "ffmmmmmkkmmmmmff",
+  ], { f: "#3a3a44", m: "#9a9aa8", l: "#c9c9d6", k: "#2a2a30", y: "#ffd54a", g: "#6dff7a" });
+  // the Elevator door, slid open (its light turns green)
+  const elevDoorOpen = paintMap([
+    "ffffggggggggffff",
+    "ffffggggggggffff",
+    "ffmm........mmff",
+    "ffmm........mmff",
+    "ffmm........mmff",
+    "ffmm........mmff",
+    "ffmm........mmff",
+    "ffmm........mmff",
+    "ffmm........mmff",
+    "ffmm........mmff",
+    "ffmm........mmff",
+    "ffmm........mmff",
+    "ffmm........mmff",
+    "ffmm........mmff",
+    "ffmm........mmff",
+    "ffmm........mmff",
+    "ffmm........mmff",
+    "ffmm........mmff",
+    "ffmm........mmff",
+    "ffmm........mmff",
+    "ffmm........mmff",
+    "ffmm........mmff",
+    "ffmm........mmff",
+    "ffmm........mmff",
+    "ffmm........mmff",
+    "ffmm........mmff",
+    "ffmm........mmff",
+    "ffmm........mmff",
+    "ffmm........mmff",
+    "ffmm........mmff",
+    "ffmm........mmff",
+    "ffmm........mmff",
+  ], { f: "#3a3a44", m: "#9a9aa8", l: "#c9c9d6", k: "#2a2a30", y: "#ffd54a", g: "#6dff7a" });
+
+  // the Zombie trap's zombie: green, red eyes, ragged brown shirt (two blocks tall)
+  const zombie = paintMap([
+    "....SSSSSSSS....",
+    "....SSSSSSSS....",
+    "....ssssssss....",
+    "....srksskrs....",
+    "....skksskks....",
+    "....ssssssss....",
+    "....sskkkkss....",
+    "....ssssssss....",
+    "...CCCCCCCCCC...",
+    "cccCCCCCCCCCCccc",
+    "cccccccccccccccc",
+    "cccccccccccccccc",
+    "cccccccccccccccc",
+    "sssccccccccccsss",
+    "sssccccccccccsss",
+    "sssccccccccccsss",
+    "sssccccccccccsss",
+    "...ccccccccc....",
+    "...cccccccccc...",
+    "...c.cc.cc.cc...",
+    "....pppPPppp....",
+    "....pppPPppp....",
+    "....pppPPppp....",
+    "....pppPPppp....",
+    "....pppPPppp....",
+    "....pppPPppp....",
+    "....pppPPppp....",
+    "....pppPPppp....",
+    "....pppPPppp....",
+    "....pppPPppp....",
+    "...kkkkkkkkkk...",
+    "...kkkkkkkkkk...",
+  ], { s: "#6bbf4a", S: "#4f9a34", k: "#1b1b22", r: "#ff4a4a", c: "#7a5a3a", C: "#8f6c48", p: "#3a4a5a", P: "#2a3a4a" });
+  // the Zombie trap: hazard stripes round a little zombie portal
+  const zombieTrap = paintMap([
+    "kkyykkyykkyykkyy",
+    "ykkyykkyykkyykky",
+    "yykkyykkyykkyykk",
+    "kyyffffffffffyyk",
+    "kkyfvvvvvvvvfkyy",
+    "ykkfvvvvvvvvfkky",
+    "yykfvvssssvvfykk",
+    "kyyfvvsrrsvvfyyk",
+    "kkyfvvsrrsvvfkyy",
+    "ykkfvvssssvvfkky",
+    "yykfvvvvvvvvfykk",
+    "kyyfvvvvvvvvfyyk",
+    "kkyffffffffffkyy",
+    "ykkyykkyykkyykky",
+    "yykkyykkyykkyykk",
+    "kyykkyykkyykkyyk",
+  ], { y: "#ffd54a", k: "#1b1b22", f: "#2a1240", v: "#7a2fd0", s: "#6bbf4a", r: "#ff4a4a" });
+  // a Zombie trap that has gone off
+  const zombieTrapUsed = paintMap([
+    "kkyykkyykkyykkyy",
+    "ykkyykkyykkyykky",
+    "yykkyykkyykkyykk",
+    "kyyffffffffffyyk",
+    "kkyfggggggggfkyy",
+    "ykkfggggggggfkky",
+    "yykfggggggggfykk",
+    "kyyfggggggggfyyk",
+    "kkyfggggggggfkyy",
+    "ykkfggggggggfkky",
+    "yykfggggggggfykk",
+    "kyyfggggggggfyyk",
+    "kkyffffffffffkyy",
+    "ykkyykkyykkyykky",
+    "yykkyykkyykkyykk",
+    "kyykkyykkyykkyyk",
+  ], { y: "#8a7a3a", k: "#1b1b22", f: "#2a1240", g: "#3a3a44" });
+
+  // flowers: decorations you run past
+  const flowerRed = paintMap([
+    "................",
+    ".......pp.......",
+    ".....pppppp.....",
+    ".....ppccpp.....",
+    "....pppccppp....",
+    ".....ppccpp.....",
+    ".....pppppp.....",
+    ".......pp.......",
+    ".......ss.......",
+    ".......sslll....",
+    ".......sslll....",
+    "....lllss.......",
+    "....lllss.......",
+    ".......ss.......",
+    ".......ss.......",
+    ".......ss.......",
+  ], { s: "#3d8a2a", l: "#5fb53a", p: "#e0302a", P: "#1b1b22", c: "#1b1b22" }); // a red flower
+  const flowerYellow = paintMap([
+    "................",
+    ".......pp.......",
+    ".....pppppp.....",
+    ".....ppccpp.....",
+    "....pppccppp....",
+    ".....ppccpp.....",
+    ".....pppppp.....",
+    ".......pp.......",
+    ".......ss.......",
+    ".......sslll....",
+    ".......sslll....",
+    "....lllss.......",
+    "....lllss.......",
+    ".......ss.......",
+    ".......ss.......",
+    ".......ss.......",
+  ], { s: "#3d8a2a", l: "#5fb53a", p: "#ffd54a", P: "#c07a1a", c: "#c07a1a" }); // a yellow flower
+  const flowerBlue = paintMap([
+    "................",
+    ".......pp.......",
+    ".....pppppp.....",
+    ".....ppccpp.....",
+    "....pppccppp....",
+    ".....ppccpp.....",
+    ".....pppppp.....",
+    ".......pp.......",
+    ".......ss.......",
+    ".......sslll....",
+    ".......sslll....",
+    "....lllss.......",
+    "....lllss.......",
+    ".......ss.......",
+    ".......ss.......",
+    ".......ss.......",
+  ], { s: "#3d8a2a", l: "#5fb53a", p: "#3f7fe8", P: "#f4f0ff", c: "#f4f0ff" }); // a blue flower
+  const flowerTulip = paintMap([
+    "................",
+    ".....p....p.....",
+    ".....pppppp.....",
+    ".....pPppPp.....",
+    ".....pPppPp.....",
+    ".....pPPPPp.....",
+    ".....pPPPPp.....",
+    ".....pppppp.....",
+    ".......ss.......",
+    ".......sslll....",
+    ".......sslll....",
+    "....lllss.......",
+    "....lllss.......",
+    ".......ss.......",
+    ".......ss.......",
+    ".......ss.......",
+  ], { s: "#3d8a2a", l: "#5fb53a", p: "#ff7ab8", P: "#ff4a9a", c: "#ff4a9a" }); // a pink tulip
+
+  // critters: the Slime mob (drawn at its size: big, medium or tiny)
+  const slimeMob = paintMap([
+    "................",
+    "................",
+    "gggggggggggggggg",
+    "gGGGGGGGGGGGGGGg",
+    "gGwwGGGGGGGGGGGg",
+    "gGwwGGGGGGGGGGGg",
+    "gGGGkkddddkkGGGg",
+    "gGGGkkddddkkGGGg",
+    "gGGGddddddddGGGg",
+    "gGGGddddddddGGGg",
+    "gGGGdddkkdddGGGg",
+    "gGGGddddddddGGGg",
+    "gGGGddddddddGGGg",
+    "gGGGGGGGGGGGGGGg",
+    "gGGGGGGGGGGGGGGg",
+    "gggggggggggggggg",
+  ], { g: "#3d8a2a", G: "#6bdc5a", d: "#4fb53a", k: "#1b3a12", w: "#c8ffb8" });
+  // the Skeleton, two blocks tall, with its bow
+  const skeletonMob = paintMap([
+    "....bbbbbbbb....",
+    "....bbbbbbbb....",
+    "....bbbbbbbb....",
+    "....bkkbbkkb....",
+    "....bkkbbkkb....",
+    "....bbbbbbbb....",
+    "....bbkbkbbb....",
+    "....bbbbbbbb....",
+    ".......bb.......",
+    ".wbb...bb...bb..",
+    "wsbbbbbbbbbbbb..",
+    "wsbb...bb...bb..",
+    "wsbbbbbbbbbbbb..",
+    "wsbb...bb...bb..",
+    "wsbbbbbbbbbbbb..",
+    "wsbb...bb...bb..",
+    "wsbbbbbbbbbbbb..",
+    "wsbb...bb...bb..",
+    "wsbb...bb...bb..",
+    "ws...bbbbbb.....",
+    "ws...bbbbbb.....",
+    "ws...bb..bb.....",
+    ".w...bb..bb.....",
+    ".....bb..bb.....",
+    ".....bb..bb.....",
+    ".....bb..bb.....",
+    ".....bb..bb.....",
+    ".....bb..bb.....",
+    ".....bb..bb.....",
+    ".....bb..bb.....",
+    ".....bb..bb.....",
+    ".....bb..bb.....",
+  ], { b: "#e6e6e6", k: "#1b1b22", w: "#8a6a3a", s: "#c9c9d6" });
+  // the TNT Soldier, two blocks tall
+  const tntSoldier = paintMap([
+    "........fy......",
+    "........f.......",
+    "...hhhhhhhhhh...",
+    "...hhhhhhhhhh...",
+    "...hhhhhhhhhh...",
+    "..hhhhhhhhhhhh..",
+    "....rrrrrrrr....",
+    "....kkkrrkkk....",
+    "....rkkrrkkr....",
+    "....rkkrrkkr....",
+    "....rrrrrrrr....",
+    "....rrrrrrrr....",
+    "rrrrrrrrrrrrrrrr",
+    "rrrrrrrrrrrrrrrr",
+    "rrrrrrrrrrrrrrrr",
+    "rrrWWWWWWWWWWrrr",
+    "rrrWkkkWkWkkWrrr",
+    "rrrWWWWWWWWWWrrr",
+    "rrrWWWWWWWWWWrrr",
+    "rrrrrrrrrrrrrrrr",
+    "...rrrrrrrrrr...",
+    "...rrrrrrrrrr...",
+    "....ddd..ddd....",
+    "....ddd..ddd....",
+    "....ddd..ddd....",
+    "....ddd..ddd....",
+    "....ddd..ddd....",
+    "....ddd..ddd....",
+    "....ddd..ddd....",
+    "....ddd..ddd....",
+    "...kkkkkkkkkk...",
+    "...kkkkkkkkkk...",
+  ], { f: "#5a5a64", y: "#ffd54a", h: "#4a5a3a", r: "#d23a2a", k: "#1b1b22", W: "#f4f0e6", d: "#7a2a1e" });
+
+  // the Up elevator: a cage with a big green up arrow
+  const upLift = paintMap([
+    "kkkkkkkkkkkkkkkk",
+    "kmmmmkmmmmkmmmmk",
+    "kmmmmkmmmmkmmmmk",
+    "kmmmmkmaamkmmmmk",
+    "kmmmmkaaaakmmmmk",
+    "kmmmmaaaaaammmmk",
+    "kmmmmkmaamkmmmmk",
+    "kmmmmkmaamkmmmmk",
+    "kmmmmkmaamkmmmmk",
+    "kmmmmkmaamkmmmmk",
+    "kmmmmkmaamkmmmmk",
+    "kmmmmkmaamkmmmmk",
+    "kmmmmkmaamkmmmmk",
+    "kmmmmkmmmmkmmmmk",
+    "kmmmmkmmmmkmmmmk",
+    "kkkkkkkkkkkkkkkk",
+  ], { m: "#9a9aa8", k: "#3a3a44", a: "#6dff7a" });
+  // the short Up elevator: a blue cage with a small up arrow
+  const upLiftShort = paintMap([
+    "kkkkkkkkkkkkkkkk",
+    "kmmmmkmmmmkmmmmk",
+    "kmmmmkmmmmkmmmmk",
+    "kmmmmkmmmmkmmmmk",
+    "kmmmmkmaamkmmmmk",
+    "kmmmmkaaaakmmmmk",
+    "kmmmmaaaaaammmmk",
+    "kmmmmkmaamkmmmmk",
+    "kmmmmkmaamkmmmmk",
+    "kmmmmkmaamkmmmmk",
+    "kmmmmkmmmmkmmmmk",
+    "kmmmmkmmmmkmmmmk",
+    "kmmmmkmmmmkmmmmk",
+    "kmmmmkmmmmkmmmmk",
+    "kmmmmkmmmmkmmmmk",
+    "kkkkkkkkkkkkkkkk",
+  ], { m: "#8ab4d8", k: "#2a3a54", a: "#6dff7a" });
+
   const water = paintMap([
     "bbbbbbbbbbbbbbbb",
     "bbbbbbbbbbbbbbbb",
@@ -1712,6 +2281,38 @@ window.BDArt = (() => {
     "\u0190": enterBlock,
     "\u0191": enterDone,
     "\u0192": fallElevator,
+    "\u01a0": elevDoor,
+    "\u01a1": elevDoorOpen,
+    "\u01a2": zombieTrap,
+    "\u01a3": zombieTrapUsed,
+    zombie: zombie,
+    "\u0193": decoStone,
+    "\u0194": decoWood,
+    "\u0195": decoWindow,
+    "\u0196": decoTorch,
+    "\u01a4": flowerRed,
+    "\u01a5": flowerYellow,
+    "\u01a6": flowerBlue,
+    "\u01a7": flowerTulip,
+    "\u01a8": slimeMob,
+    "\u01a9": skeletonMob,
+    "\u01aa": tntSoldier,
+    "\u01ab": upLift,
+    "\u01ac": upLiftShort,
+    "\u0197": wireRed,
+    "\u019d": wireGreen,
+    "\u019e": wireBlue,
+    "\u019f": wirePurple,
+    wireOn0: wireRedOn,
+    wireOn1: wireGreenOn,
+    wireOn2: wireBlueOn,
+    wireOn3: wirePurpleOn,
+    "\u0198": button,
+    "\u019b": buttonOn,
+    "\u0199": lever,
+    "\u019c": leverOn,
+    "\u019a": lamp,
+    lampOn: lampOn,
     enderBullet: enderBullet,
     swordStone: swordStone,
     swordIron: swordIron,
@@ -1801,6 +2402,38 @@ window.BDArt = (() => {
     { key: "\u018c", label: "Auto teleport" },
     { key: "\u018d", label: "Fall block" },
     { key: "\u0192", label: "Elevator" },
+    { key: "\u01a0", label: "Elevator door" },
+    { key: "\u01a1", label: "Elevator door (open)" },
+    { key: "\u01a2", label: "Zombie trap" },
+    { key: "\u01a3", label: "Zombie trap (used)" },
+    { key: "zombie", label: "Zombie" },
+    { key: "\u0193", label: "Stone wall" },
+    { key: "\u0194", label: "Wood wall" },
+    { key: "\u0195", label: "Window" },
+    { key: "\u0196", label: "Torch" },
+    { key: "\u01a4", label: "Red flower" },
+    { key: "\u01a5", label: "Yellow flower" },
+    { key: "\u01a6", label: "Blue flower" },
+    { key: "\u01a7", label: "Tulip" },
+    { key: "\u01a8", label: "Slime mob" },
+    { key: "\u01a9", label: "Skeleton" },
+    { key: "\u01aa", label: "TNT Soldier" },
+    { key: "\u01ab", label: "Up elevator" },
+    { key: "\u01ac", label: "Up elevator (short)" },
+    { key: "\u0197", label: "Red wire" },
+    { key: "wireOn0", label: "Red wire (powered)" },
+    { key: "\u019d", label: "Green wire" },
+    { key: "wireOn1", label: "Green wire (powered)" },
+    { key: "\u019e", label: "Blue wire" },
+    { key: "wireOn2", label: "Blue wire (powered)" },
+    { key: "\u019f", label: "Purple wire" },
+    { key: "wireOn3", label: "Purple wire (powered)" },
+    { key: "\u0198", label: "Button" },
+    { key: "\u019b", label: "Button (pressed)" },
+    { key: "\u0199", label: "Lever" },
+    { key: "\u019c", label: "Lever (on)" },
+    { key: "\u019a", label: "Lamp" },
+    { key: "lampOn", label: "Lamp (lit)" },
     { key: "\u018e", label: "Push block" },
     { key: "\u018f", label: "Shove block" },
     { key: "\u0190", label: "Enter" },
@@ -2144,6 +2777,16 @@ window.BDArt = (() => {
       const w = size * sw / sh;
       return blit(ctx, sp, x + (size - w) / 2, y, w, size);
     }
+    if (ch === "\u0196") {
+      // the torch's flame flickers
+      blit(ctx, sp, x, y, size, size);
+      ctx.save();
+      ctx.globalAlpha = 0.35 + 0.25 * Math.sin(time * 13 + x);
+      ctx.fillStyle = "#ffe98a";
+      ctx.fillRect(x + size * 0.375, y + size * 0.125, size * 0.25, size * 0.25);
+      ctx.restore();
+      return;
+    }
     if (ch === "\u018c") {
       blit(ctx, sp, x, y, size, size);
       ctx.save();
@@ -2262,6 +2905,7 @@ window.BDArt = (() => {
     { key: "end", label: "🌌 The End" },
     { key: "endStorage", label: "📦 End storage rooms" },
     { key: "deepCave", label: "⛏ Deep cave" },
+    { key: "night", label: "🌙 Night" },
     // mega: bought in the shop, then pickable in the Level Maker
     { key: "megaOverworld", label: "✨ Mega Overworld", mega: true, base: "overworld" },
     { key: "megaNether", label: "✨ Mega Nether", mega: true, base: "nether" },
@@ -2768,6 +3412,44 @@ window.BDArt = (() => {
         ctx.fillRect(x, groundY - h, 46, h + ts);
         ctx.fillStyle = "rgba(180, 100, 255, 0.5)";
         ctx.fillRect(x + 17, groundY - h - 10, 12, 10);
+      }
+    } else if (kind === "night") {
+      // a dark blue sky, twinkling stars, the moon, and hills in shadow
+      ctx.fillStyle = skyGrad(ctx, H, "#070b24", "#1f2f63");
+      ctx.fillRect(0, 0, W, H);
+      const sspan = W + 300;
+      for (let i = 0; i < 70; i++) {
+        const x = wrapX(i * 97, scroll, 0.04, sspan, 20);
+        const y = (i * 53) % Math.floor(H * 0.7);
+        ctx.globalAlpha = 0.45 + 0.45 * Math.sin(t * 2 + i * 1.7);
+        ctx.fillStyle = i % 7 ? "#ffffff" : "#ffe9a8";
+        const s = i % 5 ? 2 : 3;
+        ctx.fillRect(x, y, s, s);
+      }
+      ctx.globalAlpha = 1;
+      // the moon, drifting slowly
+      const mx = wrapX(W * 0.72, scroll, 0.02, W + 200, 100), my = H * 0.16, mr = ts * 0.9;
+      ctx.fillStyle = "rgba(255, 244, 200, 0.18)";
+      ctx.fillRect(mx - mr * 1.5, my - mr * 1.5, mr * 3, mr * 3);
+      ctx.fillStyle = "#fff4c8";
+      ctx.fillRect(mx - mr, my - mr, mr * 2, mr * 2);
+      ctx.fillStyle = "#e6d9a2";
+      ctx.fillRect(mx - mr * 0.5, my - mr * 0.4, mr * 0.4, mr * 0.4);
+      ctx.fillRect(mx + mr * 0.2, my + mr * 0.2, mr * 0.5, mr * 0.5);
+      ctx.fillRect(mx + mr * 0.3, my - mr * 0.7, mr * 0.25, mr * 0.25);
+      // a few dim clouds and dark hills
+      const span = W + 400;
+      ctx.globalAlpha = 0.18;
+      for (let i = 0; i < 5; i++) drawCloud(ctx, wrapX(i * 413, scroll, 0.2, span, 200), 30 + ((i * 71) % 100), 120 + (i % 3) * 50);
+      ctx.globalAlpha = 1;
+      const hspan = W + 520;
+      for (let i = 0; i < 10; i++) {
+        const x = wrapX(i * 260, scroll, 0.5, hspan, 260);
+        const hgt = 40 + ((i * 53) % 70);
+        ctx.fillStyle = "rgba(14, 26, 30, 0.75)";
+        ctx.fillRect(x, groundY - hgt, 200, hgt + ts);
+        ctx.fillStyle = "rgba(30, 52, 48, 0.75)";
+        ctx.fillRect(x, groundY - hgt, 200, 8);
       }
     } else if (kind === "mooshroom") {
       ctx.fillStyle = skyGrad(ctx, H, "#8f7bc4", "#f2cfe0");

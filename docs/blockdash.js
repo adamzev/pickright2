@@ -91,6 +91,34 @@
     "\u0190": { name: "Enter" },
     "\u0191": { name: "Enter (done)", solid: true }, // only ever made in play
     "\u0192": { name: "Elevator", solid: true },
+    // decorations: you run straight past them (mostly for the background layer)
+    "\u0193": { name: "Stone wall" },
+    "\u0194": { name: "Wood wall" },
+    "\u0195": { name: "Window" },
+    "\u0196": { name: "Torch" },
+    "\u01a4": { name: "Red flower" },
+    "\u01a5": { name: "Yellow flower" },
+    "\u01a6": { name: "Blue flower" },
+    "\u01a7": { name: "Tulip" },
+    "\u01a8": { name: "Slime mob" },
+    "\u01a9": { name: "Skeleton" },
+    "\u01aa": { name: "TNT Soldier" },
+    "\u01ab": { name: "Up elevator", solid: true },
+    "\u01ac": { name: "Up elevator (short)", solid: true },
+    // wires are solid bars: you can stand on them
+    "\u0197": { name: "Red wire", solid: true },
+    "\u019d": { name: "Green wire", solid: true },
+    "\u019e": { name: "Blue wire", solid: true },
+    "\u019f": { name: "Purple wire", solid: true },
+    "\u0198": { name: "Button" },
+    "\u0199": { name: "Lever" },
+    "\u019a": { name: "Lamp", solid: true },
+    "\u019b": { name: "Button (pressed)" }, // only ever made in play
+    "\u019c": { name: "Lever (on)" }, // only ever made in play
+    "\u01a0": { name: "Elevator door", solid: true },
+    "\u01a1": { name: "Elevator door (open)" }, // only ever made in play
+    "\u01a2": { name: "Zombie trap", solid: true },
+    "\u01a3": { name: "Zombie trap (used)", solid: true }, // only ever made in play
   };
   const KEY = "\u0186";
   const DOORS = ["\u0180", "\u0181", "\u0182", "\u0183", "\u0184", "\u0185"];
@@ -106,6 +134,12 @@
   const FALL_PUSH = 8; // blocks a second, downward
   const FALL_MAX = 2.5; // blocks a second: it floats down gently
   const FALL_ACCEL = 12; // how fast it gets up to that speed
+  const ELEVATOR_BOOST = 3.2;
+  // Up elevators: when power reaches one, it and every Up elevator block joined
+  // to it rise together, once. The plain one rises until it bumps a ceiling;
+  // the short one rises the number of blocks set on it in the Level Maker.
+  const UP_LIFT = "\u01ab", UP_LIFT_SHORT = "\u01ac";
+  const UP_SPEED = 2.5, UP_DEFAULT = 3; // hold jump while riding an elevator: this many times faster
   // Water: you sink slowly, each jump press is a swim stroke up, and you keep
   // running forward, just slower. Near the surface a press jumps you out.
   const WATER = "\u0189";
@@ -127,12 +161,49 @@
   // soon as it's on screen, rider or not, and stops at the bottom (or zooms
   // on through an Auto teleport). You wait on it while it moves.
   const LIFT = "\u0192";
+  // Elevator door: falls with the Elevator blocks, shut (solid) the whole
+  // way, and slides open once everything near it has landed.
+  const ELEV_DOOR = "\u01a0", ELEV_DOOR_OPEN = "\u01a1"; // two squares tall, like the doors
   // Push and Shove blocks: run into one and a Push block slides ahead of you
   // (and you stop, not explode, if it's stuck); a Shove block slides up to
   // SHOVE_DIST blocks by itself. Both fall down holes. Push one into an Enter
   // and the Enter turns green; when every Enter is green, you win.
   const PUSH = "\u018e", SHOVE = "\u018f", ENTER = "\u0190", ENTER_DONE = "\u0191";
   const SHOVE_DIST = 4;
+  // Power: Buttons (run over one) and Levers (touch one) switch on for good,
+  // and so does a green Enter. Power runs along Wires that touch side by side,
+  // and opens any door, or lights any Lamp, touching a powered wire or source.
+  const WIRE = "\u0197", BUTTON = "\u0198", LEVER = "\u0199", LAMP = "\u019a";
+  // Zombie trap: when power reaches it, the screen flashes red and you're
+  // whisked to a plains biome, where a zombie drops out of a portal in the sky.
+  // You have ZOMBIE_LIVES hits; stomp it ZOMBIE_HP times to win and go back.
+  const ZOMBIE_TRAP = "\u01a2", ZOMBIE_TRAP_USED = "\u01a3";
+  const ZOMBIE_LIVES = 4, ZOMBIE_HP = 3, ZOMBIE_SPEED = 2.2;
+  // Wires come in four colours, each its own circuit: power only passes
+  // between wires of the same colour (any source powers any colour touching it).
+  const WIRES = [WIRE, "\u019d", "\u019e", "\u019f"]; // red, green, blue, purple
+  const isWire = (ch) => WIRES.includes(baseOf(ch));
+  const BUTTON_ON = "\u019b", LEVER_ON = "\u019c";
+  // Critters: mobs that come alive once they're on screen. Slimes hop at you
+  // and split when stomped (big, medium, tiny); Skeletons walk at you shooting
+  // arrows; TNT Soldiers march up quietly, fizz, and blow up. Stomp any of them.
+  const SLIME_MOB = "\u01a8", SKELETON = "\u01a9", TNT_SOLDIER = "\u01aa";
+  const CRITTERS = [SLIME_MOB, SKELETON, TNT_SOLDIER];
+  const SLIME_SIZES = [null, [0.55, 0.45], [0.9, 0.75], [1.4, 1.1]]; // tiny, medium, big: [w, h]
+  const SKELETON_SPEED = 1.5, SKELETON_SHOOT = 2, ARROW_SPEED = 8;
+  const SOLDIER_SPEED = 1.8, SOLDIER_FUSE = 1.2, SOLDIER_BLAST = 2.2;
+  const HEALTH_MAX = 4, HURT_SAFE = 1.2; // your health against them, and the safe moment after a hit
+  const makeCritter = (ch, x, y) => {
+    const kind = baseOf(ch);
+    const [w, h] = kind === SLIME_MOB ? SLIME_SIZES[3] : kind === SKELETON ? [0.8, 1.8] : [0.8, 1.6];
+    return { kind, ch, x: x + (1 - w) / 2, y: y + 1 - h, w, h, vy: 0, vx: 0, onGround: false, awake: false,
+      size: 3, t: 0.6, fuse: 0, shootT: 1, gone: false };
+  };
+  const FLOWERS = ["\u01a4", "\u01a5", "\u01a6", "\u01a7"]; // red, yellow, blue, tulip
+  const DECOR = ["\u0193", "\u0194", "\u0195", "\u0196", ...FLOWERS];
+  // The background layer: blocks drawn darker behind the level, just for
+  // looks. Nothing in it is solid or does anything. These can't go in it.
+  const BACK_HIDE = "PKOMhCGE" + CRASH;
   const BLOCK_STEP = 0.06; // seconds for a pushed, shoved or dropping block to move one square
   const GALAXY_KEY = "blockdash_galaxy"; // "1" once you've escaped: armor and the skin are yours
   const galaxyWon = () => {
@@ -170,7 +241,7 @@
   const MEGA_PICK = "~"; // likewise, the palette button that opens the mega blocks
 
   const PALETTE = ["g", "s", "p", "n", "k", "e", "m", "t", "T", "h", "A", "L", "U", "D", "F", "S", "Z",
-    "W", "Y", "V", "Q", "N", "I", "C", "d", "+", "$", "@", "r", "9", "o", "H", "R", "b", "%", "w", "f", "K", "O", "M", "E", "G", "J", "B", IRON, GLITCH_STONE, GLITCH_IRON, WATER, CRASH, TELEPORT, ELEVATOR, LIFT, PUSH, SHOVE, ENTER, ...DOORS, KEY, MEGA_PICK, MINE, "P", ERASER];
+    "W", "Y", "V", "Q", "N", "I", "C", "d", "+", "$", "@", "r", "9", "o", "H", "R", "b", "%", "w", "f", "K", "O", "M", "E", "G", "J", "B", IRON, GLITCH_STONE, GLITCH_IRON, WATER, CRASH, TELEPORT, ELEVATOR, LIFT, ELEV_DOOR, UP_LIFT, UP_LIFT_SHORT, ...CRITTERS, PUSH, SHOVE, ENTER, ...WIRES, BUTTON, LEVER, LAMP, ZOMBIE_TRAP, ...DECOR, ...DOORS, KEY, MEGA_PICK, MINE, "P", ERASER];
 
   // The boss arena is drawn in the same editor as the level, with a slightly
   // different set of blocks: no portals, save points or note-carrying blocks
@@ -179,6 +250,8 @@
   // the fake crash's arena: like the boss arena, but End portals (the way
   // out) instead of Boss platforms
   const CRASH_HIDE = LEVEL_ONLY.replace("E", "") + "J";
+  // the Zombie trap's plains: like an arena, minus Boss platforms
+  const PLAINS_HIDE = LEVEL_ONLY + "J";
   const ARENA_ONLY = "J";
 
   const isSolid = (ch) => !!(tileOf(ch) && tileOf(ch).solid);
@@ -486,6 +559,30 @@
     });
   };
 
+  // A layer made the same size as its level: rows are added or cut at the top
+  // (the floor stays put), columns at the right.
+  const fitLayer = (g, width, height) => {
+    const rows = g.length > height ? g.slice(g.length - height)
+      : [...Array.from({ length: height - g.length }, () => Array(width).fill(AIR)), ...g];
+    return resizeGrid(rows, width);
+  };
+  const layerRows = (g) => (g.some((r) => r.some((ch) => ch !== AIR)) ? gridToRows(g) : undefined);
+  // Draws the background layer's blocks in columns x0..x1 and rows y0..y1,
+  // darkened so they sit behind. ox shifts it (the play screen's scroll).
+  const drawBackLayer = (ctx, g, x0, x1, y0, y1, ts, ox, t) => {
+    for (let y = Math.max(0, y0); y <= Math.min(g.length - 1, y1); y++) {
+      for (let x = Math.max(0, x0); x <= Math.min(g[0].length - 1, x1); x++) {
+        const ch = g[y][x];
+        if (ch === AIR) continue;
+        const tall = isDoor(ch) || baseOf(ch) === ELEV_DOOR;
+        if (tall) Art.drawSprite(ctx, ch, x * ts + ox, (y - 1) * ts, ts, ts * 2);
+        else drawTile(ctx, overOf(ch) || ch, x * ts + ox, y * ts, ts, t, false);
+        ctx.fillStyle = "rgba(0, 0, 0, 0.38)";
+        ctx.fillRect(x * ts + ox, (tall ? y - 1 : y) * ts, ts, tall ? ts * 2 : ts);
+      }
+    }
+  };
+
   const resizeGrid = (g, width) =>
     g.map((row) =>
       Array.from({ length: width }, (_, x) => (x < row.length ? row[x] : AIR)),
@@ -519,6 +616,22 @@
     const g = rowsToGrid(rows.map(String));
     return resizeGrid(g, clamp(g[0].length, ARENA_W, 400));
   };
+  // The Zombie trap's plains until someone draws their own: a grassy floor,
+  // a start, and a couple of little hills. The zombie's portal opens in the
+  // sky at PLAINS_PORTAL. One screen wide, like the boss arena.
+  const PLAINS_PORTAL = { x: 15, y: 2 };
+  const defaultPlains = () => {
+    const g = Array.from({ length: H }, (_, y) => Array(ARENA_W).fill(y === H - 1 ? "g" : AIR));
+    for (const [x0, x1, top] of [[6, 8, H - 2], [14, 15, H - 2], [15, 15, H - 3]]) {
+      for (let x = x0; x <= x1; x++) for (let y = top; y < H - 1; y++) g[y][x] = "g";
+    }
+    g[H - 2][2] = "P";
+    // flowers grow on the plains
+    for (const [x, f] of [[4, 0], [10, 1], [12, 3], [18, 2], [20, 0]]) g[H - 2][x] = FLOWERS[f];
+    return g;
+  };
+  const plainsGrid = (rows) =>
+    (Array.isArray(rows) && rows.length ? resizeGrid(rowsToGrid(rows.map(String)), ARENA_W) : defaultPlains());
   // its background: The End unless it's been given another
   const crashBgOf = (o) => (window.BDArt.BACKGROUNDS.some((b) => b.key === o.crashBg) ? o.crashBg : "end");
 
@@ -598,6 +711,12 @@
       const ch = baseOf(rows[y] && rows[y][x]);
       if (ch === "K" && typeof v === "string" && v.trim()) out[k] = v.slice(0, 200);
       else if (ch === "O" && +v > 0) out[k] = clamp(+v, 0.5, 30);
+      else if (ch === UP_LIFT_SHORT && +v >= 1) out[k] = clamp(Math.round(+v), 1, MAX_H);
+      else if (ch === TELEPORT && typeof v === "string" && /^\d+,\d+$/.test(v)) {
+        // a linked Auto teleport: its partner's square, kept while the partner is still a teleport
+        const [px, py] = v.split(",").map(Number);
+        if (baseOf(rows[py] && rows[py][px]) === TELEPORT && v !== k) out[k] = v;
+      }
     }
     return out;
   };
@@ -617,6 +736,8 @@
     if (arenaBgOf(l) !== bgOf(l)) o.arenaBg = l.arenaBg;
     if (Array.isArray(l.crashArena) && l.crashArena.length) o.crashArena = l.crashArena;
     if (crashBgOf(l) !== "end") o.crashBg = l.crashBg;
+    if (Array.isArray(l.back) && l.back.some((r) => /[^.]/.test(r))) o.back = l.back;
+    if (Array.isArray(l.plains) && l.plains.length) o.plains = l.plains;
     // kept even when this browser has no art for it; it just plays as the usual player
     if (isMine(l.hero)) o.hero = l.hero;
     if (musicOf(l)) o.music = l.music;
@@ -644,6 +765,10 @@
       ...(Array.isArray(o.arena) && o.arena.length ? { arena: gridToRows(arenaGrid(o.arena)) } : {}),
       ...(Array.isArray(o.crashArena) && o.crashArena.length ? { crashArena: gridToRows(crashArenaGrid(o.crashArena)) } : {}),
       ...(crashBgOf(o) !== "end" ? { crashBg: o.crashBg } : {}),
+      ...(Array.isArray(o.plains) && o.plains.length ? { plains: gridToRows(plainsGrid(o.plains)) } : {}),
+      // the background layer, made the level's size
+      ...(Array.isArray(o.back) && o.back.length
+        ? { back: gridToRows(fitLayer(rowsToGrid(o.back.map(String)), clean[0].length, clean.length)) } : {}),
     };
   };
 
@@ -699,7 +824,7 @@
   // ---------- share codes ----------
 
   const encodeLevel = (lvl) => {
-    const json = JSON.stringify({ n: lvl.name, r: lvl.rows, b: bgOf(lvl), x: cleanNotes(lvl.rows, lvl.notes), a: lvl.arena, ab: lvl.arenaBg, c: lvl.crashArena, cb: lvl.crashBg, h: lvl.hero, m: musicOf(lvl) || undefined });
+    const json = JSON.stringify({ n: lvl.name, r: lvl.rows, b: bgOf(lvl), x: cleanNotes(lvl.rows, lvl.notes), a: lvl.arena, ab: lvl.arenaBg, c: lvl.crashArena, cb: lvl.crashBg, k: lvl.back, pl: lvl.plains, h: lvl.hero, m: musicOf(lvl) || undefined });
     const bytes = new TextEncoder().encode(json);
     let s = "";
     for (const b of bytes) s += String.fromCharCode(b);
@@ -711,7 +836,7 @@
     const bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0));
     const o = JSON.parse(new TextDecoder().decode(bytes));
     if (!o || !Array.isArray(o.r) || !o.r.length) throw new Error("bad code");
-    return { name: String(o.n || "Imported level"), rows: o.r.map(String), bg: o.b, notes: o.x, arena: o.a, arenaBg: o.ab, crashArena: o.c, crashBg: o.cb, hero: o.h, music: o.m };
+    return { name: String(o.n || "Imported level"), rows: o.r.map(String), bg: o.b, notes: o.x, arena: o.a, arenaBg: o.ab, crashArena: o.c, crashBg: o.cb, back: o.k, plains: o.pl, hero: o.h, music: o.m };
   };
 
   // Art codes are much bigger than level codes, so each drawing is stored as
@@ -1904,10 +2029,32 @@
       [CRASH, "Fake crash — invisible when you play. Touch it and the game pretends to crash! Reload, and you're in the 🌌 Crash arena with the Galactic Monstrosity. Escape through an End portal to win"],
       [TELEPORT, "Auto teleport — touch it and you zoom to the next one ahead. A falling block that drops into one zooms ahead too"],
       [ELEVATOR, "Fall block — stand on it and it carries you down until it lands"],
+      [ELEV_DOOR, "Elevator door — two blocks tall, like the doors: put it in the bottom square of a gap in your elevator's wall. It falls with the Elevator blocks, stays shut the whole way down, and opens when the elevator hits the bottom"],
+      [UP_LIFT, "Up elevator — when power reaches it (a Button, Lever or wire), it rises until it bumps a ceiling, with every Up elevator block joined to it. Ride it up!"],
+      [UP_LIFT_SHORT, "Up elevator (short) — like the Up elevator, but rises the number of blocks you set (pick the number, then tap the grid)"],
       [LIFT, "Elevator — goes down by itself as soon as it's on screen, and stops at the bottom. Hop on to ride it down. It zooms through Auto teleports"],
       [PUSH, "Push block — run into it to push it along in front of you. If it's stuck you just stop. It falls down holes"],
       [SHOVE, "Shove block — run into it and it slides 4 blocks by itself. It falls down holes"],
       [ENTER, "Enter — push a Push or Shove block into it and it turns green. When every Enter is green, you win!"],
+      [WIRE, "Red wire — a solid bar you can stand on that carries power. Buttons, Levers and green Enters power the wires touching them, and power runs along wires of the SAME colour that touch side by side"],
+      ["\u019d", "Green wire — like the red wire, but its own circuit: it only passes power to green wires"],
+      ["\u019e", "Blue wire — its own circuit: only passes power to blue wires"],
+      ["\u019f", "Purple wire — its own circuit: only passes power to purple wires"],
+      [BUTTON, "Button — run over it and it clicks down, powering the wires touching it (it stays on)"],
+      [LEVER, "Lever — touch it to flip it on, powering the wires touching it (it stays on)"],
+      [ZOMBIE_TRAP, "Zombie trap — when power reaches it, the screen flashes red and you're taken to the plains: a zombie drops out of a portal! You have 4 hits; stomp it 3 times to win and go back to the level"],
+      [LAMP, "Lamp — lights up when it touches a powered wire. Doors touching a powered wire open by themselves"],
+      ["\u0193", "Stone wall — decoration you run right past. Great on the background layer (🖼 Background)"],
+      ["\u0194", "Wood wall — decoration you run right past"],
+      ["\u0195", "Window — decoration you run right past"],
+      ["\u0196", "Torch — a flickering decoration you run right past"],
+      ["\u01a4", "Red flower — a pretty decoration you run right past"],
+      ["\u01a5", "Yellow flower — a pretty decoration you run right past"],
+      ["\u01a6", "Blue flower — a pretty decoration you run right past"],
+      ["\u01a7", "Tulip — a pretty pink decoration you run right past"],
+      [SLIME_MOB, "Slime mob — hops at you once it's on screen. Stomp a big one and it splits into 2 medium, which split into tiny ones. Don't touch it from the side!"],
+      [SKELETON, "Skeleton — walks at you and shoots arrows. Jump the arrows and stomp it"],
+      [TNT_SOLDIER, "TNT Soldier — marches up quietly, fizzes when it's close, then BOOM! Stomp it before it blows"],
       [WATER, "Water — swim! You sink slowly; press jump to swim up, or jump out near the top. Lava touching water turns into stone"],
       ["P", "Start — where you spawn"],
     ].forEach(([ch, text]) => {
@@ -2620,15 +2767,29 @@
     const parked = {
       arena: arenaGrid(existing && existing.arena, arenaBg || bg),
       crash: crashArenaGrid(existing && existing.crashArena),
+      plains: plainsGrid(existing && existing.plains),
+      // the level's background layer, always the level's size (see syncLayers)
+      back: fitLayer(existing && existing.back ? rowsToGrid(existing.back) : [[AIR]], grid[0].length, grid.length),
     };
     // until it's opened, the level uses the default arena (and crash arena)
     let arenaDrawn = !!(existing && existing.arena);
     let crashDrawn = !!(existing && existing.crashArena);
+    let plainsDrawn = !!(existing && existing.plains);
     const gridOf = (m) => (editing === m ? grid : parked[m]);
     const levelG = () => gridOf("level");
     const arenaRows = () => (arenaDrawn ? gridToRows(gridOf("arena")) : undefined);
     const crashRows = () => (crashDrawn ? gridToRows(gridOf("crash")) : undefined);
+    const plainsRows = () => (plainsDrawn ? gridToRows(gridOf("plains")) : undefined);
+    const backRows = () => layerRows(gridOf("back"));
+    // The level and its background layer stay the same size: whichever one
+    // you're editing leads (Higher, Longer and so on), the other follows.
+    const syncLayers = () => {
+      if (editing !== "level" && editing !== "back") return;
+      const other = editing === "level" ? "back" : "level";
+      parked[other] = fitLayer(parked[other], grid[0].length, grid.length);
+    };
     let stopSecs = STOP_DEFAULT;
+    let upBlocks = UP_DEFAULT;
     let dialogText = "";
     let slot = index;
     let sel = "g";
@@ -2656,9 +2817,10 @@
     // A new level (or a copy) only gets a slot in My levels once it's changed.
     const savedLabel = el("span", "hint", slot >= 0 ? "✓ Saved" : "");
     const autosave = () => {
+      syncLayers();
       const all = loadLevels();
       const lvl = levelData({ name: (name || "").trim() || "Untitled", rows: gridToRows(levelG()), bg, notes,
-        arena: arenaRows(), arenaBg, crashArena: crashRows(), crashBg, hero, music });
+        arena: arenaRows(), arenaBg, crashArena: crashRows(), crashBg, back: backRows(), plains: plainsRows(), hero, music });
       if (slot >= 0 && slot < all.length) all[slot] = lvl;
       else { all.push(lvl); slot = all.length - 1; }
       savedLabel.textContent = saveLevels(all) ? "✓ Saved" : "⚠ Not saved";
@@ -2668,7 +2830,8 @@
     const testBtn = el("button", "", "▶ Test");
     testBtn.onclick = () => {
       const lvl = { name: (nameInput.value || "Untitled").trim(), rows: gridToRows(levelG()), bg,
-        notes: cleanNotes(levelG(), notes), arena: arenaRows(), arenaBg, crashArena: crashRows(), crashBg, hero, music };
+        notes: cleanNotes(levelG(), notes), arena: arenaRows(), arenaBg, crashArena: crashRows(), crashBg,
+        back: (syncLayers(), backRows()), plains: plainsRows(), hero, music };
       showPlay(lvl, () => showEditor(lvl, slot), true);
     };
     nameRow.append(nameInput, testBtn, savedLabel);
@@ -2687,6 +2850,7 @@
         // the buttons set the background of whichever one is being edited
         if (editing === "arena") arenaBg = b.key;
         else if (editing === "crash") crashBg = b.key;
+        else if (editing === "plains") { toast("The plains always have the Overworld sky"); return; }
         else bg = b.key;
         showBg();
         autosave();
@@ -2758,6 +2922,7 @@
     const levelTab = el("button", "small green", "🗺 Level");
     const arenaTab = el("button", "small", "💥 Boss arena");
     const crashTab = el("button", "small", "🌌 Crash arena");
+    const plainsTab = el("button", "small", "🌾 Plains arena");
     const editHint = el("span", "hint", "");
     const setEditing = (m) => {
       if (m === editing) return;
@@ -2767,10 +2932,15 @@
       editing = m;
       if (m === "arena") arenaDrawn = true;
       if (m === "crash") crashDrawn = true;
+      if (m === "plains") plainsDrawn = true;
+      if (linking) { linking = false; linkSel = null; linkBtn.classList.remove("green"); }
       undoStack.length = 0; // undo steps belong to the grid they were made on
-      levelTab.classList.toggle("green", m === "level");
+      levelTab.classList.toggle("green", m === "level" || m === "back");
+      layerBtn.classList.toggle("green", m === "back");
+      layerBtn.textContent = m === "back" ? "🖼 Background: on" : "🖼 Background: off";
       arenaTab.classList.toggle("green", m === "arena");
       crashTab.classList.toggle("green", m === "crash");
+      plainsTab.classList.toggle("green", m === "plains");
       showBg();
       refreshPalette();
       autosave();
@@ -2780,7 +2950,15 @@
     levelTab.onclick = () => setEditing("level");
     arenaTab.onclick = () => setEditing("arena");
     crashTab.onclick = () => setEditing("crash");
-    editRow.append(levelTab, arenaTab, crashTab, editHint);
+    plainsTab.onclick = () => setEditing("plains");
+    // the level's background layer: blocks placed while it's on go behind
+    const layerBtn = el("button", "small", "🖼 Background: off");
+    layerBtn.onclick = () => {
+      if (editing !== "level" && editing !== "back") { toast("Background blocks are for the level, not the arenas"); return; }
+      syncLayers();
+      setEditing(editing === "back" ? "level" : "back");
+    };
+    editRow.append(levelTab, arenaTab, crashTab, plainsTab, layerBtn, editHint);
     namePanel.appendChild(editRow);
     root.appendChild(namePanel);
 
@@ -2791,7 +2969,9 @@
     const palItems = {};
     // The player's own blocks share one palette button, so the palette stays
     // the same size however many they make; a tray under it picks which one.
-    const hiddenNow = () => (editing === "arena" ? LEVEL_ONLY : editing === "crash" ? CRASH_HIDE : ARENA_ONLY);
+    const hiddenNow = () => (editing === "arena" ? LEVEL_ONLY : editing === "crash" ? CRASH_HIDE
+      : editing === "plains" ? PLAINS_HIDE
+      : editing === "back" ? BACK_HIDE + ARENA_ONLY : ARENA_ONLY);
     // player looks aren't blocks; they're picked with Player look above
     const myBlocks = Art.customBlocks().filter((b) => b.base !== "player" && !PET_SOUND[b.base])
       .map((b) => ({ key: b.key, label: b.label, base: baseOf(b.key) }));
@@ -2911,6 +3091,13 @@
     stopInput.value = String(stopSecs);
     stopInput.style.width = "5em";
     stopInput.oninput = () => { stopSecs = clamp(parseFloat(stopInput.value) || STOP_DEFAULT, 0.5, 30); };
+    const upInput = el("input");
+    upInput.type = "number";
+    upInput.min = "1";
+    upInput.max = String(MAX_H);
+    upInput.value = String(upBlocks);
+    upInput.style.width = "4em";
+    upInput.oninput = () => { upBlocks = clamp(Math.round(+upInput.value) || UP_DEFAULT, 1, MAX_H); };
     const dialogInput = el("input");
     dialogInput.type = "text";
     dialogInput.maxLength = 200;
@@ -2920,7 +3107,11 @@
     const showOpts = () => {
       optRow.innerHTML = "";
       const kind = baseOf(sel);
-      optRow.style.display = kind === "O" || kind === "K" ? "" : "none";
+      optRow.style.display = kind === "O" || kind === "K" || kind === UP_LIFT_SHORT ? "" : "none";
+      if (kind === UP_LIFT_SHORT) {
+        optRow.append(el("span", "hint", "Goes up"), upInput,
+          el("span", "hint", "blocks. Set this, then tap the grid. Tap one again to change it."));
+      }
       if (kind === "O") {
         optRow.append(el("span", "hint", "Stop for"), stopInput,
           el("span", "hint", "seconds. Set this, then tap the grid. Tap a Stop block again to change it."));
@@ -2942,6 +3133,12 @@
         ? "This is where the boss fight happens (reached through a Boss portal). The faded boss shows where it stands. " +
           "Boss platforms only appear during CLIMB UP; everything else is always there. " +
           "The Background buttons above now change the arena's background, not the level's."
+        : editing === "back"
+          ? "🖼 Background is on: blocks you place now go BEHIND the level, darker, and you run right past them. " +
+            "Your level shows faded on top. Click 🖼 Background again to go back."
+        : editing === "plains"
+          ? "🌾 This is where a Zombie trap sends you. The faded portal shows where the zombie drops in; " +
+            "put the Start where you want to land. The plains are always one screen, with the Overworld sky."
         : editing === "crash"
           ? "This is where a Fake crash block sends you. The faded Galactic Monstrosity shows where it floats " +
             "(up and down); put End portals in front of it as the way out. " +
@@ -2970,6 +3167,74 @@
       mode = mode === "draw" ? "pan" : "draw";
       modeBtn.textContent = mode === "draw" ? "✏ Draw" : "✋ Scroll";
       canvas.classList.toggle("draw-mode", mode === "draw");
+    };
+
+    // Link tool: tap an Auto teleport (it glows), then another, to link the
+    // two: each sends you to the other. Tap a glowing one again to unlink it.
+    let linking = false, linkSel = null;
+    const linkBtn = el("button", "small", "🔗 Link");
+    linkBtn.title = "Link two Auto teleports together";
+    linkBtn.onclick = () => {
+      if (editing !== "level") { toast("Link teleports on the level itself"); return; }
+      linking = !linking;
+      linkSel = null;
+      linkBtn.classList.toggle("green", linking);
+      if (linking) { filling = false; fillBtn.classList.remove("green"); toast("🔗 Tap a teleport, then another to link them"); }
+      render();
+    };
+    const unlink = (k) => {
+      const partner = notes[k];
+      delete notes[k];
+      if (partner && notes[partner] === k) delete notes[partner];
+    };
+    const linkTap = (cx, cy) => {
+      if (baseOf((grid[cy] || [])[cx]) !== TELEPORT) { toast("🔗 Tap an Auto teleport"); return; }
+      const k = noteKey(cx, cy);
+      if (!linkSel) { linkSel = k; render(); return; }
+      if (linkSel === k) {
+        const had = notes[k];
+        unlink(k);
+        linkSel = null;
+        if (had) toast("Unlinked");
+      } else {
+        unlink(linkSel);
+        unlink(k);
+        notes[linkSel] = k;
+        notes[k] = linkSel;
+        linkSel = null;
+        toast("🔗 Linked!");
+      }
+      autosave();
+      render();
+    };
+
+    // Bucket fill: a tap fills every connected square that matches the one tapped.
+    let filling = false;
+    const fillBtn = el("button", "small", "🪣 Fill");
+    fillBtn.title = "Tap the level to fill an area with the selected block";
+    fillBtn.onclick = () => {
+      filling = !filling;
+      fillBtn.classList.toggle("green", filling);
+      if (filling && linking) { linking = false; linkSel = null; linkBtn.classList.remove("green"); render(); }
+      if (filling) toast("🪣 Fill is on: tap an area to fill it");
+    };
+    const fillFrom = (cx, cy) => {
+      if (cy < 0 || cy >= grid.length || cx < 0 || cx >= grid[0].length) return;
+      const want = sel === ERASER ? AIR : sel;
+      // blocks with a setting or only one allowed are placed one at a time
+      if ("PKO".includes(baseOf(want)) || isDoor(want)) { toast("Fill can't do that block; place it by hand"); return; }
+      const target = grid[cy][cx];
+      if (target === want) return;
+      pushUndo();
+      const stack = [[cx, cy]];
+      while (stack.length) {
+        const [x, y] = stack.pop();
+        if (y < 0 || y >= grid.length || x < 0 || x >= grid[0].length || grid[y][x] !== target) continue;
+        grid[y][x] = want;
+        stack.push([x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]);
+      }
+      autosave();
+      render();
     };
 
     const undoBtn = el("button", "small", "↶ Undo");
@@ -3019,7 +3284,7 @@
 
     const lenLabel = el("span", "hint");
 
-    tools.append(modeBtn, undoBtn, leftBtn, rightBtn, floorBtn,
+    tools.append(modeBtn, fillBtn, linkBtn, undoBtn, leftBtn, rightBtn, floorBtn,
       shorterBtn, longerBtn, lowerBtn, higherBtn, clearBtn, lenLabel);
     gridPanel.appendChild(tools);
     gridPanel.appendChild(
@@ -3039,7 +3304,7 @@
     };
 
     const setWidth = (w) => {
-      if (editing === "arena") { toast("The boss arena is always one screen wide"); return; }
+      if (editing === "arena" || editing === "plains") { toast("This arena is always one screen wide"); return; }
       w = clamp(w, editing === "crash" ? ARENA_W : 20, 400);
       if (w === grid[0].length) return;
       pushUndo();
@@ -3054,7 +3319,7 @@
     };
 
     const setHeight = (h) => {
-      if (editing !== "level") { toast("Arenas are always one screen tall"); return; }
+      if (editing !== "level" && editing !== "back") { toast("Arenas are always one screen tall"); return; }
       h = clamp(h, H, MAX_H);
       const add = h - grid.length;
       if (!add) { toast(h === H ? "Levels can't be lower than one screen" : `Levels can be up to ${MAX_H} tall`); return; }
@@ -3070,7 +3335,11 @@
       const moved = {};
       for (const [k, v] of Object.entries(notes)) {
         const [x, y] = k.split(",").map(Number);
-        if (y + add >= 0) moved[noteKey(x, y + add)] = v;
+        if (y + add < 0) continue;
+        // a teleport's link points at a square too, which has moved as well
+        const link = typeof v === "string" && /^\d+,\d+$/.test(v) && baseOf(levelG()[y + add][x]) === TELEPORT;
+        const [lx, ly] = link ? v.split(",").map(Number) : [];
+        moved[noteKey(x, y + add)] = link ? noteKey(lx, ly + add) : v;
       }
       setNotes(moved);
       autosave();
@@ -3087,7 +3356,7 @@
       if (ch === "h" && TRAP_OVER[cur]) ch = TRAP_OVER[cur];
       else if (TRAP_OVER[ch] && isHiddenTnt(cur)) ch = TRAP_OVER[ch];
       const kind = baseOf(ch);
-      const want = kind === "O" ? stopSecs : kind === "K" ? (dialogText.trim() || "Hello!") : undefined;
+      const want = kind === "O" ? stopSecs : kind === "K" ? (dialogText.trim() || "Hello!") : kind === UP_LIFT_SHORT ? upBlocks : undefined;
       // re-tapping a Stop or Dialog block with a new setting updates it
       if (cur === ch && (want === undefined || notes[noteKey(cx, cy)] === want)) return false;
       if (want !== undefined) notes[noteKey(cx, cy)] = want;
@@ -3122,6 +3391,8 @@
     canvas.addEventListener("pointerdown", (e) => {
       if (mode !== "draw") return;
       e.preventDefault();
+      if (filling) { const c = cellFrom(e); fillFrom(c.x, c.y); return; }
+      if (linking) { const c = cellFrom(e); linkTap(c.x, c.y); return; }
       painting = true;
       pushUndo();
       const c = cellFrom(e);
@@ -3176,6 +3447,8 @@
         Art.drawBackground(ctx, shownBg(), view, canvas.height, 0, TS, 0, null);
         ctx.restore();
       }
+      syncLayers();
+      if (editing === "level") drawBackLayer(ctx, parked.back, 0, w - 1, 0, grid.length - 1, TS, 0, animT);
 
       for (let y = 0; y < grid.length; y++) {
         for (let x = 0; x < w; x++) {
@@ -3184,9 +3457,9 @@
             if (overOf(ch)) {
               drawTile(ctx, overOf(ch), x * TS, y * TS, TS, animT, false);
               drawTile(ctx, "h", x * TS, y * TS, TS, animT, false);
-            } else if (isMob(ch)) {
+            } else if (isMob(ch) || (CRITTERS.includes(baseOf(ch)) && baseOf(ch) !== SLIME_MOB)) {
               Art.drawSprite(ctx, ch, x * TS + TS * 0.05, (y - 1) * TS, TS * 0.9, TS * 2);
-            } else if (isDoor(ch)) {
+            } else if (isDoor(ch) || baseOf(ch) === ELEV_DOOR) {
               Art.drawSprite(ctx, ch, x * TS, (y - 1) * TS, TS, TS * 2);
             } else {
               drawTile(ctx, ch, x * TS, y * TS, TS, animT, y > 0 && isSolid(grid[y - 1][x]));
@@ -3197,11 +3470,53 @@
       for (let y = 0; y < grid.length; y++) {
         for (let x = 0; x < w; x++) if ("WY".includes(baseOf(grid[y][x]))) drawCone(ctx, grid, x, y, TS, 0, true);
       }
+      if (editing === "level") {
+        ctx.save();
+        ctx.strokeStyle = "rgba(244, 240, 255, 0.85)";
+        ctx.lineWidth = 3;
+        ctx.setLineDash([8, 6]);
+        for (const [k, v] of Object.entries(notes)) {
+          const [x, y] = k.split(",").map(Number);
+          if (baseOf((grid[y] || [])[x]) !== TELEPORT || typeof v !== "string" || k > v) continue; // each pair once
+          const [px, py] = v.split(",").map(Number);
+          ctx.beginPath();
+          ctx.moveTo((x + 0.5) * TS, (y + 0.5) * TS);
+          ctx.lineTo((px + 0.5) * TS, (py + 0.5) * TS);
+          ctx.stroke();
+        }
+        ctx.restore();
+        if (linking && linkSel) {
+          const [sx, sy] = linkSel.split(",").map(Number);
+          ctx.save();
+          ctx.globalAlpha = 0.5 + 0.4 * Math.sin(animT * 6);
+          ctx.strokeStyle = "#ffd54a";
+          ctx.lineWidth = 4;
+          ctx.strokeRect(sx * TS + 2, sy * TS + 2, TS - 4, TS - 4);
+          ctx.fillStyle = "rgba(255, 213, 74, 0.35)";
+          ctx.fillRect(sx * TS, sy * TS, TS, TS);
+          ctx.restore();
+        }
+      }
+      if (editing === "back") {
+        ctx.save();
+        ctx.globalAlpha = 0.35;
+        const lv = parked.level;
+        for (let y = 0; y < lv.length; y++) {
+          for (let x = 0; x < w; x++) if (lv[y][x] !== AIR) drawTile(ctx, overOf(lv[y][x]) || lv[y][x], x * TS, y * TS, TS, animT, false);
+        }
+        ctx.restore();
+      }
 
       if (editing === "arena") {
         ctx.save();
         ctx.globalAlpha = 0.45;
         Art.drawSprite(ctx, "boss", BOSS_X * TS, BOSS_TOP * TS, 24 * BOSS_PX * TS, 32 * BOSS_PX * TS);
+        ctx.restore();
+      } else if (editing === "plains") {
+        ctx.save();
+        ctx.globalAlpha = 0.45;
+        drawTile(ctx, TELEPORT, (PLAINS_PORTAL.x - 0.7) * TS, (PLAINS_PORTAL.y - 0.7) * TS, TS * 2.4, 0, false);
+        Art.drawSprite(ctx, "zombie", (PLAINS_PORTAL.x + 0.1) * TS, (H - 1 - MOB_H) * TS, MOB_W * TS, MOB_H * TS);
         ctx.restore();
       } else if (editing === "crash") {
         ctx.save();
@@ -3219,13 +3534,14 @@
       for (let y = 0; y < grid.length; y++) {
         for (let x = 0; x < w; x++) {
           const ch = baseOf(grid[y][x]);
-          if (ch !== "O" && ch !== "K") continue;
+          if (ch !== "O" && ch !== "K" && ch !== UP_LIFT_SHORT) continue;
           const n = notes[noteKey(x, y)];
-          let label = ch === "O" ? (n || STOP_DEFAULT) + "s" : String(n || "…");
+          let label = ch === "O" ? (n || STOP_DEFAULT) + "s" : ch === UP_LIFT_SHORT ? "↑" + (n || UP_DEFAULT) : String(n || "…");
           if (label.length > 16) label = label.slice(0, 15) + "…";
-          ctx.textAlign = ch === "O" ? "center" : "left";
-          const lx = ch === "O" ? (x + 0.5) * TS : x * TS + 2;
-          const ly = ch === "O" ? y * TS + TS * 0.36 : y * TS;
+          const mid = ch === "O" || ch === UP_LIFT_SHORT;
+          ctx.textAlign = mid ? "center" : "left";
+          const lx = mid ? (x + 0.5) * TS : x * TS + 2;
+          const ly = mid ? y * TS + TS * 0.36 : y * TS;
           ctx.strokeText(label, lx, ly);
           ctx.fillText(label, lx, ly);
         }
@@ -3275,25 +3591,30 @@
 
   // blockdash.js's own names that the play files (blockdash-play-*.js) use
   const BD = {
-    AIR, ARENA_W, arenaBgOf, arenaGrid, Art, baseOf, bestKey, bgOf, BLAZE_DRIFT, BLAZE_MAX,
-    BLAZE_REACH, BLAZE_SHOOT, blinkOn, BLOCK_STEP, BOSS_BODY, BOSS_HP, BOSS_PX,
+    AIR, ARENA_W, arenaBgOf, arenaGrid, ARROW_SPEED, Art, baseOf, bestKey, bgOf, BLAZE_DRIFT,
+    BLAZE_MAX, BLAZE_REACH, BLAZE_SHOOT, blinkOn, BLOCK_STEP, BOSS_BODY, BOSS_HP, BOSS_PX,
     BOSS_SHOT_SPEED, BOSS_STAGE, BOSS_TOP, BOSS_X, BOUNCE_V, builtinLevels, BULLET_LIFE,
-    BULLET_SPEED, BULLET_TURN, CAT_LOOK, CHASE_SPEED, clamp, COIN_VALUE, COYOTE, CRASH,
-    crashArenaGrid, crashBgOf, CUT_END, dailyLevelDone, dailyNote, dayKey, DOOR_SWING,
-    drawCone, drawExplosion, drawPlayer, drawTile, EFFECT_TIME, el, ELEVATOR, ENDER_AHEAD,
-    ENDER_BULLET_SPEED, ENDER_NOTICE, ENTER, ENTER_DONE, FALL_ACCEL, FALL_MAX, FALL_PUSH,
-    findSpawn, FIREBALL_SPEED, FLOWED, FLY_THRUST, FLY_UP_V, FLYING_PETS, GALAXY_H,
-    GALAXY_KEY, GALAXY_LOOK, GALAXY_SHOOT, GALAXY_W, galaxyWon, getBest, GHOST_BONUS,
-    GHOST_EVERY, GLIDE_FALL, GLITCH_BLOCKS, GLITCH_COLORS, GLITCH_EVERY, GLITCH_FIX_TIME,
-    GLITCH_HOP, GLITCH_HP, GLITCH_IRON, GLITCH_SIZE, GLITCH_SOLID, GLITCH_SPOTS,
-    GLITCH_STONE, glitchLookOn, GRAVITY, H, inCone, isDoor, isHidden, isHiddenTnt, isLava,
-    isLogged, isOpenDoor, isSolid, JUMP_BUFFER, JUMP_V, KEY, lapSpeed, LAVA_FALL, LAVA_RISE,
-    LIFT, loadBag, loadPets, LOGGABLE, MEGA_BASE, MEGA_BLAST,
-    MEGA_BOUNCE_V, MEGATITE_PAYS, MOB_H, MOB_W, musicOf, nextToWater, noteKey, overOf,
-    PET_SOUND, PLAYER_H, PLAYER_W, POOF_AFTER, PUSH, RAIN_SPEED, saveBag, savePets, setBest,
-    SHIELD_TIME, SHOOT_EVERY, SHOVE, SHOVE_DIST, SINK_MAX, SPAWN_EVERY, SPEED_BASE,
-    SPEED_FAST, SPEED_SLOW, STILL_PETS, STOP_DEFAULT, SWIM_V, SWORDS, TELEPORT, TILES, toast,
-    trailOn, WARP_TIME, WATCH_CYCLE, WATCH_OPEN, WATER, WATER_GRAVITY, WATER_SLOW
+    BULLET_SPEED, BULLET_TURN, BUTTON, BUTTON_ON, CAT_LOOK, CHASE_SPEED, clamp, COIN_VALUE,
+    COYOTE, CRASH, crashArenaGrid, crashBgOf, CUT_END, dailyLevelDone, dailyNote, dayKey,
+    DOOR_SWING, drawBackLayer, drawCone, drawExplosion, drawPlayer, drawTile, EFFECT_TIME,
+    el, ELEV_DOOR, ELEV_DOOR_OPEN, ELEVATOR, ELEVATOR_BOOST, ENDER_AHEAD, ENDER_BULLET_SPEED,
+    ENDER_NOTICE, ENTER, ENTER_DONE, FALL_ACCEL, FALL_MAX, FALL_PUSH, findSpawn,
+    FIREBALL_SPEED, FLOWED, FLY_THRUST, FLY_UP_V, FLYING_PETS, GALAXY_H, GALAXY_KEY,
+    GALAXY_LOOK, GALAXY_SHOOT, GALAXY_W, galaxyWon, getBest, GHOST_BONUS, GHOST_EVERY,
+    GLIDE_FALL, GLITCH_BLOCKS, GLITCH_COLORS, GLITCH_EVERY, GLITCH_FIX_TIME, GLITCH_HOP,
+    GLITCH_HP, GLITCH_IRON, GLITCH_SIZE, GLITCH_SOLID, GLITCH_SPOTS, GLITCH_STONE,
+    glitchLookOn, GRAVITY, H, HEALTH_MAX, HURT_SAFE, inCone, isDoor, isHidden, isHiddenTnt,
+    isLava, isLogged, isOpenDoor, isSolid, isWire, JUMP_BUFFER, JUMP_V, KEY, LAMP, lapSpeed,
+    LAVA_FALL, LAVA_RISE, LEVER, LEVER_ON, LIFT, loadBag, loadPets, LOGGABLE, MEGA_BASE,
+    MEGA_BLAST, MEGA_BOUNCE_V, MEGATITE_PAYS, MOB_H, MOB_W, musicOf, nextToWater, noteKey,
+    overOf, PET_SOUND, PLAINS_PORTAL, plainsGrid, PLAYER_H, PLAYER_W, POOF_AFTER, PUSH,
+    RAIN_SPEED, saveBag, savePets, setBest, SHIELD_TIME, SHOOT_EVERY, SHOVE, SHOVE_DIST,
+    SINK_MAX, SKELETON, SKELETON_SHOOT, SKELETON_SPEED, SLIME_MOB, SLIME_SIZES,
+    SOLDIER_BLAST, SOLDIER_FUSE, SOLDIER_SPEED, SPAWN_EVERY, SPEED_BASE, SPEED_FAST,
+    SPEED_SLOW, STILL_PETS, STOP_DEFAULT, SWIM_V, SWORDS, TELEPORT, TILES, TNT_SOLDIER,
+    toast, trailOn, UP_DEFAULT, UP_LIFT, UP_LIFT_SHORT, UP_SPEED, WARP_TIME, WATCH_CYCLE,
+    WATCH_OPEN, WATER, WATER_GRAVITY, WATER_SLOW, WIRE, WIRES, ZOMBIE_HP, ZOMBIE_LIVES,
+    ZOMBIE_SPEED, ZOMBIE_TRAP, ZOMBIE_TRAP_USED
   };
 
   // `chain` links a level to the ones after it: { i, count, carried, playNext }.
@@ -3334,6 +3655,8 @@
     S.width = S.template[0].length;
     S.spawn = findSpawn(S.template);
     const home = { template: S.template, width: S.width, spawn: S.spawn, looks: S.looks };
+    // the level's background layer (just for looks), the level's size
+    P.backGrid = level.back ? fitLayer(rowsToGrid(level.back), S.width, S.template.length) : null;
 
     const header = el("div", "row");
     header.appendChild(el("h1", null, level.name || "Level"));
@@ -3439,7 +3762,7 @@
       watchers: [], mobs: [], runT: 0, warp: null, free: false, moveL: false, moveR: false,
       stopT: 0, talk: null, talkAt: 0, poofed: false, inBoss: false, boss: null,
       introSeen: false, cutT: 0, downT: 0, knock: 0, plats: [], flipT: 0, fallers: [], camY: 0,
-      crash: false, armor: galaxyWon() ? 1 : 0, slides: [], blockT: 0, tpSkip: null, entersLeft: 0,
+      crash: false, armor: galaxyWon() ? 1 : 0, slides: [], blockT: 0, tpSkip: null, entersLeft: 0, doorsLanded: [], critters: [], arrows: [], hp: 4, hurtT: 0, risers: [], powered: new Set(),
     });
 
     const showItems = () => {
@@ -3603,8 +3926,14 @@
       S.fireballs = [];
       S.watchers = [];
       S.mobs = [];
+      S.critters = [];
+      S.risers = [];
+      S.hp = HEALTH_MAX;
+      S.hurtT = 0;
+      S.arrows = [];
       S.plats = [];
       S.fallers = [];
+      S.doorsLanded = [];
       S.runT = 0;
       for (let y = 0; y < S.grid.length; y++) {
         for (let x = 0; x < S.width; x++) {
@@ -3623,6 +3952,10 @@
             S.watchers.push({ x, y, ph: (x * 0.37) % WATCH_CYCLE, stare: ch === "Y" });
           }
           // creatures live outside the grid while you play; they restart on every respawn
+          if (CRITTERS.includes(baseOf(ch))) {
+            S.grid[y][x] = AIR;
+            S.critters.push(makeCritter(ch, x, y));
+          }
           if (isMob(ch)) {
             S.grid[y][x] = AIR;
             S.mobs.push({ kind: ch, look: S.looks[noteKey(x, y)], x: x + (1 - MOB_W) / 2, y: y + 1 - MOB_H, vy: 0,
@@ -3631,10 +3964,14 @@
         }
       }
       quench(S.grid);
+      S.zombie = null;
+      S.zombieQueued = false;
+      S.powered = new Set();
       S.slides = [];
       S.blockT = 0;
       S.tpSkip = null;
       S.entersLeft = S.grid.reduce((n, row) => n + row.filter((ch) => baseOf(ch) === ENTER).length, 0);
+      P.updatePower();
       for (const m of S.movers) if (S.grid[m.tip][m.x] === "s") m.done = true;
       S.player = {
         x: at.x + 0.15,

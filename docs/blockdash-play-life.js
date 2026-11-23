@@ -8,7 +8,7 @@ window.BDPlayLife = (S, P, BD) => {
   const {
     bestKey, builtinLevels, dailyLevelDone, dailyNote, dayKey, el, GALAXY_KEY, galaxyWon,
     getBest, GHOST_BONUS, H, loadBag, loadPets, musicOf, noteKey, PLAYER_H, PLAYER_W,
-    saveBag, savePets, setBest, SHIELD_TIME, toast
+    saveBag, savePets, setBest, SHIELD_TIME, TELEPORT, toast
   } = BD;
   const {
     bag, chain, endRun, fromEditor, hasEyes, hasPearls, hasRods, jumpBtn, level, msgSlot,
@@ -231,8 +231,18 @@ window.BDPlayLife = (S, P, BD) => {
   };
 
   // tile: "I" for Blink, or the Auto teleport
+  // a linked Auto teleport's partner square, or null. Teleports never send
+  // you backwards, so a link only works from the one further back.
+  const linkOf = (x, y) => {
+    const v = P.notes[noteKey(x, y)];
+    if (typeof v !== "string" || !/^\d+,\d+$/.test(v)) return null;
+    const [px, py] = v.split(",").map(Number);
+    if (px < x) return null;
+    return S.grid[py] && S.grid[py][px] === TELEPORT ? { x: px, y: py } : null;
+  };
+
   const blink = (fromX, fromY, tile = "I") => {
-    const best = nextAhead(tile, fromX, fromY);
+    const best = (tile === TELEPORT && linkOf(fromX, fromY)) || nextAhead(tile, fromX, fromY);
     if (!best) return false;
     sparkle(S.player.x + PLAYER_W / 2, S.player.y + PLAYER_H / 2, ["#b46bff", "#f4f0ff"]);
     S.player.x = best.x + (1 - PLAYER_W) / 2;
@@ -247,7 +257,7 @@ window.BDPlayLife = (S, P, BD) => {
   };
 
   return {
-    nextAhead,
+    linkOf, nextAhead,
     blink, boom, die, ember, explode, fakeCrash, gotRod, puff, sparkle, win
   };
 };
