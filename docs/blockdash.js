@@ -1245,6 +1245,17 @@
     ctx.restore();
   };
 
+  // the blocks someone placed in the level: not the Start, and not the grass
+  // floor along the bottom that every new level starts with (and Fill floor
+  // makes); a bottom square changed to anything else does count
+  const countBlocks = (g) => {
+    let n = 0;
+    g.forEach((row, y) => row.forEach((ch) => {
+      if (ch === AIR || ch === "P" || (y === g.length - 1 && ch === "g")) return;
+      n++;
+    }));
+    return n;
+  };
   const countDiamonds = (g) => {
     let n = 0;
     for (const row of g) for (const ch of row) if (baseOf(ch) === "d") n++;
@@ -1523,7 +1534,7 @@
     card.appendChild(
       el("div", "name",
         `${lvl.name}<span class="meta">${g[0].length} blocks long · ` +
-        `${countDiamonds(g)} diamonds${best ? ` · best ${best}` : ""}</span>`),
+        `${countBlocks(g)} blocks placed${best ? ` · best ${best}` : ""}</span>`),
     );
     actions.forEach((b) => card.appendChild(b));
     return card;
