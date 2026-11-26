@@ -555,3 +555,6 @@ button.tool-btn.sel {
 .cat-tabs { display: flex; flex-wrap: wrap; gap: 0; border-bottom: 3px solid var(--grass); margin-bottom: 10px; }
 .cat-tabs button { margin: 0; }
 .cat-hide { display: none !important; }
+/* under the game: your attempts and wins, and everyone's */
+.play-stats { display: flex; flex-wrap: wrap; gap: 4px 18px; margin-top: 6px; font-size: 13px; color: var(--muted, #9aa0b4); }
+.play-stats:empty { display: none; }

@@ -4851,6 +4851,10 @@
     canvas.height = 540;
     panel.appendChild(canvas);
     const ctx = canvas.getContext("2d");
+    // your attempts and wins on this level, and everyone's
+    const counter = window.BDPlayCounts?.forPlay(level, bestKey(level), fromEditor);
+    if (counter) panel.appendChild(counter.el);
+    P.counter = counter; // the win is counted in blockdash-play-life.js
 
     const msgSlot = el("div");
     panel.appendChild(msgSlot);
@@ -5152,6 +5156,7 @@
       S.deadT = 0;
       S.attempts++;
       attEl.textContent = "Attempt " + S.attempts;
+      counter?.attempt();
       msgSlot.innerHTML = "";
       jumpBtn.disabled = false;
       S.knock = 0;
