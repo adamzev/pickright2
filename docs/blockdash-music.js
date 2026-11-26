@@ -28,6 +28,8 @@
     // hidden: only ever plays in The Glitch's fight, never listed
     glitch: { name: "Glitch", icon: "🌀", what: "", hidden: true },
     off: { name: "No music", icon: "🔇", what: "Quiet. Boss fights stay quiet too." },
+    // a level's own song, made in the Music Maker; only that level plays it
+    custom: { name: "My song", icon: "🎼", what: "Made in the Music Maker.", hidden: true },
   };
   // every song gets a mega version, listed once it's unlocked in the shop
   for (const [k, sg] of Object.entries(SONGS)) {
@@ -39,7 +41,7 @@
   let settings = { song: "calm", vol: "mid" };
   try {
     const s = JSON.parse(localStorage.getItem(KEY) || "{}") || {};
-    if (SONGS[s.song]) settings.song = s.song;
+    if (SONGS[s.song] || /^my_/.test(s.song)) settings.song = s.song; // my_ ones arrive later (mine)
     if (VOLUMES[s.vol]) settings.vol = s.vol;
   } catch (e) { /* first visit */ }
   const save = () => {
@@ -58,6 +60,8 @@
   let upgraded = [], shift = 0, section = null, muffle = null, songDrums = true;
 
   const freq = (m) => 440 * Math.pow(2, (m - 69) / 12);
+  const MASTER_LEVEL = 0.36; // was 0.5: everything a bit quieter
+  const HARSH = ["pulse", "square", "sawtooth"]; // these get their edges filed off (see tone)
 
   const setup = () => {
     const AC = window.AudioContext || window.webkitAudioContext;
@@ -66,8 +70,24 @@
     const comp = ctx.createDynamicsCompressor();
     comp.connect(ctx.destination);
     master = ctx.createGain();
-    master.gain.value = VOLUMES[settings.vol] * 0.5;
-    master.connect(comp);
+    master.gain.value = VOLUMES[settings.vol] * MASTER_LEVEL;
+    // Softer overall: the very top is rounded off (it's what makes beeps
+    // grate), and a little room echo makes it sound played, not printed.
+    const tame = ctx.createBiquadFilter();
+    tame.type = "lowpass";
+    tame.frequency.value = 4500;
+    tame.Q.value = 0.5;
+    master.connect(tame).connect(comp);
+    const room = ctx.createConvolver();
+    const len = Math.floor(ctx.sampleRate * 1.6), ir = ctx.createBuffer(2, len, ctx.sampleRate);
+    for (let ch = 0; ch < 2; ch++) {
+      const data = ir.getChannelData(ch);
+      for (let i = 0; i < len; i++) data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3);
+    }
+    room.buffer = ir;
+    const roomLevel = ctx.createGain();
+    roomLevel.gain.value = 0.22;
+    tame.connect(room).connect(roomLevel).connect(comp);
     // a soft echo, mostly for the calm song's notes to ring out
     echo = ctx.createDelay(1);
     echo.delayTime.value = 0.42;
@@ -77,9 +97,10 @@
     wet.gain.value = 0.5;
     echo.connect(fb).connect(echo);
     echo.connect(wet).connect(master);
-    // a 25% pulse wave sounds more like an old game console than a plain square
+    // a 25% pulse wave sounds more like an old game console than a plain
+    // square; its high overtones are turned down so it's less buzzy
     const n = 32, re = new Float32Array(n), im = new Float32Array(n);
-    for (let i = 1; i < n; i++) re[i] = (2 * Math.sin(i * Math.PI * 0.25)) / (i * Math.PI);
+    for (let i = 1; i < n; i++) re[i] = (2 * Math.sin(i * Math.PI * 0.25)) / (i * Math.PI) / Math.pow(i, 0.6);
     pulse = ctx.createPeriodicWave(re, im);
     noise = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
     const d = noise.getChannelData(0);
@@ -101,7 +122,9 @@
     // slide: glide to another note over the note's length (bloops, sirens)
     if (o.slide != null) osc.frequency.exponentialRampToValueAtTime(freq(o.slide), t + (o.decay || dur));
     const g = ctx.createGain();
-    const a = o.attack || 0.005, peak = o.gain;
+    const harsh = HARSH.includes(o.wave);
+    // a softer start, so notes don't click on
+    const a = Math.max(o.attack || 0.005, harsh ? 0.012 : 0.005), peak = o.gain;
     g.gain.setValueAtTime(0.0001, t);
     g.gain.linearRampToValueAtTime(peak, t + a);
     if (o.decay) g.gain.exponentialRampToValueAtTime(0.0001, t + a + o.decay);
@@ -110,10 +133,10 @@
       g.gain.exponentialRampToValueAtTime(0.0001, t + dur + (o.release || 0.03));
     }
     let out = g;
-    if (o.lowpass) {
+    if (o.lowpass || harsh) {
       const f = ctx.createBiquadFilter();
       f.type = "lowpass";
-      f.frequency.value = o.lowpass;
+      f.frequency.value = o.lowpass || Math.min(2800, freq(m) * 6); // keep a few overtones, lose the fizz
       g.connect(f);
       out = f;
     }
@@ -305,7 +328,93 @@
   const CALM_NOTES = [72, 74, 76, 79, 81, 84, 86, 88];
   let calmAt = 3;
 
+  // ----- the Music Maker's songs -----
+  // A song is a row of boxes, one bar (16 steps) each. Every box has a premade
+  // tune piece, how far it's moved up or down (p, in steps of the scale, so it
+  // always stays in key) and a drum beat. The bass follows on its own.
+  // { bpm, mood, sound, slots: [{ t: tune, p: up/down, b: beat }] }
+  // Tunes are [step, note, length] with notes counted up the scale from the
+  // home note (0); more can be added here and the Music Maker lists them.
+  const MAKER = {
+    SLOTS: 16,
+    TUNES: {
+      hop: { name: "Hop", icon: "🐇", notes: [[0, 0, 2], [2, 2, 2], [4, 4, 2], [6, 2, 2], [8, 0, 2], [10, 2, 2], [12, 4, 4]] },
+      rocket: { name: "Rocket", icon: "🚀", notes: [[0, 0, 2], [2, 1, 2], [4, 2, 2], [6, 3, 2], [8, 4, 2], [10, 5, 2], [12, 6, 2], [14, 7, 2]] },
+      parachute: { name: "Parachute", icon: "🪂", notes: [[0, 7, 2], [2, 6, 2], [4, 5, 2], [6, 4, 2], [8, 3, 2], [10, 2, 2], [12, 1, 2], [14, 0, 2]] },
+      wave: { name: "Wave", icon: "🌊", notes: [[0, 2, 2], [2, 3, 2], [4, 4, 2], [6, 3, 2], [8, 2, 2], [10, 1, 2], [12, 0, 4]] },
+      ding: { name: "Ding dong", icon: "🔔", notes: [[0, 4, 7], [8, 0, 7]] },
+      fanfare: { name: "Fanfare", icon: "🎺", notes: [[0, 0, 1], [2, 0, 1], [4, 0, 1], [6, 4, 6], [12, 4, 1], [14, 7, 2]] },
+      shout: { name: "Shout", icon: "📣", notes: [[0, 4, 2], [2, 4, 2], [4, 5, 2], [6, 4, 6], [12, 2, 4]] },
+      stomp: { name: "Stomp", icon: "🥾", notes: [[0, 0, 3], [4, 0, 1], [6, 2, 2], [8, 4, 3], [12, 2, 4]] },
+      jumpy: { name: "Jumpy", icon: "🦘", notes: [[0, 0, 2], [2, 7, 2], [4, 0, 2], [6, 7, 2], [8, 2, 2], [10, 9, 2], [12, 4, 2], [14, 9, 2]] },
+      twirl: { name: "Twirl", icon: "🌀", notes: [[0, 4, 1], [1, 5, 1], [2, 4, 1], [3, 3, 1], [4, 4, 2], [8, 2, 1], [9, 3, 1], [10, 2, 1], [11, 1, 1], [12, 2, 4]] },
+      sparkle: { name: "Sparkle", icon: "⭐", notes: [[0, 7, 1], [2, 9, 1], [4, 11, 1], [6, 9, 1], [8, 7, 1], [10, 9, 1], [12, 11, 1], [14, 14, 2]] },
+      long: { name: "Long note", icon: "🐢", notes: [[0, 2, 15]] },
+      end: { name: "The end", icon: "🏁", notes: [[0, 4, 2], [2, 2, 2], [4, 1, 2], [6, -1, 2], [8, 0, 8]] },
+      quiet: { name: "Quiet", icon: "🤫", notes: [] },
+    },
+    // drums for one bar: kick, snare and hi-hat steps; bass: how the bass plays
+    BEATS: {
+      pop: { name: "Pop", icon: "🥁", k: [0, 8], s: [4, 12], h: [0, 2, 4, 6, 8, 10, 12, 14], bass: "half" },
+      dance: { name: "Dance", icon: "💃", k: [0, 4, 8, 12], s: [4, 12], h: [2, 6, 10, 14], bass: "pump" },
+      rock: { name: "Rock", icon: "🎸", k: [0, 7, 8, 10], s: [4, 12], h: [0, 2, 4, 6, 8, 10, 12, 14], bass: "pump" },
+      march: { name: "March", icon: "🪖", k: [0, 8], s: [0, 3, 4, 8, 11, 12, 14], h: [], bass: "half" },
+      soft: { name: "Soft", icon: "🌙", k: [0], s: [], h: [8], bass: "long" },
+      roll: { name: "Drum roll", icon: "💥", k: [0], s: [8, 10, 12, 13, 14, 15], h: [], bass: "long" },
+      none: { name: "No drums", icon: "🔇", k: [], s: [], h: [], bass: "long" },
+    },
+    MOODS: { happy: { name: "Happy", icon: "😀", scale: [0, 2, 4, 5, 7, 9, 11] }, spooky: { name: "Spooky", icon: "👻", scale: [0, 2, 3, 5, 7, 8, 10] } },
+    SOUNDS: {
+      beep: { name: "Beep", icon: "🎮", o: { wave: "pulse", gain: 0.16 } },
+      bell: { name: "Bell", icon: "🔔", o: { wave: "sine", gain: 0.24, decay: 0.7, echo: true } },
+      buzz: { name: "Buzz", icon: "🎸", o: { wave: "sawtooth", gain: 0.1, lowpass: 2200 } },
+      flute: { name: "Flute", icon: "🪈", o: { wave: "triangle", gain: 0.28, attack: 0.03 } },
+    },
+  };
+  let customSong = null;
+  // a note counted up the scale from the home note, as a piano key number
+  const scaleNote = (deg, mood, home) => {
+    const sc = (MAKER.MOODS[mood] || MAKER.MOODS.happy).scale;
+    return home + 12 * Math.floor(deg / 7) + sc[((deg % 7) + 7) % 7];
+  };
+  // How many bars (boxes' worth) a tune lasts: piano tunes can be up to 4.
+  const tuneBars = (tune) => Math.max(1, Math.min(4, Math.ceil(Math.max(0, ...((tune && tune.notes) || []).map(([at, , len]) => at + len)) / 16)));
+  // a song carries copies of any tunes made on the piano (song.tunes)
+  const tuneIn = (song, k) => (song.tunes && song.tunes[k]) || MAKER.TUNES[k];
+  // which box is playing at step s, and how far into it: [slot index, step in it]
+  const slotAt = (song, s) => {
+    const bars = song.slots.map((x) => tuneBars(tuneIn(song, x.t)));
+    let bar = Math.floor(s / 16) % bars.reduce((a, b) => a + b, 0);
+    for (let k = 0; k < bars.length; k++) {
+      if (bar < bars[k]) return [k, bar * 16 + (s % 16)];
+      bar -= bars[k];
+    }
+    return [0, 0];
+  };
+  const makerStep = (song, s, t, d) => {
+    if (!song || !song.slots.length) return;
+    const [k, local] = slotAt(song, s), slot = song.slots[k], i = s % 16;
+    const tune = tuneIn(song, slot.t), beat = MAKER.BEATS[slot.b] || MAKER.BEATS.none;
+    const o = (MAKER.SOUNDS[song.sound] || MAKER.SOUNDS.beep).o;
+    if (tune) {
+      for (const [at, deg, len] of tune.notes) {
+        if (at === local) tone(t, scaleNote(deg + slot.p, song.mood, 72), d * len * 0.92, o);
+      }
+    }
+    // the bass: the home note of where the tune's been moved to, down low
+    const root = scaleNote(slot.p, song.mood, 36);
+    const low = root >= 48 ? root - 12 : root;
+    if (beat.bass === "pump" ? i % 2 === 0 : beat.bass === "half" ? i % 8 === 0 : i === 0) {
+      tone(t, low + (beat.bass === "pump" && i % 4 === 2 ? 12 : 0), d * (beat.bass === "pump" ? 1.8 : beat.bass === "half" ? 7.5 : 15.5), { wave: "triangle", gain: 0.4 });
+    }
+    if (beat.k.includes(i)) kick(t);
+    if (beat.s.includes(i)) snare(t);
+    if (beat.h.includes(i)) hat(t);
+  };
+  const makerPlayer = (get) => ({ get bpm() { return (get() && get().bpm) || 120; }, step: (s, t, d) => makerStep(get(), s, t, d) });
+
   const PLAY = {
+    custom: makerPlayer(() => customSong),
     fire: {
       bpm: 168,
       step(s, t, d) {
@@ -694,7 +803,7 @@
   // ----- sound effects (pets) -----
   // They get their own output, because the song's `bus` is missing when
   // music is off and swapped out whenever the song changes.
-  let sfxBus = null, sfxAt = 0;
+  let sfxBus = null, sfxAt = 0, previewBus = null;
   const chirp = (t) => {
     tone(t, 91, 0.07, { wave: "sine", gain: 0.2, slide: 96 });
     tone(t + 0.1, 93, 0.07, { wave: "sine", gain: 0.2, slide: 98 });
@@ -713,6 +822,8 @@
     glitch: blips,
     galaxy: (t) => tone(t, 84, 0.3, { wave: "sine", gain: 0.15, slide: 96 }), // a spacey woo-oo
     cat: (t) => meow(t, 77, 0.35, 0.3),
+    // a horse: a quick wobbly neigh, high then sliding down
+    horse: (t) => { for (const [at, m] of [[0, 84], [0.12, 86], [0.24, 81]]) tone(t + at, m, 0.14, { wave: "sawtooth", gain: 0.07, lowpass: 2200, slide: m - 7 }); },
     dog: (t) => bark(t, 64, 0.35),
     frog: (t) => ribbit(t, 57, 0.3),
     parrot: chirp,
@@ -752,7 +863,8 @@
     if (muted || settings.song === "off") return null;
     if (inBoss) return inBoss;
     if (levelSong === "off") return null;
-    return levelSong || settings.song;
+    const k = levelSong || settings.song;
+    return SONGS[k] ? k : "calm"; // e.g. a song of yours that's been deleted
   };
 
   // ----- mega versions -----
@@ -764,7 +876,7 @@
   const MEGA_SPEED = 1.12;
   const LOOP = { calm: 128, end: 128, rain: 128, pirate: 48 }; // steps per time through; most are 64
   const loopOf = (k) => LOOP[k] || 64;
-  let root = null, padRoot = null, megaD = 0.1;
+  let root = null, padRoot = null, megaD = 0.1, lastD = 0.1;
 
   // the song's own drums are swapped for these
   const drum = (fn) => { songDrums = true; fn(); songDrums = false; };
@@ -847,6 +959,7 @@
     if (!playing || !ctx) return;
     const info = SONGS[playing], base = info.base || playing, song = PLAY[base];
     const d = 60 / (song.bpm * (info.mega ? MEGA_SPEED : 1)) / 4;
+    lastD = d;
     while (nextT < ctx.currentTime + 0.15) {
       if (info.mega) megaStep(base, step, nextT, d);
       else song.step(step, nextT, d);
@@ -869,7 +982,7 @@
     playing = want;
     clearInterval(timer);
     if (!want) return;
-    if (window.BDBadges) window.BDBadges.heard(want, Object.keys(SONGS).filter((k) => k !== "off" && !SONGS[k].secret && !SONGS[k].mega && !SONGS[k].hidden));
+    if (window.BDBadges) window.BDBadges.heard(want, Object.keys(SONGS).filter((k) => k !== "off" && !SONGS[k].secret && !SONGS[k].mega && !SONGS[k].hidden && !SONGS[k].mine));
     bus = ctx.createGain();
     muffle = ctx.createBiquadFilter();
     muffle.type = "lowpass";
@@ -912,6 +1025,39 @@
 
   window.BDMusic = {
     SONGS,
+    MAKER,
+    // the song the "My song" choice plays (a level's own, from the Music Maker)
+    custom(song) { customSong = song || null; },
+    // your saved songs from the Music Maker: [{ id, name, song }], listed as my_<id>
+    mine(list) {
+      for (const k of Object.keys(SONGS)) if (SONGS[k].mine) { delete SONGS[k]; delete PLAY[k]; }
+      for (const { id, name, song } of list) {
+        const k = "my_" + id;
+        SONGS[k] = { name, icon: "🎼", what: "Your song, made in the Music Maker.", mine: true };
+        PLAY[k] = makerPlayer(() => song);
+      }
+      update();
+    },
+    bpmOf: (k) => (PLAY[(SONGS[k] && SONGS[k].base) || k] || {}).bpm || 120,
+    // hear one box of a song once, when it's placed in the Music Maker
+    preview(song) {
+      if (!ctx || ctx.state !== "running") return;
+      if (muted) setMuted(false);
+      if (!sfxBus) { sfxBus = ctx.createGain(); sfxBus.connect(master); }
+      if (previewBus) previewBus.gain.setTargetAtTime(0, ctx.currentTime, 0.03); // stop the last one
+      previewBus = ctx.createGain();
+      previewBus.connect(sfxBus);
+      const songBus = bus, t0 = ctx.currentTime + 0.03, d = 60 / song.bpm / 4;
+      bus = previewBus;
+      songDrums = true;
+      const steps = 16 * tuneBars(tuneIn(song, song.slots[0].t));
+      try { for (let s = 0; s < steps; s++) makerStep(song, s, t0 + s * d, d); } finally { bus = songBus; }
+    },
+    tuneBars,
+    // which box of a Music Maker song is playing at step s
+    slotAt: (song, s) => slotAt(song, s)[0],
+    // which step you're hearing right now (the playing line in the Music Maker)
+    get stepNow() { return playing && ctx ? step - Math.ceil((nextT - ctx.currentTime) / lastD) : -1; },
     get muted() { return muted; },
     setMuted,
     VOLUMES,
@@ -948,7 +1094,7 @@
       if (!VOLUMES[k]) return;
       settings.vol = k;
       save();
-      if (ctx) master.gain.setTargetAtTime(VOLUMES[k] * 0.5, ctx.currentTime, 0.05);
+      if (ctx) master.gain.setTargetAtTime(VOLUMES[k] * MASTER_LEVEL, ctx.currentTime, 0.05);
     },
     // a level with its own song plays it until you leave; null goes back to yours
     level(k) {

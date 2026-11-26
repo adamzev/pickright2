@@ -7,23 +7,92 @@ window.BDPlayDraw = (S, P, BD) => {
   "use strict";
   const {
     AIR, arenaBgOf, Art, baseOf, bgOf, BLINK_TIME, blinkOn, BOSS_PX, BOSS_TOP, CAT_LOOK,
-    clamp, crashBgOf, DOOR_SWING, drawBackLayer, drawCone, drawExplosion, drawPlayer,
-    drawTile, el, ELEV_DOOR, ELEV_DOOR_OPEN, FLOWED, FLYING_PETS, GALAXY_H, GALAXY_LOOK,
-    GALAXY_W, GHOST_EVERY, GLITCH_COLORS, GLITCH_SIZE, GLITCH_STONE, glitchLookOn, H,
-    HEALTH_MAX, isDoor, isHidden, isLogged, isOpenDoor, isSolid, isWire, LAMP, LOGGABLE,
-    MOB_H, MOB_W, noteKey, overOf, PLAINS_PORTAL, PLAYER_H, PLAYER_W, POOF_AFTER, SKELETON,
-    SLIME_MOB, STILL_PETS, SWORDS, TNT_SOLDIER, trailOn, WARP_TIME, WATCH_CYCLE, WIRE, WIRES,
-    ZOMBIE_HP, ZOMBIE_LIVES
+    CAT_MOB, CAT_MOBS, clamp, crashBgOf, DOOR_SWING, drawBackLayer, drawCone, drawExplosion,
+    drawMiniQuarter, drawPlayer, drawTile, el, ELEV_DOOR, ELEV_DOOR_OPEN, FAN, FLOWED,
+    FLYING_PETS, GALAXY_H, GALAXY_LOOK, GALAXY_W, GHOST_EVERY, GLITCH_COLORS, GLITCH_SIZE,
+    GLITCH_STONE, glitchLookOn, H, HEALTH_MAX, isDoor, isHidden, isLogged, isOpenDoor,
+    isSolid, isWire, LAMP, LOGGABLE, MINIGAME, MOB_H, MOB_W, noteKey, overOf, PLAINS_PORTAL,
+    PLAYER_H, PLAYER_W, POOF_AFTER, SKELETON, SLEEPY_CAT, SLIME_MOB, STILL_PETS, SWORDS,
+    TNT_SOLDIER, trailOn, VAC_ESCAPE, vacInsideGrid, VACUUM, VILLAGER, WARP_TIME,
+    WATCH_CYCLE, WIRE, WIRES, ZOMBIE_HP, ZOMBIE_LIVES
   } = BD;
   const {
     bossMax, canvas, ctx, dragonAt, eyeOpen, hero, level, pet, petBase, showBoost, sword,
     trail, TS, VIEW_COLS
   } = P;
 
+  // A cat: asleep (with Zzz), scared (with !), or walking, facing the way it
+  // goes, with hearts once it's made friends and a "meow!" when bumped.
+  const drawCat = (c) => {
+    const x = (c.x - S.camX) * TS, y = c.y * TS, w = c.w * TS, h = c.h * TS;
+    const look = c.mood === "sleep" ? SLEEPY_CAT : c.mood === "scared" ? "catScared" : Math.floor(c.step * 5) % 2 ? "catWalk2" : CAT_MOB;
+    ctx.save();
+    if (c.face < 0 && c.mood !== "sleep") { ctx.translate(x + w, 0); ctx.scale(-1, 1); ctx.translate(-x, 0); }
+    Art.drawSprite(ctx, look, x, y, w, h);
+    ctx.restore();
+    ctx.textAlign = "center";
+    ctx.textBaseline = "bottom";
+    const say = (text, color, size, dy = 0) => {
+      ctx.font = `bold ${size}px ui-monospace, monospace`;
+      ctx.lineWidth = 3; ctx.strokeStyle = "rgba(0, 0, 0, 0.6)";
+      ctx.strokeText(text, x + w / 2, y - 2 + dy);
+      ctx.fillStyle = color; ctx.fillText(text, x + w / 2, y - 2 + dy);
+    };
+    if (c.mood === "sleep") say("z".repeat(1 + Math.floor(S.time * 1.5) % 3), "#c8d8ff", 14, -Math.sin(S.time * 2) * 3);
+    else if (c.mood === "scared") say("!", "#ff5a5a", 22);
+    else if (c.meowT > 0.8) say("meow!", "#ffffff", 13);
+    else if (c.t > 0) say("❤", "#ff6a8a", 16, -(2.5 - c.t) * 6);
+  };
+
+  // The giant vacuum: facing you, rocking as it rolls, with air rushing into
+  // its nozzle when it's sucking.
+  const drawVacuum = (c) => {
+    const x = (c.x - S.camX) * TS, y = c.y * TS, w = c.w * TS, h = c.h * TS;
+    const face = S.player.x + PLAYER_W / 2 < c.x + c.w / 2 ? -1 : 1;
+    const b = c.boss;
+    if (b) {
+      for (const d of b.dirt) {
+        ctx.fillStyle = "#6a4a2a";
+        ctx.fillRect((d.x - S.camX) * TS - TS * 0.25, d.y * TS - TS * 0.2, TS * 0.5, TS * 0.4);
+        ctx.fillStyle = "#8a6a3a";
+        ctx.fillRect((d.x - S.camX) * TS - TS * 0.1, d.y * TS - TS * 0.1, TS * 0.2, TS * 0.15);
+      }
+    }
+    if (b && b.hurtT > 0 && Math.floor(b.hurtT * 20) % 2) return; // flashes when stomped
+    ctx.save();
+    ctx.translate(x + w / 2, y + h);
+    ctx.rotate(Math.sin(c.step * 14) * 0.04);
+    if (face < 0) ctx.scale(-1, 1); // the art faces right
+    if (b && b.stage === 3) ctx.rotate(Math.sin(S.time * 25) * 0.025); // shaking as it spits dirt
+    // stage 2: its low battery look (flashing); stage 3: its handle comes down.
+    // Both can be repainted in the Art Studio.
+    const look = !b ? VACUUM : b.stage === 2 ? (Math.floor(S.time * 3) % 2 ? "vacuumLow" : VACUUM)
+      : b.stage === 3 ? "vacuumHandleDown" : VACUUM;
+    Art.drawSprite(ctx, look, -w / 2, -h, w, h);
+    ctx.restore();
+    if (b) {
+      ctx.textAlign = "center";
+      ctx.textBaseline = "bottom";
+      ctx.font = "bold 22px ui-monospace, monospace";
+      ctx.fillStyle = "#ff4a4a";
+      ctx.fillText("❤".repeat(b.hp), x + w / 2, y - 6);
+    }
+    if (c.sucking) {
+      ctx.fillStyle = "rgba(255, 255, 255, 0.6)";
+      for (let i = 0; i < 5; i++) {
+        const k = (S.time * 3 + i / 5) % 1;
+        const sx = x + w / 2 + face * (w * 0.55 + (1 - k) * TS * 2.5), sy = y + h * 0.8 + Math.sin(i * 2.3) * TS * 0.4 * (1 - k);
+        ctx.fillRect(sx, sy, 4, 4);
+      }
+    }
+  };
+
   // --- rendering ---
   const drawBackground = () =>
-    Art.drawBackground(ctx, S.zombie && S.zombie.phase !== "flash" ? "overworld" // the plains
+    Art.drawBackground(ctx, S.box ? "box" : S.mini ? ({ meteor: "space", pvp: "overworld" }[S.mini.game] || "night")
+      : S.zombie && S.zombie.phase !== "flash" ? "overworld" // the plains
       : S.inBoss ? (S.crash ? crashBgOf(level) : arenaBgOf(level))
+      : S.bgNow ? S.bgNow // a Background change block switched it
       : level.zones ? level.zones[Math.floor((S.camX + VIEW_COLS / 2) / level.zoneW) % level.zones.length]
       : bgOf(level), canvas.width, canvas.height, S.camX * TS, TS, S.time, S.effect);
 
@@ -271,6 +340,93 @@ window.BDPlayDraw = (S, P, BD) => {
       }
     }
   };
+  // Mini games: player 2 (or the computer), the lasers and meteors, the countdown.
+  const PVP_HP_BARS = 5;
+  const drawMini = () => {
+    const m = S.mini;
+    for (const h of m.hazards) {
+      const hx = (h.x - S.camX) * TS;
+      if (h.kind === "laser") {
+        if (h.warn > 0) {
+          // a blinking warning stripe, then the beam
+          if (Math.floor(h.warn * 10) % 2) continue;
+          ctx.fillStyle = "rgba(255, 60, 60, 0.35)";
+          ctx.fillRect(hx + TS * 0.3, 0, TS * 0.4, canvas.height);
+          ctx.fillStyle = "#ff4a4a";
+          ctx.fillRect(hx + TS * 0.2, 0, TS * 0.6, TS * 0.4);
+        } else {
+          ctx.fillStyle = "#ff2a2a"; ctx.fillRect(hx, 0, TS, canvas.height);
+          ctx.fillStyle = "#ffd0d0"; ctx.fillRect(hx + TS * 0.3, 0, TS * 0.4, canvas.height);
+        }
+      } else {
+        // a blocky meteor with a flaming tail
+        const my = (h.y - S.camY) * TS, s = TS * 0.9, q = s / 4;
+        ctx.fillStyle = "rgba(255, 140, 40, 0.5)"; ctx.fillRect(hx + q, my - s, q * 2, s);
+        ctx.fillStyle = "rgba(255, 220, 80, 0.6)"; ctx.fillRect(hx + q * 1.5, my - s * 0.6, q, s * 0.6);
+        ctx.fillStyle = "#6a5a50"; ctx.fillRect(hx, my + q, s, q * 2); ctx.fillRect(hx + q, my, q * 2, s);
+        ctx.fillStyle = "#8c7a6a"; ctx.fillRect(hx + q, my + q, q * 2, q * 2);
+        ctx.fillStyle = "#ff8a3d"; ctx.fillRect(hx + q * 2, my + q, q, q);
+      }
+    }
+    const p2 = m.p2;
+    if (m.game === "pvp") {
+      for (const s of m.shots) {
+        ctx.fillStyle = s.from === m.p1 ? "#ffd54a" : "#b46bff";
+        ctx.fillRect((s.x - S.camX) * TS - TS * 0.15, (s.y - S.camY) * TS - TS * 0.08, TS * 0.3, TS * 0.16);
+      }
+      // swords, health bars over both heads
+      const fighters = [[m.p1, S.player.x, S.player.y], ...(p2.alive ? [[p2, p2.x, p2.y]] : [])];
+      for (const [who, x, y] of fighters) {
+          const cx = (x + PLAYER_W / 2 - S.camX) * TS, cy = (y - S.camY) * TS;
+        ctx.save();
+        ctx.translate(cx + who.face * PLAYER_W * TS * 0.5, cy + PLAYER_H * TS * 0.5);
+        ctx.scale(who.face, 1);
+        ctx.rotate(who.swing > 0 ? 0.3 - (1 - who.swing / 0.2) * 1.6 + 1.3 : -0.6);
+        Art.drawSprite(ctx, "swordIron", 0, -TS * 0.7, TS * 0.7, TS * 0.7);
+        ctx.restore();
+        for (let i = 0; i < PVP_HP_BARS; i++) {
+          ctx.fillStyle = "#1b1b22";
+          ctx.fillRect(cx - TS * 0.8 + i * TS * 0.32, cy - TS * 0.45 - (who === p2 ? 14 : 0), TS * 0.28, TS * 0.2);
+          ctx.fillStyle = i < who.hp ? (who === m.p1 ? "#ff4a4a" : "#b46bff") : "#3a2a3a";
+          ctx.fillRect(cx - TS * 0.8 + i * TS * 0.32 + 2, cy - TS * 0.45 - (who === p2 ? 14 : 0) + 2, TS * 0.28 - 4, TS * 0.2 - 4);
+        }
+      }
+    }
+    if (p2.alive && !(p2.safeT > 0 && Math.floor(p2.safeT * 20) % 2)) {
+      Art.drawPlayer(ctx, (p2.x - S.camX) * TS, (p2.y - S.camY) * TS, PLAYER_W * TS, PLAYER_H * TS, 0, "playerGalaxy");
+      ctx.fillStyle = "#e2dcf2"; ctx.font = "bold 14px ui-monospace, monospace";
+      ctx.textAlign = "center"; ctx.textBaseline = "bottom";
+      ctx.fillText(m.opp === "cpu" ? "🤖" : "P2", (p2.x + PLAYER_W / 2 - S.camX) * TS, (p2.y - S.camY) * TS - 4);
+    }
+  };
+  const drawMiniHud = () => {
+    const m = S.mini;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    const big = (text, color) => {
+      ctx.font = "bold 48px ui-monospace, monospace";
+      ctx.lineWidth = 6; ctx.strokeStyle = "rgba(0, 0, 0, 0.7)";
+      ctx.strokeText(text, canvas.width / 2, canvas.height / 2);
+      ctx.fillStyle = color; ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+    };
+    const title = { meteor: "☄️ METEOR DODGE", pvp: "⚔️ PVP" }[m.game] || "⚡ LASER DODGE";
+    ctx.font = "bold 22px ui-monospace, monospace";
+    ctx.fillStyle = "#e2dcf2";
+    ctx.textBaseline = "top";
+    ctx.fillText(m.phase === "play" ? `${title} · ${Math.floor(m.play)}s` : title, canvas.width / 2, 12);
+    ctx.textBaseline = "middle";
+    if (m.phase === "count") {
+      big(m.t < 3 ? String(3 - Math.floor(m.t)) : "GO!", "#ffd54a");
+      ctx.font = "bold 18px ui-monospace, monospace"; ctx.fillStyle = "#e2dcf2";
+      const keys = m.game === "pvp"
+        ? (m.opp === "2p" ? "You: W A D · S sword · E shoot     Player 2: ← ↑ → · ↓ sword · Enter shoot" : "W A D move · S sword · E shoot")
+        : m.game === "meteor"
+          ? (m.opp === "2p" ? "You: Space/W up · Shift/S down · A D     Player 2: ↑ up · ↓ down · ← →" : "Space or ↑ up · Shift or ↓ down · let go to stay")
+        : (m.opp === "2p" ? "You: W A D   ·   Player 2: ← ↑ →" : "Last one standing wins!");
+      ctx.fillText(keys, canvas.width / 2, canvas.height / 2 + 50);
+    } else if (m.phase === "won") big(m.opp === "2p" ? "PLAYER 1 WINS!" : "YOU WIN!", "#8ff09a");
+    else if (m.phase === "lost") big(m.opp === "2p" ? "PLAYER 2 WINS!" : "YOU LOSE!", "#ff8a80");
+  };
   const drawZombieHud = () => {
     const z = S.zombie;
     if (z.phase === "flash") {
@@ -436,7 +592,37 @@ window.BDPlayDraw = (S, P, BD) => {
     }
   };
 
+  // Inside the giant vacuum: its insides fill the screen, you in the middle,
+  // and the sign from his drawing with how far out you've got.
+  let insideGrid = null;
+  const drawInside = () => {
+    const ins = S.inside, W = canvas.width, Hh = canvas.height;
+    // the level's own inside (Inside the vacuum tab): its blocks as junk,
+    // and a big spinning fan at each Fan block
+    insideGrid = insideGrid || vacInsideGrid(level.vac);
+    Art.drawBackground(ctx, "vacuumBare", W, Hh, 0, TS, S.time, null);
+    insideGrid.forEach((row, y) => row.forEach((ch, x) => {
+      if (ch === FAN) Art.drawFan(ctx, (x + 0.5) * TS, (y + 0.5) * TS, TS * 2.6, S.time);
+      else if (ch !== AIR) drawTile(ctx, ch, x * TS, y * TS, TS, S.time, false);
+    }));
+    const pw = PLAYER_W * TS * 1.6, ph = PLAYER_H * TS * 1.6;
+    const along = ins.got / VAC_ESCAPE;
+    drawPlayer(ctx, W * (0.2 + 0.6 * along) - pw / 2 + Math.sin(S.time * 20) * 3, Hh * 0.62 - ph / 2, pw, ph, Math.sin(S.time * 9) * 0.4, hero);
+    const bw = 520, bx = W / 2 - bw / 2, by = 24;
+    ctx.fillStyle = "rgba(20, 20, 28, 0.9)"; ctx.fillRect(bx, by, bw, 96);
+    ctx.strokeStyle = "#ffd54a"; ctx.lineWidth = 4; ctx.strokeRect(bx, by, bw, 96);
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillStyle = "#ffffff"; ctx.font = "bold 24px ui-monospace, monospace";
+    ctx.fillText("CONSTANTLY CLICK TO GET OUT!", W / 2, by + 30);
+    ctx.font = "bold 16px ui-monospace, monospace";
+    ctx.fillStyle = ins.t < 2 ? (Math.floor(S.time * 8) % 2 ? "#ff4a4a" : "#ffffff") : "#ffd54a";
+    ctx.fillText(`spam SPACE!   ⏱ ${Math.ceil(Math.max(0, ins.t))} before the fan gets you`, W / 2, by + 56);
+    ctx.fillStyle = "#3a3a48"; ctx.fillRect(bx + 20, by + 70, bw - 40, 14);
+    ctx.fillStyle = "#8ff09a"; ctx.fillRect(bx + 20, by + 70, (bw - 40) * along, 14);
+  };
+
   const render = () => {
+    if (S.inside) { drawInside(); return; }
     drawBackground();
     showBoost();
 
@@ -452,7 +638,9 @@ window.BDPlayDraw = (S, P, BD) => {
     for (let x = startX; x <= endX; x++) {
       for (let y = startY; y <= endY; y++) {
         const ch = S.grid[y][x];
-        if (isDoor(ch) || baseOf(ch) === ELEV_DOOR || ch === ELEV_DOOR_OPEN) {
+        if (baseOf(ch) === MINIGAME) {
+          drawMiniQuarter(ctx, S.grid, x, y, (x - S.camX) * TS, y * TS, TS);
+        } else if (isDoor(ch) || baseOf(ch) === ELEV_DOOR || ch === ELEV_DOOR_OPEN) {
           Art.drawSprite(ctx, ch, (x - S.camX) * TS, (y - 1) * TS, TS, TS * 2);
         } else if (isOpenDoor(ch)) {
           const t = clamp((S.time - (S.doorT[noteKey(x, y)] || 0)) / DOOR_SWING, 0, 1);
@@ -550,6 +738,9 @@ window.BDPlayDraw = (S, P, BD) => {
     }
 
     for (const c of S.critters) {
+      if (CAT_MOBS.includes(c.kind)) { drawCat(c); continue; }
+      if (c.kind === VACUUM) { drawVacuum(c); continue; }
+      if (c.kind === VILLAGER && c.hurtT > 0 && Math.floor(c.hurtT * 20) % 2) continue; // flashes when stomped
       Art.drawSprite(ctx, c.ch, (c.x - S.camX) * TS, c.y * TS, c.w * TS, c.h * TS);
       if (c.kind === TNT_SOLDIER && c.fuse > 0 && Math.floor(c.fuse * 10) % 2 === 0) {
         // fizzing: it flashes white faster and faster
@@ -585,6 +776,7 @@ window.BDPlayDraw = (S, P, BD) => {
 
     if (S.boss) drawBoss();
     if (S.zombie) drawZombie();
+    if (S.mini) drawMini();
 
     for (const bz of S.blazes) {
       const bs = TS * 0.8;
@@ -705,10 +897,36 @@ window.BDPlayDraw = (S, P, BD) => {
       ctx.fillText("🪽 FLY! hold jump", canvas.width / 2, y);
     }
 
+    if (S.nipT > 0) {
+      canvas.style.filter = `hue-rotate(${Math.round((S.time * 300) % 360)}deg) saturate(1.8)`;
+      canvas.style.transform = `rotate(${(Math.sin(S.time * 7) * 1.5).toFixed(2)}deg) scale(${(1 + Math.sin(S.time * 5) * 0.015).toFixed(3)})`;
+      S.nipShown = true;
+    } else if (S.nipShown) {
+      canvas.style.filter = "";
+      canvas.style.transform = "";
+      S.nipShown = false;
+    }
+    if (S.state === "run" && (S.nineLives > 0 || S.wallJump)) {
+      ctx.font = "bold 20px ui-monospace, monospace";
+      ctx.textAlign = "left";
+      ctx.textBaseline = "bottom";
+      ctx.fillStyle = "#ffd54a";
+      ctx.fillText([S.nineLives > 0 ? `😺 ×${S.nineLives}` : "", S.wallJump ? "🧗" : ""].join(" ").trim(), 12, canvas.height - 10);
+    }
     if (S.boss) drawBossHud();
     if (S.zombie) drawZombieHud();
+    const vb = S.critters.find((c) => c.boss && !c.gone);
+    if (vb && S.state === "run") {
+      ctx.textAlign = "center";
+      ctx.textBaseline = "top";
+      ctx.font = "bold 22px ui-monospace, monospace";
+      ctx.fillStyle = vb.boss.stage === 2 ? "#8ff09a" : "#e2dcf2";
+      ctx.fillText(vb.boss.stage === 1 ? "🌀 1: It's sucking! Don't get caught!"
+        : vb.boss.stage === 2 ? "🔋 2: LOW BATTERY! Climb up and stomp it!" : "💩 3: Dirt! Jump the low ones!", canvas.width / 2, 12);
+    }
+    if (S.mini) drawMiniHud();
 
-    if (S.state === "run" && (S.stopT > 0 || (S.free && !S.boss))) {
+    if (S.state === "run" && !S.mini && (S.stopT > 0 || (S.free && !S.boss))) {
       const y = 16 + (S.effect ? 36 : 0) + (S.flying ? 36 : 0);
       ctx.fillStyle = S.stopT > 0 ? "#ff8a80" : "#8ff09a";
       ctx.font = "bold 26px ui-monospace, monospace";
@@ -732,7 +950,7 @@ window.BDPlayDraw = (S, P, BD) => {
       ctx.font = "bold 46px ui-monospace, monospace";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText({ burn: "BURNED!", delete: "DELETED!", poof: "POOF!", megaboom: "MEGA BOOM!" }[S.deathKind] || "BOOM!",
+      ctx.fillText({ burn: "BURNED!", delete: "DELETED!", poof: "POOF!", megaboom: "MEGA BOOM!", fan: "THE FAN GOT YOU!" }[S.deathKind] || "BOOM!",
         canvas.width / 2, canvas.height / 2);
     }
   };

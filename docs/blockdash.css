@@ -163,6 +163,7 @@ textarea {
 .level-card .name { font-size: 0.95rem; flex: 1; min-width: 140px; word-break: break-word; }
 .level-card .meta { color: var(--dim); font-size: 0.7rem; display: block; margin-top: 3px; }
 /* play order — the number is the level's place in the run */
+.level-card .num.emoji { width: auto; min-width: 28px; padding: 0 3px; font-size: 1rem; }
 .level-card .num {
   flex: none;
   width: 28px;
@@ -545,3 +546,6 @@ button.tool-btn.sel {
   font: inherit; font-size: 0.75rem; color: inherit;
   background: #4a4a5a; border: 2px solid #2a2a35; padding: 5px 8px; max-width: 100%;
 }
+
+/* hidden by a 🔍 search box */
+.search-hide { display: none !important; }

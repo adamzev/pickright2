@@ -105,6 +105,69 @@
     "\u01aa": { name: "TNT Soldier" },
     "\u01ab": { name: "Up elevator", solid: true },
     "\u01ac": { name: "Up elevator (short)", solid: true },
+    "\u01ad": { name: "Background change", hidden: true },
+    "\u01ae": { name: "Mini game" },
+    // Ultra Cat world
+    "\u01af": { name: "Cat bed", solid: true },
+    "\u01b0": { name: "Scratching post" },
+    "\u01b1": { name: "Sleepy cat" },
+    "\u01b2": { name: "Cat" },
+    "\u01b3": { name: "Wall jump power" },
+    "\u01b4": { name: "Nine lives power" },
+    "\u01b5": { name: "Fish" },
+    "\u01b6": { name: "Yarn ball" },
+    "\u01b7": { name: "Cat face block", solid: true },
+    "\u01b8": { name: "Carpet", solid: true },
+    "\u01b9": { name: "Sofa", solid: true },
+    "\u01ba": { name: "Cat tree" },
+    "\u01bb": { name: "Cat leaves" },
+    "\u01bc": { name: "Box", solid: true },
+    "\u01bd": { name: "Cardboard", solid: true },
+    "\u01be": { name: "Box (opened)", solid: true }, // only ever made in play
+    "\u01bf": { name: "Catnip" },
+    "\u01c0": { name: "Giant vacuum cleaner" },
+    "\u01c1": { name: "Wallpaper", solid: true },
+    "\u01c2": { name: "Diamond block", solid: true },
+    "\u01c3": { name: "Gold block", solid: true },
+    "\u01c4": { name: "Emerald block", solid: true },
+    "\u01c5": { name: "Cat door" },
+    // cat tree parts
+    "\u01c6": { name: "Cat tree post" },
+    "\u01c7": { name: "Cat tree platform", solid: true },
+    "\u01c8": { name: "Cat tree cat house", solid: true },
+    "\u01c9": { name: "Cat tree base", solid: true },
+    "\u01ca": { name: "Cat tree slant /" },
+    "\u01cb": { name: "Cat tree slant \\" },
+    "\u01cc": { name: "Void block", solid: true },
+    "\u01cd": { name: "Harmful void block" },
+    "\u01ce": { name: "Fan" }, // where the fan goes, inside the giant vacuum
+    // castle (the son's design): concrete in 16 colours, castle blocks, a
+    // treasure chest, moving platforms and a grey villager that acts like a zombie
+    "\u01d0": { name: "White concrete", solid: true },
+    "\u01d1": { name: "Light grey concrete", solid: true },
+    "\u01d2": { name: "Grey concrete", solid: true },
+    "\u01d3": { name: "Black concrete", solid: true },
+    "\u01d4": { name: "Brown concrete", solid: true },
+    "\u01d5": { name: "Red concrete", solid: true },
+    "\u01d6": { name: "Orange concrete", solid: true },
+    "\u01d7": { name: "Yellow concrete", solid: true },
+    "\u01d8": { name: "Lime concrete", solid: true },
+    "\u01d9": { name: "Green concrete", solid: true },
+    "\u01da": { name: "Cyan concrete", solid: true },
+    "\u01db": { name: "Light blue concrete", solid: true },
+    "\u01dc": { name: "Blue concrete", solid: true },
+    "\u01dd": { name: "Purple concrete", solid: true },
+    "\u01de": { name: "Magenta concrete", solid: true },
+    "\u01df": { name: "Pink concrete", solid: true },
+    "\u01e0": { name: "Castle wall", solid: true },
+    "\u01e1": { name: "Battlements", solid: true },
+    "\u01e2": { name: "Castle window" },
+    "\u01e3": { name: "Flag" },
+    "\u01e4": { name: "Treasure chest" },
+    "\u01e5": { name: "Treasure chest (open)" }, // only ever made in play
+    "\u01e6": { name: "Side-to-side platform", solid: true },
+    "\u01e7": { name: "Up-and-down platform", solid: true },
+    "\u01e8": { name: "Grey villager" },
     // wires are solid bars: you can stand on them
     "\u0197": { name: "Red wire", solid: true },
     "\u019d": { name: "Green wire", solid: true },
@@ -139,7 +202,42 @@
   // to it rise together, once. The plain one rises until it bumps a ceiling;
   // the short one rises the number of blocks set on it in the Level Maker.
   const UP_LIFT = "\u01ab", UP_LIFT_SHORT = "\u01ac";
-  const UP_SPEED = 2.5, UP_DEFAULT = 3; // hold jump while riding an elevator: this many times faster
+  const UP_SPEED = 2.5, UP_DEFAULT = 3;
+  // Background change block: invisible in play; run through it and the
+  // background becomes the one set on it in the Level Maker.
+  const BG_CHANGE = "\u01ad";
+  // Mini game block: touch it and you're taken to the level's mini game arena
+  // against a second player (same keyboard: you W A D, them the arrows) or the
+  // computer. Lasers or meteors come down; last one standing wins.
+  const MINIGAME = "\u01ae";
+  const MINI_GAMES = [["laser", "⚡ Laser dodge"], ["meteor", "☄️ Meteor dodge"], ["pvp", "⚔️ PvP"]];
+  const MINI_OPPS = [["cpu", "🤖 Computer"], ["2p", "👥 Player 2 (arrow keys)"]];
+  const MINI_DEFAULT = "laser:cpu";
+  // A Mini game block is 2x2 squares showing one big picture. Each square works
+  // out which quarter it is by counting Mini game squares to its left and above.
+  const miniQuarter = (g, x, y) => {
+    let l = 0, u = 0;
+    while (x - l - 1 >= 0 && baseOf(g[y][x - l - 1]) === MINIGAME) l++;
+    while (y - u - 1 >= 0 && baseOf(g[y - u - 1][x]) === MINIGAME) u++;
+    return [l % 2, u % 2];
+  };
+  // the four squares of the Mini game block at (x, y)
+  const miniGroup = (g, x, y) => {
+    const [qx, qy] = miniQuarter(g, x, y);
+    const out = [];
+    for (const [dx, dy] of [[0, 0], [1, 0], [0, 1], [1, 1]]) {
+      const gx = x - qx + dx, gy = y - qy + dy;
+      if (g[gy] && baseOf(g[gy][gx]) === MINIGAME) out.push([gx, gy]);
+    }
+    return out;
+  };
+  const drawMiniQuarter = (ctx, g, x, y, px, py, ts) => {
+    const [qx, qy] = miniQuarter(g, x, y);
+    ctx.save();
+    ctx.beginPath(); ctx.rect(px, py, ts, ts); ctx.clip();
+    Art.drawSprite(ctx, MINIGAME, px - qx * ts, py - qy * ts, ts * 2, ts * 2);
+    ctx.restore();
+  }; // hold jump while riding an elevator: this many times faster
   // Water: you sink slowly, each jump press is a swim stroke up, and you keep
   // running forward, just slower. Near the surface a press jumps you out.
   const WATER = "\u0189";
@@ -188,19 +286,67 @@
   // and split when stomped (big, medium, tiny); Skeletons walk at you shooting
   // arrows; TNT Soldiers march up quietly, fizz, and blow up. Stomp any of them.
   const SLIME_MOB = "\u01a8", SKELETON = "\u01a9", TNT_SOLDIER = "\u01aa";
-  const CRITTERS = [SLIME_MOB, SKELETON, TNT_SOLDIER];
+  // Ultra Cat world (the son's design): a bouncy cat bed, a scratching post you
+  // climb, cats that never hurt you, two cat powers, and fish and yarn to collect.
+  const CAT_BED = "\u01af", SCRATCH_POST = "\u01b0", SLEEPY_CAT = "\u01b1", CAT_MOB = "\u01b2";
+  const WALL_JUMP = "\u01b3", NINE_LIVES = "\u01b4", FISH = "\u01b5", YARN = "\u01b6";
+  const CAT_BLOCKS = ["\u01b7", "\u01b8", "\u01b9"]; // cat face, carpet, sofa: just for building
+  const CAT_MOBS = [SLEEPY_CAT, CAT_MOB];
+  const CAT_LEAVES = "\u01bb";
+  // Cat tree parts: the post and the two slants are climbed; the platform,
+  // the cat house and the base are solid
+  const TREE_PARTS = ["\u01c6", "\u01c7", "\u01c8", "\u01c9", "\u01ca", "\u01cb"];
+  const CLIMBABLE = [SCRATCH_POST, CAT_LEAVES, "\u01c6", "\u01ca", "\u01cb"]; // touch one and you climb straight up
+  // Land on a Box and you jump inside it: the level's Box arena, inside a
+  // cardboard box. Climb out of the top and you pop back out on the box.
+  const BOX = "\u01bc", CARDBOARD = "\u01bd", BOX_OPEN = "\u01be";
+  // Catnip: zoomies, mega jumps and a wobbly rainbow screen, all at once
+  const CATNIP = "\u01bf", NIP_TIME = 6, NIP_JUMP = 1.3;
+  // A giant vacuum cleaner, as tall as the screen, rolls after you (straight
+  // through blocks, it's too big to stop), faster and faster, and sucks you in
+  const VACUUM = "\u01c0", VAC_SIZE = 9, VAC_PULL = 7, VAC_REACH = 14; // 9 tall: room above it to stomp from
+  const WALLPAPER = "\u01c1";
+  // Cat door: inside a Box, click it while you're next to it to pop back out
+  // on top of the box (a way out besides the top)
+  const CAT_DOOR = "\u01c5", DOOR_REACH = 2.5;
+  // Void block: solid, looks like empty space. Harmful void: touch it, you're out.
+  const VOID = "\u01cc", HARM_VOID = "\u01cd";
+  const FAN = "\u01ce"; // Inside the vacuum tab: a big spinning fan here
+  // Concrete comes in 16 colours, all under one "Concrete ▾" palette button
+  const CONCRETES = Array.from({ length: 16 }, (_, i) => String.fromCharCode(0x1d0 + i));
+  const CONCRETE_PICK = "\u01cf"; // the palette button (not a block)
+  const CASTLE_WALL = "\u01e0", BATTLEMENTS = "\u01e1", CASTLE_WINDOW = "\u01e2", FLAG = "\u01e3";
+  const CHEST = "\u01e4", CHEST_OPEN = "\u01e5";
+  // Moving platforms: one square a PLAT_STEP, up to PLAT_RANGE squares, then
+  // back; anything standing on one rides along
+  const PLAT_SIDE = "\u01e6", PLAT_UPDOWN = "\u01e7", PLAT_STEP = 0.35, PLAT_RANGE = 4;
+  // Grey villager: walks after you like the zombie; VILLAGER_HP stomps
+  const VILLAGER = "\u01e8", VILLAGER_SPEED = 1.6, VILLAGER_HP = 3;
+  // The giant vacuum is a boss (the son's design), fought right in the level.
+  // Three stages, round and round: 1, it rolls after you and sucks (catch you
+  // and you're INSIDE it: press jump VAC_ESCAPE times to pop out of its
+  // nozzle); 2, its battery runs out and platforms appear beside it: stomp
+  // its top; 3, it shoots dirt. VAC_HP stomps beat it.
+  // Inside it you have VAC_FAN seconds to get out, or the fan gets you.
+  const VAC_SUCK = 6, VAC_LOW = 7, VAC_DIRT = 5, VAC_HP = 3, VAC_ESCAPE = 30, VAC_FAN = 8;
+  const SHINY_BLOCKS = ["\u01c2", "\u01c3", "\u01c4"]; // diamond, gold and emerald blocks: just for building
+  const CAT_BED_BOUNCE = 1.42; // times a jump's speed: twice as high
+  const CLIMB_V = 5, CAT_SPEED = 1.2;
+  const NINE_SAFE = 1.2; // seconds you can't be hurt again after a life saves you
+  const CRITTERS = [SLIME_MOB, SKELETON, TNT_SOLDIER, ...CAT_MOBS, VACUUM, VILLAGER];
   const SLIME_SIZES = [null, [0.55, 0.45], [0.9, 0.75], [1.4, 1.1]]; // tiny, medium, big: [w, h]
   const SKELETON_SPEED = 1.5, SKELETON_SHOOT = 2, ARROW_SPEED = 8;
   const SOLDIER_SPEED = 1.8, SOLDIER_FUSE = 1.2, SOLDIER_BLAST = 2.2;
   const HEALTH_MAX = 4, HURT_SAFE = 1.2; // your health against them, and the safe moment after a hit
   const makeCritter = (ch, x, y) => {
     const kind = baseOf(ch);
-    const [w, h] = kind === SLIME_MOB ? SLIME_SIZES[3] : kind === SKELETON ? [0.8, 1.8] : [0.8, 1.6];
+    const [w, h] = kind === SLIME_MOB ? SLIME_SIZES[3] : kind === SKELETON ? [0.8, 1.8] : CAT_MOBS.includes(kind) ? [1, 0.75] : kind === VACUUM ? [VAC_SIZE, VAC_SIZE] : kind === VILLAGER ? [0.8, 1.8] : [0.8, 1.6];
     return { kind, ch, x: x + (1 - w) / 2, y: y + 1 - h, w, h, vy: 0, vx: 0, onGround: false, awake: false,
-      size: 3, t: 0.6, fuse: 0, shootT: 1, gone: false };
+      size: 3, t: 0.6, fuse: 0, shootT: 1, gone: false,
+      mood: kind === SLEEPY_CAT ? "sleep" : "walk", face: -1, meowT: 0, step: 0, spd: 1.5, hp: VILLAGER_HP, hurtT: 0 };
   };
   const FLOWERS = ["\u01a4", "\u01a5", "\u01a6", "\u01a7"]; // red, yellow, blue, tulip
-  const DECOR = ["\u0193", "\u0194", "\u0195", "\u0196", ...FLOWERS];
+  const DECOR = ["\u0193", "\u0194", "\u0195", "\u0196", ...FLOWERS, "\u01ba", "\u01e2", "\u01e3"];
   // The background layer: blocks drawn darker behind the level, just for
   // looks. Nothing in it is solid or does anything. These can't go in it.
   const BACK_HIDE = "PKOMhCGE" + CRASH;
@@ -241,7 +387,7 @@
   const MEGA_PICK = "~"; // likewise, the palette button that opens the mega blocks
 
   const PALETTE = ["g", "s", "p", "n", "k", "e", "m", "t", "T", "h", "A", "L", "U", "D", "F", "S", "Z",
-    "W", "Y", "V", "Q", "N", "I", "C", "d", "+", "$", "@", "r", "9", "o", "H", "R", "b", "%", "w", "f", "K", "O", "M", "E", "G", "J", "B", IRON, GLITCH_STONE, GLITCH_IRON, WATER, CRASH, TELEPORT, ELEVATOR, LIFT, ELEV_DOOR, UP_LIFT, UP_LIFT_SHORT, ...CRITTERS, PUSH, SHOVE, ENTER, ...WIRES, BUTTON, LEVER, LAMP, ZOMBIE_TRAP, ...DECOR, ...DOORS, KEY, MEGA_PICK, MINE, "P", ERASER];
+    "W", "Y", "V", "Q", "N", "I", "C", "d", "+", "$", "@", "r", "9", "o", "H", "R", "b", "%", "w", "f", "K", "O", "M", "E", "G", "J", "B", IRON, GLITCH_STONE, GLITCH_IRON, WATER, CRASH, TELEPORT, ELEVATOR, LIFT, ELEV_DOOR, UP_LIFT, UP_LIFT_SHORT, BG_CHANGE, MINIGAME, CAT_BED, SCRATCH_POST, WALL_JUMP, NINE_LIVES, FISH, YARN, CAT_LEAVES, BOX, CATNIP, WALLPAPER, CARDBOARD, ...CAT_BLOCKS, ...SHINY_BLOCKS, CAT_DOOR, ...TREE_PARTS, VOID, HARM_VOID, FAN, CASTLE_WALL, BATTLEMENTS, CONCRETE_PICK, CHEST, PLAT_SIDE, PLAT_UPDOWN, ...CRITTERS, PUSH, SHOVE, ENTER, ...WIRES, BUTTON, LEVER, LAMP, ZOMBIE_TRAP, ...DECOR, ...DOORS, KEY, MEGA_PICK, MINE, "P", ERASER];
 
   // The boss arena is drawn in the same editor as the level, with a slightly
   // different set of blocks: no portals, save points or note-carrying blocks
@@ -252,7 +398,7 @@
   const CRASH_HIDE = LEVEL_ONLY.replace("E", "") + "J";
   // the Zombie trap's plains: like an arena, minus Boss platforms
   const PLAINS_HIDE = LEVEL_ONLY + "J";
-  const ARENA_ONLY = "J";
+  const ARENA_ONLY = "J" + "\u01ce"; // the Fan only goes inside the vacuum
 
   const isSolid = (ch) => !!(tileOf(ch) && tileOf(ch).solid);
   const overOf = (ch) => TILES[ch] && TILES[ch].over;
@@ -361,7 +507,7 @@
 
   // Money. Picking these up pays coins (which is also the level's score);
   // megatite pays megacoins instead.
-  const COIN_VALUE = { d: 10, "+": 15, $: 20 };
+  const COIN_VALUE = { d: 10, "+": 15, $: 20, [FISH]: 10 };
   const MEGATITE_PAYS = 30;
   const COINS_PER_MEGACOIN = 2;
   // The coin shop. A better sword means fewer stomps to beat the boss; you
@@ -630,6 +776,417 @@
     for (const [x, f] of [[4, 0], [10, 1], [12, 3], [18, 2], [20, 0]]) g[H - 2][x] = FLOWERS[f];
     return g;
   };
+  // The Mini game arena until someone draws their own: a floor, two ledges,
+  // and the Start (player 2 starts at the mirror spot on the other side).
+  const defaultMiniArena = () => {
+    const g = Array.from({ length: H }, (_, y) => Array(ARENA_W).fill(y === H - 1 ? "s" : AIR));
+    for (const [x0, x1, y] of [[3, 6, H - 5], [ARENA_W - 7, ARENA_W - 4, H - 5], [9, 12, H - 8]]) for (let x = x0; x <= x1; x++) g[y][x] = "s";
+    g[H - 2][3] = "P";
+    return g;
+  };
+  // The Box arena until someone builds their own: inside a cardboard box,
+  // with steps and a scratching post up to the open top (the way out), and
+  // a few fish.
+  const defaultBoxArena = () => {
+    const g = Array.from({ length: H }, (_, y) => Array(ARENA_W).fill(AIR));
+    for (let y = 0; y < H; y++) g[y][0] = g[y][ARENA_W - 1] = CARDBOARD;
+    for (let x = 0; x < ARENA_W; x++) g[H - 1][x] = CARDBOARD;
+    for (const [x0, y] of [[4, 9], [8, 7], [12, 5], [16, 3]]) {
+      for (let x = x0; x < x0 + 3; x++) g[y][x] = CARDBOARD;
+      g[y - 1][x0 + 1] = FISH;
+    }
+    // and an easy way out: a scratching post up the far side, right to the top
+    for (let y = 0; y < H - 1; y++) g[y][ARENA_W - 2] = SCRATCH_POST;
+    g[H - 2][2] = "P";
+    return g;
+  };
+  const boxArenaGrid = (rows) =>
+    (Array.isArray(rows) && rows.length ? resizeGrid(rowsToGrid(rows.map(String)), ARENA_W) : defaultBoxArena());
+  // Inside the giant vacuum (what you see while you spam your way out),
+  // until someone builds their own: just the fan, in the middle.
+  const defaultVacInside = () => {
+    const g = Array.from({ length: H }, () => Array(ARENA_W).fill(AIR));
+    g[4][Math.floor(ARENA_W / 2)] = FAN;
+    return g;
+  };
+  const vacInsideGrid = (rows) =>
+    (Array.isArray(rows) && rows.length ? resizeGrid(rowsToGrid(rows.map(String)), ARENA_W) : defaultVacInside());
+  const miniArenaGrid = (rows) =>
+    (Array.isArray(rows) && rows.length ? resizeGrid(rowsToGrid(rows.map(String)), ARENA_W) : defaultMiniArena());
+  // ----- 🎼 Music Maker -----
+  // Songs are built from premade pieces, like a level from blocks: a row of
+  // boxes, one bar each, and every box gets a tune piece (moved up or down if
+  // you like) and a drum beat. The pieces live in blockdash-music.js (MAKER).
+  const SPOOKY_SONGS = ["boss", "nether", "fortress", "spooky", "final", "glitch", "end", "rain"];
+  // a song to start from: a tune, the tune again higher, a second tune, a drum
+  // roll, and an ending
+  const surpriseSong = (mood = "happy", bpm = 128) => {
+    const { TUNES } = window.BDMusic.MAKER;
+    const lively = ["hop", "rocket", "wave", "fanfare", "shout", "stomp", "jumpy", "twirl", "ding", "parachute"];
+    const pick = (list) => list[Math.floor(Math.random() * list.length)];
+    const a = pick(lively), b = pick(lively.filter((t) => t !== a)), c = pick(["sparkle", "long", "ding", "twirl"]);
+    const beat = mood === "spooky" ? pick(["march", "soft", "rock"]) : pick(["pop", "dance", "rock"]);
+    const up = mood === "spooky" ? 3 : 2;
+    const slots = [[a, 0], [a, up], [b, 0], [b, -1], [a, 0], [a, up], [c, 0], ["end", 0]]
+      .map(([t, p], i) => ({ t, p, b: i === 6 ? "roll" : beat }));
+    return { bpm, mood, sound: pick(["beep", "bell", "flute", "buzz"]), slots: slots.filter((x) => TUNES[x.t]) };
+  };
+
+  // Its own page. opts.name: show a name box starting with this name.
+  // done gets (song, name), or undefined for Cancel; it decides where to go next.
+  const openMusicMaker = (start, done, opts = {}) => {
+    const Mu = window.BDMusic, { TUNES, BEATS, MOODS, SOUNDS, SLOTS } = Mu.MAKER;
+    let song = cleanSong(start) || surpriseSong();
+    let sel = 0; // the box new pieces go into
+    const history = [];
+    const remember = () => { history.push(JSON.stringify(song)); if (history.length > 60) history.shift(); };
+    let playing = false;
+    Mu.level("off"); // quiet until you press Play
+    clear();
+
+    const head = el("div", "row");
+    head.appendChild(el("h1", null, "🎼 Music Maker"));
+    head.appendChild(el("div", "spacer"));
+    const playBtn = el("button", "green", "▶ Play");
+    const undoBtn = el("button", "small", "↶ Undo");
+    const cancelBtn = el("button", "small", "✖ Cancel");
+    const doneBtn = el("button", "green", "✔ Done");
+    head.append(playBtn, undoBtn, cancelBtn, doneBtn);
+    root.appendChild(head);
+
+    const top = el("div", "panel");
+    const nameBox = el("input");
+    if (opts.name != null) {
+      const nameRow = el("div", "row");
+      nameBox.value = opts.name;
+      nameBox.maxLength = 30;
+      nameRow.append(el("span", "hint", "Song name:"), nameBox);
+      top.appendChild(nameRow);
+    }
+    const choiceRow = (label, table, keyOf, setTo) => {
+      const row = el("div", "row tight");
+      row.appendChild(el("span", "hint", label));
+      for (const [k, v] of Object.entries(table)) {
+        const b = el("button", "small" + (keyOf() === k ? " green" : ""), `${v.icon} ${v.name}`);
+        b.onclick = () => { remember(); setTo(k); changed(); };
+        row.appendChild(b);
+      }
+      return row;
+    };
+    const settingsBox = el("div");
+    top.appendChild(settingsBox);
+    root.appendChild(top);
+
+    const strip = el("div", "panel");
+    root.appendChild(strip);
+    const palette = el("div", "panel");
+    root.appendChild(palette);
+
+    const preview = (slot) => Mu.preview({ bpm: song.bpm, mood: song.mood, sound: song.sound, slots: [slot] });
+    const replay = () => { if (playing) Mu.custom(cleanSong(song)); };
+    const changed = () => { replay(); draw(); };
+
+    const tuneOf = (k) => (song.tunes && song.tunes[k]) || TUNES[k] || { name: "?", icon: "❓", notes: [] };
+    // put one of your piano tunes into the song (it keeps its own copy)
+    const useMine = (t) => {
+      song.tunes = Object.assign({}, song.tunes, { ["u_" + t.id]: { name: t.name, icon: t.icon, notes: t.notes } });
+    };
+    const cards = [];
+    const drawSettings = () => {
+      settingsBox.textContent = "";
+      settingsBox.append(
+        choiceRow("Mood:", MOODS, () => song.mood, (k) => { song.mood = k; }),
+        choiceRow("Sound:", SOUNDS, () => song.sound, (k) => { song.sound = k; }));
+      const speedRow = el("div", "row tight");
+      const speed = el("input");
+      speed.type = "range"; speed.min = "60"; speed.max = "200"; speed.step = "4"; speed.value = String(song.bpm);
+      speed.onchange = () => { remember(); song.bpm = +speed.value; replay(); };
+      const surprise = el("button", "small", "🎲 Surprise me");
+      surprise.onclick = () => { remember(); song = surpriseSong(song.mood, song.bpm); sel = 0; changed(); };
+      speedRow.append(el("span", "hint", "Speed: 🐢"), speed, el("span", "hint", "🐇"), el("div", "spacer"), surprise);
+      settingsBox.appendChild(speedRow);
+    };
+    const drawStrip = () => {
+      strip.textContent = "";
+      strip.appendChild(el("h2", null, "Your song"));
+      strip.appendChild(el("p", "hint", "Tap a box, then tap a tune or a beat below to put it in. ⬆ ⬇ move a tune higher or lower."));
+      const row = el("div");
+      Object.assign(row.style, { display: "flex", flexWrap: "wrap", gap: "8px" });
+      cards.length = 0;
+      song.slots.forEach((slot, i) => {
+        const tune = tuneOf(slot.t), beat = BEATS[slot.b];
+        const card = el("div");
+        Object.assign(card.style, { position: "relative", width: "112px", padding: "6px 4px", borderRadius: "6px", cursor: "pointer", textAlign: "center",
+          background: i === sel ? "#4a3a7a" : "#2c2940", border: i === sel ? "3px solid #ffd54a" : "3px solid #3a3650" });
+        const big = el("div", null, tune.icon);
+        big.style.fontSize = "30px";
+        const nm = el("div", null, tune.name);
+        nm.style.fontWeight = "bold";
+        const upDown = el("div");
+        Object.assign(upDown.style, { display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", margin: "4px 0" });
+        const down = el("button", "small", "⬇"), up = el("button", "small", "⬆");
+        for (const b of [down, up]) Object.assign(b.style, { padding: "2px 8px", margin: "0", minWidth: "0" });
+        const lvl = el("span", "hint", slot.p > 0 ? "+" + slot.p : String(slot.p));
+        down.onclick = (e) => { e.stopPropagation(); if (slot.p > -4) { remember(); slot.p--; sel = i; changed(); preview(slot); } };
+        up.onclick = (e) => { e.stopPropagation(); if (slot.p < 7) { remember(); slot.p++; sel = i; changed(); preview(slot); } };
+        upDown.append(down, lvl, up);
+        const bars = Mu.tuneBars(tune);
+        if (bars > 1) { card.style.width = `${112 + (bars - 1) * 60}px`; nm.textContent += ` (${bars} bars)`; }
+        const bt = el("div", "hint", `${beat.icon} ${beat.name}`);
+        const del = el("button", "small", "✖");
+        Object.assign(del.style, { position: "absolute", top: "2px", right: "2px", padding: "0 5px", margin: "0", minWidth: "0", fontSize: "11px" });
+        del.title = "Take this box out";
+        del.onclick = (e) => {
+          e.stopPropagation();
+          if (song.slots.length <= 1) { toast("A song needs at least one box"); return; }
+          remember(); song.slots.splice(i, 1); sel = Math.min(sel, song.slots.length - 1); changed();
+        };
+        card.append(big, nm, upDown, bt, del);
+        card.onclick = () => { sel = i; draw(); preview(slot); };
+        cards.push(card);
+        row.appendChild(card);
+      });
+      if (song.slots.length < SLOTS) {
+        const add = el("button", "", "➕ Add a box");
+        add.style.minHeight = "100px";
+        add.onclick = () => {
+          remember();
+          const copy = Object.assign({}, song.slots[sel] || { t: "hop", p: 0, b: "pop" });
+          song.slots.splice(sel + 1, 0, copy);
+          sel++;
+          changed();
+        };
+        row.appendChild(add);
+      }
+      strip.appendChild(row);
+    };
+    const drawPalette = () => {
+      palette.textContent = "";
+      const section = (title, table, field) => {
+        palette.appendChild(el("h2", null, title));
+        const row = el("div", "row tight");
+        row.style.flexWrap = "wrap";
+        for (const [k, v] of Object.entries(table)) {
+          const now = song.slots[sel] && song.slots[sel][field] === k;
+          const b = el("button", now ? "green" : "", `${v.icon} ${v.name}`);
+          b.onclick = () => {
+            const slot = song.slots[sel];
+            if (!slot) return;
+            remember();
+            slot[field] = k;
+            changed();
+            preview(slot);
+          };
+          row.appendChild(b);
+        }
+        palette.appendChild(row);
+      };
+      section("🎵 Tunes", TUNES, "t");
+      // your own tunes from the piano
+      palette.appendChild(el("h2", null, "🎹 My tunes"));
+      const mine = el("div", "row tight");
+      mine.style.flexWrap = "wrap";
+      for (const t of loadMyTunes()) {
+        const k = "u_" + t.id;
+        const now = song.slots[sel] && song.slots[sel].t === k;
+        const b = el("button", now ? "green" : "", `${t.icon} ${t.name}`);
+        b.onclick = () => {
+          const slot = song.slots[sel];
+          if (!slot) return;
+          remember();
+          useMine(t);
+          slot.t = k;
+          changed();
+          preview(slot);
+        };
+        const edit = el("button", "small", "✏");
+        edit.title = "Change this tune on the piano";
+        edit.onclick = () => openPiano(t);
+        mine.append(b, edit);
+      }
+      const newTune = el("button", "green", "🎹 New tune");
+      newTune.onclick = () => openPiano(null);
+      mine.appendChild(newTune);
+      palette.appendChild(mine);
+      section("🥁 Beats", BEATS, "b");
+    };
+
+    // ----- the piano: make a tune one note at a time -----
+    // Each key press adds a note of the chosen length to the end of the tune,
+    // until it's 4 bars (64 steps) long. The keys are the song's scale, so
+    // whatever you play fits.
+    const pianoBox = el("div", "panel");
+    let onPianoKey = null;
+    const openPiano = (editing) => {
+      const FULL = 64, COL = 16; // 4 bars; each step's width in the picture
+      const KEYS = "asdfghjkl;", COLORS = ["#ff5a5a", "#ff9a3d", "#ffd54a", "#8fe05a", "#3ad0c8", "#4a9fff", "#8a6ae0", "#e06ad0", "#ff5a8a", "#ffffff"];
+      const ICONS = ["🎹", "🎵", "🐱", "🐶", "🦄", "🔥", "⚡", "💎", "👾", "🍕", "🌈", "🐉"];
+      // the tune as a list of notes and rests: { deg (null for a rest), len }
+      const parts = [];
+      if (editing) {
+        let at = 0;
+        for (const [s0, deg, len] of editing.notes.slice().sort((a, b) => a[0] - b[0])) {
+          if (s0 > at) parts.push({ deg: null, len: s0 - at });
+          if (s0 >= at) { parts.push({ deg, len }); at = s0 + len; }
+        }
+      }
+      let name = editing ? editing.name : "My tune", icon = editing ? editing.icon : "🎹", len = 2;
+      const used = () => parts.reduce((a, x) => a + x.len, 0);
+      const toNotes = () => {
+        const out = [];
+        let at = 0;
+        for (const x of parts) { if (x.deg != null) out.push([at, x.deg, Math.min(x.len, FULL - at)]); at += x.len; }
+        return out.filter((n) => n[0] < FULL);
+      };
+      const hear = (notes) => Mu.preview({ bpm: song.bpm, mood: song.mood, sound: song.sound,
+        tunes: { u_x: { notes } }, slots: [{ t: "u_x", p: 0, b: "none" }] });
+      const add = (deg) => {
+        const room = FULL - used();
+        if (room <= 0) { toast("Your tune is full! Press ⌫ Back to change the end"); return; }
+        parts.push({ deg, len: Math.min(len, room) });
+        if (deg != null) hear([[0, deg, Math.min(len, 4)]]);
+        draw();
+      };
+      strip.style.display = palette.style.display = top.style.display = head.style.display = "none";
+      root.appendChild(pianoBox);
+      const draw = () => {
+        pianoBox.textContent = "";
+        pianoBox.appendChild(el("h2", null, editing ? "🎹 Change your tune" : "🎹 New tune"));
+        const nameRow = el("div", "row tight");
+        const nameIn = el("input");
+        nameIn.value = name; nameIn.maxLength = 16;
+        nameIn.oninput = () => { name = nameIn.value; };
+        nameRow.append(el("span", "hint", "Name:"), nameIn);
+        for (const ic of ICONS) {
+          const b = el("button", "small" + (ic === icon ? " green" : ""), ic);
+          b.onclick = () => { icon = ic; draw(); };
+          nameRow.appendChild(b);
+        }
+        pianoBox.appendChild(nameRow);
+        // the tune so far: one column per step, coloured like the key it came from
+        const cv = el("canvas");
+        cv.width = FULL * COL; cv.height = 10 * 12 + 4;
+        cv.style.maxWidth = "100%";
+        const c = cv.getContext("2d");
+        c.fillStyle = "#16141f"; c.fillRect(0, 0, cv.width, cv.height);
+        for (let s = 0; s < FULL; s++) {
+          c.fillStyle = Math.floor(s / 4) % 2 ? "#272436" : "#211e2c";
+          c.fillRect(s * COL + 1, 0, COL - 2, cv.height);
+          if (s % 16 === 0 && s) { c.fillStyle = "#8a84aa"; c.fillRect(s * COL - 1, 0, 2, cv.height); } // where each box ends
+        }
+        let at = 0;
+        for (const x of parts) {
+          if (x.deg != null && x.deg >= 0 && x.deg < 10) {
+            c.fillStyle = COLORS[x.deg];
+            c.fillRect(at * COL + 2, (9 - x.deg) * 12 + 2, Math.min(x.len, FULL - at) * COL - 4, 10);
+          }
+          at += x.len;
+        }
+        pianoBox.appendChild(cv);
+        const bars = Math.max(1, Math.ceil(used() / 16));
+        pianoBox.appendChild(el("p", "hint", `${Math.min(FULL, used())} of ${FULL} filled (${bars} box${bars > 1 ? "es" : ""} long). ` +
+          "Tap the keys (or type A S D F G H J K L ;) to add notes. It can be up to 4 boxes long."));
+        const lenRow = el("div", "row tight");
+        lenRow.appendChild(el("span", "hint", "Each note is:"));
+        for (const [n, label] of [[1, "· Tiny"], [2, "♪ Short"], [4, "♩ Medium"], [8, "𝅗𝅥 Long"]]) {
+          const b = el("button", "small" + (n === len ? " green" : ""), label);
+          b.onclick = () => { len = n; draw(); };
+          lenRow.appendChild(b);
+        }
+        pianoBox.appendChild(lenRow);
+        // the piano
+        const keys = el("div");
+        Object.assign(keys.style, { display: "flex", gap: "4px", margin: "10px 0" });
+        for (let deg = 0; deg < 10; deg++) {
+          const k = el("button", "", KEYS[deg].toUpperCase());
+          Object.assign(k.style, { flex: "1", height: "150px", background: "#f4f0ff", color: "#1b1b22", borderBottom: `14px solid ${COLORS[deg]}`,
+            display: "flex", alignItems: "flex-end", justifyContent: "center", paddingBottom: "8px", margin: "0", minWidth: "0" });
+          k.onclick = () => add(deg);
+          keys.appendChild(k);
+        }
+        pianoBox.appendChild(keys);
+        const btns = el("div", "row tight");
+        const rest = el("button", "", "🤫 Rest");
+        rest.onclick = () => add(null);
+        const back = el("button", "", "⌫ Back");
+        back.onclick = () => { parts.pop(); draw(); };
+        const wipe = el("button", "", "🗑 Start over");
+        wipe.onclick = () => { parts.length = 0; draw(); };
+        const play = el("button", "", "▶ Hear it");
+        play.onclick = () => { const n = toNotes(); if (n.length) hear(n); else toast("Tap some keys first"); };
+        const cancel = el("button", "", "✖ Cancel");
+        cancel.onclick = () => closePiano();
+        const save = el("button", "green", "✔ Save tune");
+        save.onclick = () => {
+          const notes = toNotes();
+          if (!notes.length) { toast("Tap some keys first"); return; }
+          const list = loadMyTunes();
+          const t = { id: editing ? editing.id : Date.now().toString(36), name: name.trim() || "My tune", icon, notes };
+          const i = list.findIndex((x) => x.id === t.id);
+          if (i >= 0) list[i] = t; else list.push(t);
+          saveMyTunes(list);
+          remember();
+          // a changed tune changes in this song too; a new one goes in the picked box
+          if (editing && song.tunes && song.tunes["u_" + t.id]) useMine(t);
+          if (!editing && song.slots[sel]) { useMine(t); song.slots[sel].t = "u_" + t.id; }
+          closePiano();
+          changed();
+        };
+        btns.append(rest, back, wipe, play, el("div", "spacer"), cancel, save);
+        pianoBox.appendChild(btns);
+      };
+      onPianoKey = (e) => {
+        if (e.target && e.target.tagName === "INPUT") return;
+        const deg = KEYS.indexOf(e.key.toLowerCase());
+        if (deg >= 0 && !e.repeat) { e.preventDefault(); add(deg); }
+        else if (e.key === "Backspace") { e.preventDefault(); parts.pop(); draw(); }
+      };
+      window.addEventListener("keydown", onPianoKey);
+      draw();
+    };
+    const closePiano = () => {
+      window.removeEventListener("keydown", onPianoKey);
+      onPianoKey = null;
+      pianoBox.remove();
+      strip.style.display = palette.style.display = top.style.display = head.style.display = "";
+    };
+    const draw = () => { drawSettings(); drawStrip(); drawPalette(); };
+    draw();
+
+    // light up the box you're hearing
+    let lit = -1;
+    const loop = () => {
+      if (!strip.isConnected) { if (playing) Mu.level(null); return; } // left the page some other way
+      const at = playing && Mu.stepNow >= 0 ? Mu.slotAt(song, Mu.stepNow) : -1;
+      if (at !== lit) {
+        if (cards[lit]) cards[lit].style.boxShadow = "";
+        if (cards[at]) cards[at].style.boxShadow = "0 0 0 3px #8ff09a";
+        lit = at;
+      }
+      requestAnimationFrame(loop);
+    };
+    requestAnimationFrame(loop);
+
+    const stop = () => { playing = false; playBtn.textContent = "▶ Play"; Mu.level("off"); lit = -2; };
+    playBtn.onclick = () => {
+      if (playing) { stop(); return; }
+      if (Mu.muted) Mu.setMuted(false);
+      Mu.custom(cleanSong(song));
+      Mu.level(null); // so it starts from the top
+      Mu.level("custom");
+      playing = true;
+      playBtn.textContent = "⏹ Stop";
+    };
+    undoBtn.onclick = () => {
+      if (!history.length) { toast("Nothing to undo"); return; }
+      song = JSON.parse(history.pop());
+      sel = Math.min(sel, song.slots.length - 1);
+      changed();
+    };
+    doneBtn.onclick = () => { if (onPianoKey) closePiano(); if (playing) stop(); done(cleanSong(song), nameBox.value.trim() || "My song"); };
+    cancelBtn.onclick = () => { if (onPianoKey) closePiano(); if (playing) stop(); done(undefined); };
+  };
+
   const plainsGrid = (rows) =>
     (Array.isArray(rows) && rows.length ? resizeGrid(rowsToGrid(rows.map(String)), ARENA_W) : defaultPlains());
   // its background: The End unless it's been given another
@@ -712,6 +1269,8 @@
       if (ch === "K" && typeof v === "string" && v.trim()) out[k] = v.slice(0, 200);
       else if (ch === "O" && +v > 0) out[k] = clamp(+v, 0.5, 30);
       else if (ch === UP_LIFT_SHORT && +v >= 1) out[k] = clamp(Math.round(+v), 1, MAX_H);
+      else if (ch === BG_CHANGE && window.BDArt.BACKGROUNDS.some((b) => b.key === v)) out[k] = v;
+      else if (ch === MINIGAME && /^(laser|meteor|pvp):(cpu|2p)$/.test(v)) out[k] = v;
       else if (ch === TELEPORT && typeof v === "string" && /^\d+,\d+$/.test(v)) {
         // a linked Auto teleport: its partner's square, kept while the partner is still a teleport
         const [px, py] = v.split(",").map(Number);
@@ -722,7 +1281,56 @@
   };
 
   // a level's own song, or null to play whatever the player picked
-  const musicOf = (o) => (o && window.BDMusic.SONGS[o.music] ? o.music : null);
+  // A Music Maker song: { bpm, m: melody rows, b: bass rows, d: drum rows },
+  // each row a string with "x" where a note plays. null if it isn't one.
+  // A tune made on the piano: { name, icon, notes: [[step, note, length]] }
+  // up to 4 bars (64 steps) long. null if it isn't one.
+  const cleanTune = (o) => {
+    if (!o || typeof o !== "object" || !Array.isArray(o.notes)) return null;
+    const notes = o.notes.filter((n) => Array.isArray(n) && n.length === 3 && n.every((v) => Number.isFinite(+v)))
+      .map(([at, deg, len]) => [clamp(Math.round(at), 0, 63), clamp(Math.round(deg), -7, 14), clamp(Math.round(len), 1, 16)]);
+    return { name: String(o.name || "My tune").slice(0, 16), icon: String(o.icon || "🎹").slice(0, 4), notes };
+  };
+  const cleanSong = (o) => {
+    if (!o || typeof o !== "object" || !Array.isArray(o.slots)) return null;
+    const { TUNES, BEATS, MOODS, SOUNDS, SLOTS } = window.BDMusic.MAKER;
+    const tunes = {};
+    for (const [k, t] of Object.entries(o.tunes && typeof o.tunes === "object" ? o.tunes : {})) {
+      if (/^u_\w+$/.test(k) && cleanTune(t)) tunes[k] = cleanTune(t);
+    }
+    const slots = o.slots.slice(0, SLOTS).filter((x) => x && (TUNES[x.t] || tunes[x.t]))
+      .map((x) => ({ t: x.t, p: clamp(Math.round(+x.p) || 0, -4, 7), b: BEATS[x.b] ? x.b : "none" }));
+    if (!slots.length) return null;
+    // only the piano tunes the song actually uses
+    const used = {};
+    for (const x of slots) if (tunes[x.t]) used[x.t] = tunes[x.t];
+    return { bpm: clamp(Math.round(+o.bpm) || 120, 60, 220), mood: MOODS[o.mood] ? o.mood : "happy",
+      sound: SOUNDS[o.sound] ? o.sound : "beep", slots, ...(Object.keys(used).length ? { tunes: used } : {}) };
+  };
+  // your piano tunes, kept in this browser, to use in any song: [{ id, ...tune }]
+  const MYTUNES_KEY = "blockdash_mytunes_v1";
+  const loadMyTunes = () => {
+    try {
+      const a = JSON.parse(localStorage.getItem(MYTUNES_KEY) || "[]");
+      return Array.isArray(a) ? a.filter((x) => x && /^\w+$/.test(x.id) && cleanTune(x)).map((x) => ({ id: x.id, ...cleanTune(x) })) : [];
+    } catch (e) { return []; }
+  };
+  const saveMyTunes = (list) => {
+    try { localStorage.setItem(MYTUNES_KEY, JSON.stringify(list)); } catch (e) { /* ignore */ }
+  };
+  // Songs made on the Music page's Music Maker, kept in this browser.
+  const MYSONGS_KEY = "blockdash_mysongs_v1";
+  const loadMySongs = () => {
+    try {
+      const a = JSON.parse(localStorage.getItem(MYSONGS_KEY) || "[]");
+      return Array.isArray(a) ? a.filter((x) => x && x.id && cleanSong(x.song)).map((x) => ({ id: String(x.id), name: String(x.name || "My song").slice(0, 30), song: cleanSong(x.song) })) : [];
+    } catch (e) { return []; }
+  };
+  const saveMySongs = (list) => {
+    try { localStorage.setItem(MYSONGS_KEY, JSON.stringify(list)); } catch (e) { /* ignore */ }
+    window.BDMusic.mine(list);
+  };
+  const musicOf = (o) => (o && window.BDMusic.SONGS[o.music] && (o.music !== "custom" || cleanSong(o.song)) ? o.music : null);
 
   // the boss arena can have its own background; without one it matches the level
   const arenaBgOf = (o) =>
@@ -738,9 +1346,14 @@
     if (crashBgOf(l) !== "end") o.crashBg = l.crashBg;
     if (Array.isArray(l.back) && l.back.some((r) => /[^.]/.test(r))) o.back = l.back;
     if (Array.isArray(l.plains) && l.plains.length) o.plains = l.plains;
+    if (Array.isArray(l.mini) && l.mini.length) o.mini = l.mini;
+    if (Array.isArray(l.box) && l.box.length) o.box = l.box;
+    if (Array.isArray(l.vac) && l.vac.length) o.vac = l.vac;
     // kept even when this browser has no art for it; it just plays as the usual player
     if (isMine(l.hero)) o.hero = l.hero;
     if (musicOf(l)) o.music = l.music;
+    if (cleanSong(l.song)) o.song = cleanSong(l.song);
+    if (cleanEmoji(l.emoji)) o.emoji = cleanEmoji(l.emoji);
     return o;
   };
 
@@ -760,12 +1373,17 @@
       ...(arenaBgOf(o) !== bgOf(o) ? { arenaBg: o.arenaBg } : {}),
       ...(isMine(o.hero) ? { hero: o.hero } : {}),
       ...(musicOf(o) ? { music: o.music } : {}),
+      ...(cleanSong(o.song) ? { song: cleanSong(o.song) } : {}),
+      ...(cleanEmoji(o.emoji) ? { emoji: cleanEmoji(o.emoji) } : {}),
       notes: cleanNotes(clean, o.notes),
       // only levels whose arena was drawn by hand carry one
       ...(Array.isArray(o.arena) && o.arena.length ? { arena: gridToRows(arenaGrid(o.arena)) } : {}),
       ...(Array.isArray(o.crashArena) && o.crashArena.length ? { crashArena: gridToRows(crashArenaGrid(o.crashArena)) } : {}),
       ...(crashBgOf(o) !== "end" ? { crashBg: o.crashBg } : {}),
       ...(Array.isArray(o.plains) && o.plains.length ? { plains: gridToRows(plainsGrid(o.plains)) } : {}),
+      ...(Array.isArray(o.mini) && o.mini.length ? { mini: gridToRows(miniArenaGrid(o.mini)) } : {}),
+      ...(Array.isArray(o.box) && o.box.length ? { box: gridToRows(boxArenaGrid(o.box)) } : {}),
+      ...(Array.isArray(o.vac) && o.vac.length ? { vac: gridToRows(vacInsideGrid(o.vac)) } : {}),
       // the background layer, made the level's size
       ...(Array.isArray(o.back) && o.back.length
         ? { back: gridToRows(fitLayer(rowsToGrid(o.back.map(String)), clean[0].length, clean.length)) } : {}),
@@ -824,7 +1442,7 @@
   // ---------- share codes ----------
 
   const encodeLevel = (lvl) => {
-    const json = JSON.stringify({ n: lvl.name, r: lvl.rows, b: bgOf(lvl), x: cleanNotes(lvl.rows, lvl.notes), a: lvl.arena, ab: lvl.arenaBg, c: lvl.crashArena, cb: lvl.crashBg, k: lvl.back, pl: lvl.plains, h: lvl.hero, m: musicOf(lvl) || undefined });
+    const json = JSON.stringify({ n: lvl.name, r: lvl.rows, b: bgOf(lvl), x: cleanNotes(lvl.rows, lvl.notes), a: lvl.arena, ab: lvl.arenaBg, c: lvl.crashArena, cb: lvl.crashBg, k: lvl.back, pl: lvl.plains, mg: lvl.mini, bx: lvl.box, vc: lvl.vac, h: lvl.hero, m: musicOf(lvl) || undefined, sg: cleanSong(lvl.song) || undefined, em: cleanEmoji(lvl.emoji) || undefined });
     const bytes = new TextEncoder().encode(json);
     let s = "";
     for (const b of bytes) s += String.fromCharCode(b);
@@ -836,7 +1454,7 @@
     const bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0));
     const o = JSON.parse(new TextDecoder().decode(bytes));
     if (!o || !Array.isArray(o.r) || !o.r.length) throw new Error("bad code");
-    return { name: String(o.n || "Imported level"), rows: o.r.map(String), bg: o.b, notes: o.x, arena: o.a, arenaBg: o.ab, crashArena: o.c, crashBg: o.cb, back: o.k, plains: o.pl, hero: o.h, music: o.m };
+    return { name: String(o.n || "Imported level"), rows: o.r.map(String), bg: o.b, notes: o.x, arena: o.a, arenaBg: o.ab, crashArena: o.c, crashBg: o.cb, back: o.k, plains: o.pl, mini: o.mg, box: o.bx, vac: o.vc, hero: o.h, music: o.m, song: o.sg, emoji: o.em };
   };
 
   // Art codes are much bigger than level codes, so each drawing is stored as
@@ -889,11 +1507,19 @@
   // blockdash.html plays the official levels; blockdash.html?edit is the level maker.
   const editMode = new URLSearchParams(location.search).has("edit");
 
+  // A level's optional emoji, shown beside its number (a cat for the cat
+  // level). Emoji only, so nothing in it can be read as HTML.
+  const cleanEmoji = (v) => {
+    // only non-plain-text characters (emoji and their joiners), up to 8 of them
+    return [...String(v == null ? "" : v)].filter((c) => c.codePointAt(0) > 0x7f).slice(0, 8).join("");
+  };
   const levelCard = (lvl, actions, num) => {
     const g = rowsToGrid(lvl.rows);
     const card = el("div", "level-card");
     const best = getBest(bestKey(lvl));
-    if (num) card.appendChild(el("div", "num", num));
+    // a level's emoji takes the place of its number
+    if (cleanEmoji(lvl.emoji)) card.appendChild(el("div", "num emoji", cleanEmoji(lvl.emoji)));
+    else if (num) card.appendChild(el("div", "num", num));
     card.appendChild(
       el("div", "name",
         `${lvl.name}<span class="meta">${g[0].length} blocks long · ` +
@@ -944,12 +1570,14 @@
   // the pet rock there. Makes no sound (there's no "rock" sound) and never
   // moves from the start.
   PET_SOUND.petRock = "rock";
+  PET_SOUND.petKitten = "cat"; // for getting every yarn ball in a level
+  PET_SOUND.petHorse = "horse"; // for winning a level with the Castle background
   PET_SOUND.petGalaxy = "galaxy"; // for escaping the Galactic Monstrosity, like the Glitch pet
   const FLYING_PETS = ["petParrot", "petDragon", "petGlitch", "petGalaxy"];
   const STILL_PETS = ["petRock"];
   const CAT_LOOK = "\ue934"; // the shipped black-cat player look
   const petBaseOf = (k) => (PET_SOUND[k] ? k : PET_SOUND[Art.baseOf(k)] ? Art.baseOf(k) : null);
-  const allPets = () => PETS.map(([key, label]) => ({ key, label })).concat([{ key: "petGlitch", label: "Glitch" }, { key: "petGalaxy", label: "Galaxy" }, { key: "petRock", label: "Sir Rock" }])
+  const allPets = () => PETS.map(([key, label]) => ({ key, label })).concat([{ key: "petGlitch", label: "Glitch" }, { key: "petGalaxy", label: "Galaxy" }, { key: "petRock", label: "Sir Rock" }, { key: "petKitten", label: "Kitten" }, { key: "petHorse", label: "Horse" }])
     .concat(Art.customBlocks().filter((b) => PET_SOUND[b.base]).map((b) => ({ key: b.key, label: b.label })));
   const rockFound = () => {
     try { return localStorage.getItem("pickright_sir_rock") === "1"; } catch (e) { return false; }
@@ -970,6 +1598,16 @@
     try { localStorage.setItem(PET_KEY, JSON.stringify(p)); } catch (e) { /* ignore */ }
     if (PETS.every(([k]) => p.owned.includes(k))) window.BDBadges.earn("pets");
   };
+
+  // all the yarn in a level: a kitten pet, the first time. True if it's new.
+  const unlockPet = (key) => {
+    const pets = loadPets();
+    if (pets.owned.includes(key)) return false;
+    pets.owned.push(key);
+    savePets(pets);
+    return true;
+  };
+  const unlockKitten = () => unlockPet("petKitten");
 
   const petPanel = () => {
     const pets = loadPets();
@@ -1525,6 +2163,26 @@
     head.appendChild(back);
     root.appendChild(head);
 
+    // the Music Maker, for your own songs and copies of these ones
+    const openMaker = (start, name, id) => openMusicMaker(start, (made, newName) => {
+      M.level(null);
+      if (made === undefined) { showMusic(); return; } // cancelled
+      const list = loadMySongs();
+      const at = list.findIndex((x) => x.id === id);
+      if (!made) { toast("That song was empty, so it wasn't saved"); showMusic(); return; }
+      if (at >= 0) list[at] = { id, name: newName, song: made };
+      else list.push({ id: Date.now().toString(36), name: newName, song: made });
+      saveMySongs(list);
+      showMusic();
+    }, { name });
+    const makeRow = el("div", "panel");
+    makeRow.appendChild(el("h2", null, "🎼 Music Maker"));
+    const newBtn = el("button", "green", "🎼 New song");
+    newBtn.onclick = () => openMaker(null, "My song", null);
+    makeRow.append(newBtn, el("p", "hint", "Build your own song from tune and beat pieces, or press 🎲 Make one like this next to any song below. " +
+      "Your songs show up in this list and in the Level Maker's Music choices."));
+    root.appendChild(makeRow);
+
     const songs = el("div", "panel");
     songs.appendChild(el("h2", null, "Pick a song"));
     const list = stack();
@@ -1538,7 +2196,25 @@
         `${song.icon} ${song.name}${k === M.song ? " ✓" : ""}`);
       pick.style.minWidth = "170px";
       pick.onclick = () => { M.setSong(k); showMusic(); };
-      row.append(pick, el("span", "hint", song.what));
+      row.append(pick);
+      if (song.mine) {
+        const id = k.slice(3), mine = loadMySongs().find((x) => x.id === id);
+        const edit = el("button", "small", "✏ Edit");
+        edit.onclick = () => openMaker(mine.song, mine.name, id);
+        const del = el("button", "small", "🗑 Delete");
+        del.onclick = () => {
+          if (del.dataset.sure !== "1") { del.dataset.sure = "1"; del.textContent = "🗑 Sure? Tap again"; return; }
+          saveMySongs(loadMySongs().filter((x) => x.id !== id));
+          showMusic();
+        };
+        row.append(edit, del);
+      } else if (k !== "off" && !song.mega) {
+        const copy = el("button", "small", "🎲 Make one like this");
+        copy.title = "Start a new song in the Music Maker with this one's mood and speed";
+        copy.onclick = () => openMaker(surpriseSong(SPOOKY_SONGS.includes(song.base || k) ? "spooky" : "happy", Math.min(200, M.bpmOf(k))), `My ${song.name}`, null);
+        row.append(copy);
+      }
+      row.append(el("span", "hint", song.what));
       list.appendChild(row);
     }
     songs.appendChild(list);
@@ -1771,6 +2447,20 @@
     root.appendChild(head);
     root.appendChild(el("p", "sub",
       editMode ? "Build a level. Then survive it." : "Run, jump, grab diamonds. Don't explode."));
+    // 🔍 search: type part of a level's name and only matching levels show
+    const levelSearch = el("input");
+    levelSearch.type = "search";
+    levelSearch.placeholder = "🔍 Search levels";
+    levelSearch.style.marginBottom = "10px";
+    levelSearch.oninput = () => {
+      const q = levelSearch.value.trim().toLowerCase();
+      for (const card of root.querySelectorAll(".level-card")) {
+        const name = card.querySelector(".name");
+        const text = name ? name.firstChild.textContent : card.textContent;
+        card.classList.toggle("search-hide", !!q && !text.toLowerCase().includes(q));
+      }
+    };
+    root.appendChild(levelSearch);
 
     if (!editMode && !builtin.length) {
       root.appendChild(el("div", "panel empty-note", "No levels yet — check back soon!"));
@@ -1786,7 +2476,7 @@
         const play = el("button", "green small", i ? "▶ Play" : "▶ Start");
         play.onclick = () => playSeries(builtin, i, 0, () => showMenu());
         const copy = el("button", "small", "✏ Copy & edit");
-        copy.onclick = () => showEditor({ name: lvl.name + " copy", rows: lvl.rows, bg: lvl.bg, notes: lvl.notes, arena: lvl.arena, arenaBg: lvl.arenaBg, hero: lvl.hero, music: lvl.music }, -1);
+        copy.onclick = () => showEditor({ name: lvl.name + " copy", rows: lvl.rows, bg: lvl.bg, notes: lvl.notes, arena: lvl.arena, arenaBg: lvl.arenaBg, hero: lvl.hero, music: lvl.music, song: lvl.song, emoji: lvl.emoji, plains: lvl.plains, mini: lvl.mini, box: lvl.box, vac: lvl.vac }, -1);
         list.appendChild(levelCard(lvl, editMode ? [play, copy] : [play], i + 1));
       });
       if (window.BDBadges.has("master")) {
@@ -2030,6 +2720,48 @@
       [TELEPORT, "Auto teleport — touch it and you zoom to the next one ahead. A falling block that drops into one zooms ahead too"],
       [ELEVATOR, "Fall block — stand on it and it carries you down until it lands"],
       [ELEV_DOOR, "Elevator door — two blocks tall, like the doors: put it in the bottom square of a gap in your elevator's wall. It falls with the Elevator blocks, stays shut the whole way down, and opens when the elevator hits the bottom"],
+      [CAT_BED, "Cat bed — bouncy! Land on it and you boing up twice as high as a jump"],
+      [SCRATCH_POST, "Scratching post — touch it and you climb straight up to the top. Stack them for a tall one"],
+      [CAT_MOB, "Cat — walks back and forth and says meow. It never hurts you"],
+      [SLEEPY_CAT, "Sleepy cat — fast asleep. Get close and it jumps up scared, then sees you're nice and walks about"],
+      [WALL_JUMP, "Wall jump power — grab it and walls don't crash you: slide down them, and jump to spring off the other way. Bounce between two walls to climb up a gap! Lasts the whole level"],
+      [NINE_LIVES, "Nine lives power — the next 9 things that would get you don't (even falling)"],
+      [FISH, "Fish — worth 10 coins, like a diamond"],
+      [YARN, "Yarn ball — rare! Get every yarn ball in the level to unlock a kitten pet"],
+      ["\u01b7", "Cat face block — a solid block for building"],
+      ["\u01b8", "Carpet — a solid block for building a cat house"],
+      ["\u01b9", "Sofa — a solid block for building a cat house"],
+      [BOX, "Box — land on top of it and you jump inside: into the 📦 Box arena (build it with its tab above). Climb out of the top to pop back out"],
+      ["\u01c6", "Cat tree post — the trunk: touch it and you climb up, like a scratching post"],
+      ["\u01c7", "Cat tree platform — a solid carpet perch: put it on top of a post"],
+      ["\u01c8", "Cat tree cat house — a solid little cubby with a round door"],
+      ["\u01c9", "Cat tree base — the solid carpet bottom of a cat tree"],
+      ["\u01ca", "Cat tree slant / — a post leaning right; climb it like a post"],
+      ["\u01cb", "Cat tree slant \\ — a post leaning left; climb it like a post"],
+      [CONCRETE_PICK, "Concrete — 16 colours to build with: tap to open them all"],
+      [CASTLE_WALL, "Castle wall — grey stone castle bricks"],
+      [BATTLEMENTS, "Battlements — the bumpy top of a castle wall"],
+      [CASTLE_WINDOW, "Castle window — decoration, an arched window"],
+      [FLAG, "Flag — decoration, a flag on a pole"],
+      [CHEST, "Treasure chest — touch it for a random prize: coins, a power… or a TNT surprise!"],
+      [PLAT_SIDE, "Side-to-side platform — moves left and right (up to 4 squares); you ride along"],
+      [PLAT_UPDOWN, "Up-and-down platform — moves up and down (up to 4 squares); you ride along"],
+      [VILLAGER, "Grey villager — acts like a zombie: walks after you and hurts you. Stomp it 3 times!"],
+      [VOID, "Void block — a solid block that looks like empty space"],
+      [FAN, "Fan — only inside the vacuum (🌀 Inside the vacuum tab): a big spinning fan goes here. Use as many as you like"],
+      [HARM_VOID, "Harmful void block — touch it and you're out!"],
+      [CAT_DOOR, "Cat door — put it inside the 📦 Box arena: stand next to it and press Space (or click it) to pop out on top of the box"],
+      [CARDBOARD, "Cardboard — a solid block, for building the inside of the Box arena"],
+      [CATNIP, "Catnip — ZOOMIES! Super fast, mega jumps and a wobbly rainbow screen for a few seconds"],
+      [VACUUM, "Giant vacuum cleaner — a BOSS! 1: it rolls after you and sucks; if it catches you, you're inside it: spam Space to pop out. 2: its battery runs out and platforms appear: stomp its top! 3: it shoots dirt. 3 stomps beats it"],
+      [WALLPAPER, "Wallpaper — a solid paw-print wall"],
+      ["\u01c2", "Diamond block — a shiny solid block for building"],
+      ["\u01c3", "Gold block — a shiny solid block for building"],
+      ["\u01c4", "Emerald block — a shiny solid block for building"],
+      [CAT_LEAVES, "Cat leaves — a leafy block you climb like a scratching post: touch it and up you go"],
+      ["\u01ba", "Cat tree — decoration: stack them for a taller one"],
+      [MINIGAME, "Mini game — a big 2×2 block (tap where its top-left goes). Touch it for a mini game in the 🕹️ Mini game arena: dodge lasers or meteors, or ⚔️ PvP: fight with swords (S / ↓) and shooting (E / Enter), 5 hits and you're out. Against Player 2 (arrow keys; you use W A D) or the computer. Last one standing wins! (Set the game, then tap the grid)"],
+      [BG_CHANGE, "Background change — invisible when you play. Run through it and the background switches to the one you set on it (pick it, then tap the grid)"],
       [UP_LIFT, "Up elevator — when power reaches it (a Button, Lever or wire), it rises until it bumps a ceiling, with every Up elevator block joined to it. Ride it up!"],
       [UP_LIFT_SHORT, "Up elevator (short) — like the Up elevator, but rises the number of blocks you set (pick the number, then tap the grid)"],
       [LIFT, "Elevator — goes down by itself as soon as it's on screen, and stops at the bottom. Hop on to ride it down. It zooms through Auto teleports"],
@@ -2216,6 +2948,18 @@
       pickItems[k] = { item, holder, lbl, label };
       pickGrid.appendChild(item);
     });
+    // 🔍 search: type part of a name and only matching pictures show
+    const artSearch = el("input");
+    artSearch.type = "search";
+    artSearch.placeholder = "🔍 Search pictures";
+    artSearch.style.marginBottom = "8px";
+    artSearch.oninput = () => {
+      const q = artSearch.value.trim().toLowerCase();
+      for (const { item, label } of Object.values(pickItems)) {
+        item.classList.toggle("search-hide", !!q && !String(label).toLowerCase().includes(q));
+      }
+    };
+    pickPanel.appendChild(artSearch);
     pickPanel.appendChild(pickGrid);
 
     // ---- inventing a new block ----
@@ -2674,7 +3418,9 @@
       const availW = Math.max(120, wrap.clientWidth - 12);
       const availH = clamp(window.innerHeight * 0.62, 200, 520);
       const z = clamp(Math.min(Math.floor(availW / img.w), Math.floor(availH / img.h)), 6, 30);
-      if (canvas.width !== img.w * z) {
+      // check both: a picture as wide as the last one but shorter left the
+      // last one's bottom rows showing
+      if (canvas.width !== img.w * z || canvas.height !== img.h * z) {
         canvas.width = img.w * z;
         canvas.height = img.h * z;
       }
@@ -2761,6 +3507,9 @@
     let arenaBg = existing && arenaBgOf(existing) !== bg ? existing.arenaBg : null;
     let hero = existing && isMine(existing.hero) ? existing.hero : null;
     let music = musicOf(existing);
+    let emoji = cleanEmoji(existing && existing.emoji);
+    let song = cleanSong(existing && existing.song); // made in the Music Maker
+    window.BDMusic.custom(song);
     window.BDMusic.level(music); // so you hear the level's song while building it
     let crashBg = existing ? crashBgOf(existing) : "end";
     const shownBg = () => (editing === "arena" ? arenaBg || bg : editing === "crash" ? crashBg : bg);
@@ -2768,6 +3517,9 @@
       arena: arenaGrid(existing && existing.arena, arenaBg || bg),
       crash: crashArenaGrid(existing && existing.crashArena),
       plains: plainsGrid(existing && existing.plains),
+      mini: miniArenaGrid(existing && existing.mini),
+      box: boxArenaGrid(existing && existing.box),
+      vac: vacInsideGrid(existing && existing.vac),
       // the level's background layer, always the level's size (see syncLayers)
       back: fitLayer(existing && existing.back ? rowsToGrid(existing.back) : [[AIR]], grid[0].length, grid.length),
     };
@@ -2775,11 +3527,17 @@
     let arenaDrawn = !!(existing && existing.arena);
     let crashDrawn = !!(existing && existing.crashArena);
     let plainsDrawn = !!(existing && existing.plains);
+    let miniDrawn = !!(existing && existing.mini);
+    let boxDrawn = !!(existing && existing.box);
+    let vacDrawn = !!(existing && existing.vac);
     const gridOf = (m) => (editing === m ? grid : parked[m]);
     const levelG = () => gridOf("level");
     const arenaRows = () => (arenaDrawn ? gridToRows(gridOf("arena")) : undefined);
     const crashRows = () => (crashDrawn ? gridToRows(gridOf("crash")) : undefined);
     const plainsRows = () => (plainsDrawn ? gridToRows(gridOf("plains")) : undefined);
+    const miniRows = () => (miniDrawn ? gridToRows(gridOf("mini")) : undefined);
+    const boxRows = () => (boxDrawn ? gridToRows(gridOf("box")) : undefined);
+    const vacRows = () => (vacDrawn ? gridToRows(gridOf("vac")) : undefined);
     const backRows = () => layerRows(gridOf("back"));
     // The level and its background layer stay the same size: whichever one
     // you're editing leads (Higher, Longer and so on), the other follows.
@@ -2790,6 +3548,8 @@
     };
     let stopSecs = STOP_DEFAULT;
     let upBlocks = UP_DEFAULT;
+    let changeBg = "night";
+    let miniGame = "laser", miniOpp = "cpu";
     let dialogText = "";
     let slot = index;
     let sel = "g";
@@ -2820,7 +3580,7 @@
       syncLayers();
       const all = loadLevels();
       const lvl = levelData({ name: (name || "").trim() || "Untitled", rows: gridToRows(levelG()), bg, notes,
-        arena: arenaRows(), arenaBg, crashArena: crashRows(), crashBg, back: backRows(), plains: plainsRows(), hero, music });
+        arena: arenaRows(), arenaBg, crashArena: crashRows(), crashBg, back: backRows(), plains: plainsRows(), mini: miniRows(), box: boxRows(), vac: vacRows(), hero, music, song, emoji });
       if (slot >= 0 && slot < all.length) all[slot] = lvl;
       else { all.push(lvl); slot = all.length - 1; }
       savedLabel.textContent = saveLevels(all) ? "✓ Saved" : "⚠ Not saved";
@@ -2831,11 +3591,31 @@
     testBtn.onclick = () => {
       const lvl = { name: (nameInput.value || "Untitled").trim(), rows: gridToRows(levelG()), bg,
         notes: cleanNotes(levelG(), notes), arena: arenaRows(), arenaBg, crashArena: crashRows(), crashBg,
-        back: (syncLayers(), backRows()), plains: plainsRows(), hero, music };
+        back: (syncLayers(), backRows()), plains: plainsRows(), mini: miniRows(), box: boxRows(), vac: vacRows(), hero, music, song, emoji };
       showPlay(lvl, () => showEditor(lvl, slot), true);
     };
     nameRow.append(nameInput, testBtn, savedLabel);
     namePanel.appendChild(nameRow);
+    const emojiRow = el("div", "row tight");
+    emojiRow.style.marginTop = "8px";
+    const emojiBtns = [];
+    const showEmoji = () => emojiBtns.forEach(([e, b]) => b.classList.toggle("green", e === emoji));
+    const emojiIn = el("input");
+    emojiIn.type = "text";
+    emojiIn.placeholder = "or type one";
+    emojiIn.style.width = "7em";
+    emojiIn.value = emoji;
+    emojiIn.oninput = () => { emoji = cleanEmoji(emojiIn.value); showEmoji(); autosave(); };
+    emojiRow.appendChild(el("span", "hint", "Emoji:"));
+    for (const e of ["", "🐱", "🐶", "🔥", "❄️", "🌋", "🏰", "🌌", "🚀", "👾", "💀", "👻", "🧟", "🐉", "🌊", "🌳", "💎", "⚡", "⭐", "🎃", "🍕", "🤖", "🏁"]) {
+      const b = el("button", "small", e || "None");
+      b.onclick = () => { emoji = e; emojiIn.value = e; showEmoji(); autosave(); };
+      emojiBtns.push([e, b]);
+      emojiRow.appendChild(b);
+    }
+    emojiRow.appendChild(emojiIn);
+    showEmoji();
+    namePanel.appendChild(emojiRow);
     const bgRow = el("div", "row");
     bgRow.style.marginTop = "8px";
     bgRow.appendChild(el("span", "hint", "Background:"));
@@ -2851,6 +3631,9 @@
         if (editing === "arena") arenaBg = b.key;
         else if (editing === "crash") crashBg = b.key;
         else if (editing === "plains") { toast("The plains always have the Overworld sky"); return; }
+        else if (editing === "mini") { toast("The mini game picks its own sky: night for lasers, space for meteors"); return; }
+        else if (editing === "box") { toast("The Box arena is always inside a cardboard box"); return; }
+        else if (editing === "vac") { toast("Inside the vacuum always looks like inside the vacuum"); return; }
         else bg = b.key;
         showBg();
         autosave();
@@ -2897,22 +3680,54 @@
     musicRow.style.marginTop = "8px";
     musicRow.appendChild(el("span", "hint", "Music:"));
     const musicPick = el("select", "music-pick");
-    [[null, "Player's choice"]]
-      .concat(Object.entries(window.BDMusic.SONGS)
-        .filter(([k]) => window.BDMusic.available(k) || k === music)
-        .map(([k, sg]) => [k, `${sg.icon} ${sg.name}`]))
-      .forEach(([k, label]) => {
-        const opt = el("option", null, label);
-        opt.value = k || "";
-        opt.selected = k === music;
-        musicPick.appendChild(opt);
-      });
+    const fillMusicPick = () => {
+      musicPick.textContent = "";
+      [[null, "Player's choice"]]
+        .concat(song ? [["custom", "🎼 This level's song (Music Maker)"]] : [])
+        .concat(loadMySongs().map((m) => ["mine:" + m.id, `🎼 ${m.name} (yours)`]))
+        .concat(Object.entries(window.BDMusic.SONGS)
+          .filter(([k, sg]) => k !== "custom" && !sg.mine && (window.BDMusic.available(k) || k === music))
+          .map(([k, sg]) => [k, `${sg.icon} ${sg.name}`]))
+        .forEach(([k, label]) => {
+          const opt = el("option", null, label);
+          opt.value = k || "";
+          opt.selected = k === music;
+          musicPick.appendChild(opt);
+        });
+    };
+    fillMusicPick();
     musicPick.onchange = () => {
       music = musicPick.value || null;
+      if (music && music.startsWith("mine:")) {
+        // one of your saved songs: the level gets its own copy, so it still
+        // plays after you change or delete the saved one, and in shared levels
+        const m = loadMySongs().find((x) => "mine:" + x.id === music);
+        song = m ? m.song : song;
+        music = song ? "custom" : null;
+        window.BDMusic.custom(song);
+        fillMusicPick();
+      }
       window.BDMusic.level(music);
       autosave();
     };
     musicRow.appendChild(musicPick);
+    const makerBtn = el("button", "small", "🎼 Music Maker");
+    makerBtn.onclick = () => {
+      autosave(); // so the level is saved and has a slot to come back to
+      const s = slot;
+      openMusicMaker(song, (made) => {
+        const all = loadLevels();
+        if (made !== undefined && all[s]) {
+          const lvl = Object.assign({}, all[s], { song: made || undefined });
+          if (made) lvl.music = "custom";
+          else if (lvl.music === "custom") delete lvl.music;
+          all[s] = levelData(lvl);
+          saveLevels(all);
+        }
+        showEditor(loadLevels()[s], s);
+      });
+    };
+    musicRow.appendChild(makerBtn);
     namePanel.appendChild(musicRow);
 
     // level <-> boss arena
@@ -2923,6 +3738,9 @@
     const arenaTab = el("button", "small", "💥 Boss arena");
     const crashTab = el("button", "small", "🌌 Crash arena");
     const plainsTab = el("button", "small", "🌾 Plains arena");
+    const miniTab = el("button", "small", "🕹️ Mini game arena");
+    const boxTab = el("button", "small", "📦 Box arena");
+    const vacTab = el("button", "small", "🌀 Inside the vacuum");
     const editHint = el("span", "hint", "");
     const setEditing = (m) => {
       if (m === editing) return;
@@ -2933,6 +3751,9 @@
       if (m === "arena") arenaDrawn = true;
       if (m === "crash") crashDrawn = true;
       if (m === "plains") plainsDrawn = true;
+      if (m === "mini") miniDrawn = true;
+      if (m === "box") boxDrawn = true;
+      if (m === "vac") vacDrawn = true;
       if (linking) { linking = false; linkSel = null; linkBtn.classList.remove("green"); }
       undoStack.length = 0; // undo steps belong to the grid they were made on
       levelTab.classList.toggle("green", m === "level" || m === "back");
@@ -2941,6 +3762,9 @@
       arenaTab.classList.toggle("green", m === "arena");
       crashTab.classList.toggle("green", m === "crash");
       plainsTab.classList.toggle("green", m === "plains");
+      miniTab.classList.toggle("green", m === "mini");
+      boxTab.classList.toggle("green", m === "box");
+      vacTab.classList.toggle("green", m === "vac");
       showBg();
       refreshPalette();
       autosave();
@@ -2951,6 +3775,9 @@
     arenaTab.onclick = () => setEditing("arena");
     crashTab.onclick = () => setEditing("crash");
     plainsTab.onclick = () => setEditing("plains");
+    miniTab.onclick = () => setEditing("mini");
+    boxTab.onclick = () => setEditing("box");
+    vacTab.onclick = () => setEditing("vac");
     // the level's background layer: blocks placed while it's on go behind
     const layerBtn = el("button", "small", "🖼 Background: off");
     layerBtn.onclick = () => {
@@ -2958,7 +3785,7 @@
       syncLayers();
       setEditing(editing === "back" ? "level" : "back");
     };
-    editRow.append(levelTab, arenaTab, crashTab, plainsTab, layerBtn, editHint);
+    editRow.append(levelTab, arenaTab, crashTab, plainsTab, miniTab, boxTab, vacTab, layerBtn, editHint);
     namePanel.appendChild(editRow);
     root.appendChild(namePanel);
 
@@ -2970,7 +3797,9 @@
     // The player's own blocks share one palette button, so the palette stays
     // the same size however many they make; a tray under it picks which one.
     const hiddenNow = () => (editing === "arena" ? LEVEL_ONLY : editing === "crash" ? CRASH_HIDE
-      : editing === "plains" ? PLAINS_HIDE
+      : editing === "plains" || editing === "mini" ? PLAINS_HIDE
+      : editing === "box" ? PLAINS_HIDE + BOX
+      : editing === "vac" ? PLAINS_HIDE + BOX + VACUUM + "P"
       : editing === "back" ? BACK_HIDE + ARENA_ONLY : ARENA_ONLY);
     // player looks aren't blocks; they're picked with Player look above
     const myBlocks = Art.customBlocks().filter((b) => b.base !== "player" && !PET_SOUND[b.base])
@@ -3001,6 +3830,24 @@
       tray.innerHTML = "";
       tray.style.display = trayOpen ? "" : "none";
       if (!trayOpen) return;
+      if (trayOpen === CONCRETE_PICK) {
+        CONCRETES.forEach((k) => {
+          const item = el("div", "pal-item" + (k === sel ? " sel" : ""));
+          const c = el("canvas");
+          c.width = c.height = 32;
+          drawTile(c.getContext("2d"), k, 0, 0, 32, 0, false);
+          item.append(c, el("div", "lbl", TILES[k].name.replace(" concrete", "")));
+          item.onclick = () => {
+            sel = k;
+            Object.values(palItems).forEach((n) => n.classList.remove("sel"));
+            palItems[CONCRETE_PICK].classList.add("sel");
+            showTray();
+            showOpts();
+          };
+          tray.appendChild(item);
+        });
+        return;
+      }
       if (trayOpen === MEGA_PICK) {
         // a mega block has to be bought in the shop before it can be placed
         const owned = loadBag().unlocked;
@@ -3050,14 +3897,15 @@
       const cx = c.getContext("2d");
       if (ch === ERASER) drawEraser(cx, 0, 0, 32);
       else if (ch === MEGA_PICK) drawTile(cx, megaOf("s"), 0, 0, 32, 0, false);
+      else if (ch === CONCRETE_PICK) CONCRETES.forEach((k, i) => drawTile(cx, k, (i % 4) * 8, Math.floor(i / 4) * 8, 8, 0, false));
       else if (ch !== MINE) drawTile(cx, ch, 0, 0, 32, 0, false);
       item.appendChild(c);
       item.appendChild(el("div", "lbl", ch === ERASER ? "Erase" : ch === MINE ? "More blocks ▾"
-        : ch === MEGA_PICK ? "Mega blocks ▾" : TILES[ch].name));
+        : ch === MEGA_PICK ? "Mega blocks ▾" : ch === CONCRETE_PICK ? "Concrete ▾" : TILES[ch].name));
       item.onclick = () => {
-        if (ch === MEGA_PICK) {
-          // opening the mega tray keeps the block you had; pick one inside it
-          trayOpen = MEGA_PICK;
+        if (ch === MEGA_PICK || ch === CONCRETE_PICK) {
+          // opening a tray keeps the block you had; pick one inside it
+          trayOpen = ch;
           showTray();
           return;
         }
@@ -3076,6 +3924,28 @@
       pal.appendChild(item);
     });
     drawMine();
+    // 🔍 search: type part of a block's name and only matching blocks show
+    // (your own blocks too: a match opens More blocks)
+    const search = el("input");
+    search.type = "search";
+    search.placeholder = "🔍 Search blocks";
+    search.style.marginBottom = "8px";
+    const doSearch = () => {
+      const q = search.value.trim().toLowerCase();
+      const hit = (name) => !q || String(name).toLowerCase().includes(q);
+      const mineHit = !!q && myBlocks.some((b) => hit(b.label));
+      for (const [ch, item] of Object.entries(palItems)) {
+        const name = ch === ERASER ? "erase eraser" : ch === MINE ? "more blocks my blocks" : ch === MEGA_PICK ? "mega blocks" : ch === CONCRETE_PICK ? "concrete colours " + CONCRETES.map((k) => TILES[k].name).join(" ") : (TILES[ch] || {}).name || "";
+        item.classList.toggle("search-hide", !(hit(name) || (ch === MINE && mineHit)));
+      }
+      if (mineHit && trayOpen !== MINE) { trayOpen = MINE; showTray(); }
+      for (const it of tray.children) {
+        const lbl = it.querySelector(".lbl");
+        if (trayOpen === MINE && lbl) it.classList.toggle("search-hide", !!q && !hit(lbl.textContent) && !/new|make/i.test(lbl.textContent));
+      }
+    };
+    search.oninput = doSearch;
+    palPanel.appendChild(search);
     palPanel.appendChild(pal);
     palPanel.appendChild(tray);
     showTray();
@@ -3098,6 +3968,21 @@
     upInput.value = String(upBlocks);
     upInput.style.width = "4em";
     upInput.oninput = () => { upBlocks = clamp(Math.round(+upInput.value) || UP_DEFAULT, 1, MAX_H); };
+    const bgPick = el("select", "music-pick");
+    const ownedForChange = loadBag().bgs;
+    for (const b of Art.BACKGROUNDS) {
+      if (b.mega && !ownedForChange.includes(b.key)) continue; // mega ones once bought
+      const opt = el("option", null, b.label);
+      opt.value = b.key;
+      opt.selected = b.key === changeBg;
+      bgPick.appendChild(opt);
+    }
+    bgPick.onchange = () => { changeBg = bgPick.value; };
+    const miniGamePick = el("select", "music-pick"), miniOppPick = el("select", "music-pick");
+    for (const [k, label] of MINI_GAMES) { const o = el("option", null, label); o.value = k; miniGamePick.appendChild(o); }
+    for (const [k, label] of MINI_OPPS) { const o = el("option", null, label); o.value = k; miniOppPick.appendChild(o); }
+    miniGamePick.onchange = () => { miniGame = miniGamePick.value; };
+    miniOppPick.onchange = () => { miniOpp = miniOppPick.value; };
     const dialogInput = el("input");
     dialogInput.type = "text";
     dialogInput.maxLength = 200;
@@ -3107,7 +3992,16 @@
     const showOpts = () => {
       optRow.innerHTML = "";
       const kind = baseOf(sel);
-      optRow.style.display = kind === "O" || kind === "K" || kind === UP_LIFT_SHORT ? "" : "none";
+      optRow.style.display = kind === "O" || kind === "K" || kind === UP_LIFT_SHORT || kind === BG_CHANGE ? "" : "none";
+      if (kind === MINIGAME) {
+        optRow.style.display = "";
+        optRow.append(el("span", "hint", "Game:"), miniGamePick, el("span", "hint", "against"), miniOppPick,
+          el("span", "hint", "Pick, then tap the grid."));
+      }
+      if (kind === BG_CHANGE) {
+        optRow.append(el("span", "hint", "Changes the background to"), bgPick,
+          el("span", "hint", "Pick, then tap the grid. Tap one again to change it."));
+      }
       if (kind === UP_LIFT_SHORT) {
         optRow.append(el("span", "hint", "Goes up"), upInput,
           el("span", "hint", "blocks. Set this, then tap the grid. Tap one again to change it."));
@@ -3136,6 +4030,15 @@
         : editing === "back"
           ? "🖼 Background is on: blocks you place now go BEHIND the level, darker, and you run right past them. " +
             "Your level shows faded on top. Click 🖼 Background again to go back."
+        : editing === "vac"
+          ? "🌀 Inside the giant vacuum: what you see when it sucks you in and you spam Space to get out. " +
+            "Put 🌀 Fan blocks where the fans spin, and any blocks you like as junk in there. Just for looks: you don't walk in here."
+        : editing === "box"
+          ? "📦 This is inside a Box: where you go when you land on one. Put the Start where you land, and build a way " +
+            "up: getting out of the TOP takes you back to the level. One screen wide, and you can move both ways in here."
+        : editing === "mini"
+          ? "🕹️ This is where a Mini game block sends you. Put the Start where you begin; player 2 (or the computer) " +
+            "starts at the faded spot on the other side. One screen wide. (☄️ Meteor dodge doesn't use it: that one's out in empty space, flying.)"
         : editing === "plains"
           ? "🌾 This is where a Zombie trap sends you. The faded portal shows where the zombie drops in; " +
             "put the Start where you want to land. The plains are always one screen, with the Overworld sky."
@@ -3304,7 +4207,7 @@
     };
 
     const setWidth = (w) => {
-      if (editing === "arena" || editing === "plains") { toast("This arena is always one screen wide"); return; }
+      if (editing === "arena" || editing === "plains" || editing === "mini" || editing === "box" || editing === "vac") { toast("This is always one screen wide"); return; }
       w = clamp(w, editing === "crash" ? ARENA_W : 20, 400);
       if (w === grid[0].length) return;
       pushUndo();
@@ -3356,7 +4259,7 @@
       if (ch === "h" && TRAP_OVER[cur]) ch = TRAP_OVER[cur];
       else if (TRAP_OVER[ch] && isHiddenTnt(cur)) ch = TRAP_OVER[ch];
       const kind = baseOf(ch);
-      const want = kind === "O" ? stopSecs : kind === "K" ? (dialogText.trim() || "Hello!") : kind === UP_LIFT_SHORT ? upBlocks : undefined;
+      const want = kind === "O" ? stopSecs : kind === "K" ? (dialogText.trim() || "Hello!") : kind === UP_LIFT_SHORT ? upBlocks : kind === BG_CHANGE ? changeBg : kind === MINIGAME ? miniGame + ":" + miniOpp : undefined;
       // re-tapping a Stop or Dialog block with a new setting updates it
       if (cur === ch && (want === undefined || notes[noteKey(cx, cy)] === want)) return false;
       if (want !== undefined) notes[noteKey(cx, cy)] = want;
@@ -3364,6 +4267,18 @@
         for (let y = 0; y < grid.length; y++) {
           for (let x = 0; x < w; x++) if (baseOf(grid[y][x]) === "P") grid[y][x] = AIR;
         }
+      }
+      if (kind === MINIGAME) {
+        if (cx + 1 >= w || cy + 1 >= grid.length) { toast("A Mini game block is 2×2: leave room to the right and below"); return false; }
+        for (const [dx, dy] of [[0, 0], [1, 0], [0, 1], [1, 1]]) {
+          grid[cy + dy][cx + dx] = ch;
+          notes[noteKey(cx + dx, cy + dy)] = want;
+        }
+        autosave();
+        return true;
+      }
+      if (baseOf(cur) === MINIGAME && ch !== cur) {
+        for (const [gx, gy] of miniGroup(grid, cx, cy)) { grid[gy][gx] = AIR; delete notes[noteKey(gx, gy)]; }
       }
       grid[cy][cx] = ch;
       autosave();
@@ -3457,10 +4372,16 @@
             if (overOf(ch)) {
               drawTile(ctx, overOf(ch), x * TS, y * TS, TS, animT, false);
               drawTile(ctx, "h", x * TS, y * TS, TS, animT, false);
-            } else if (isMob(ch) || (CRITTERS.includes(baseOf(ch)) && baseOf(ch) !== SLIME_MOB)) {
+            } else if (baseOf(ch) === VACUUM) {
+              Art.drawSprite(ctx, ch, x * TS + TS * 0.5 - TS * VAC_SIZE / 2, (y + 1 - VAC_SIZE) * TS, TS * VAC_SIZE, TS * VAC_SIZE);
+            } else if (CAT_MOBS.includes(baseOf(ch))) {
+              Art.drawSprite(ctx, ch, x * TS, y * TS + TS * 0.25, TS, TS * 0.75);
+            } else if (isMob(ch) || [SKELETON, TNT_SOLDIER, VILLAGER].includes(baseOf(ch))) {
               Art.drawSprite(ctx, ch, x * TS + TS * 0.05, (y - 1) * TS, TS * 0.9, TS * 2);
             } else if (isDoor(ch) || baseOf(ch) === ELEV_DOOR) {
               Art.drawSprite(ctx, ch, x * TS, (y - 1) * TS, TS, TS * 2);
+            } else if (baseOf(ch) === MINIGAME) {
+              drawMiniQuarter(ctx, grid, x, y, x * TS, y * TS, TS);
             } else {
               drawTile(ctx, ch, x * TS, y * TS, TS, animT, y > 0 && isSolid(grid[y - 1][x]));
             }
@@ -3512,6 +4433,20 @@
         ctx.globalAlpha = 0.45;
         Art.drawSprite(ctx, "boss", BOSS_X * TS, BOSS_TOP * TS, 24 * BOSS_PX * TS, 32 * BOSS_PX * TS);
         ctx.restore();
+      } else if (editing === "vac") {
+        ctx.save();
+        ctx.globalAlpha = 0.5;
+        grid.forEach((row, y) => row.forEach((ch, x) => {
+          if (ch === FAN) Art.drawFan(ctx, (x + 0.5) * TS, (y + 0.5) * TS, TS * 2.6, animT);
+        }));
+        ctx.restore();
+      } else if (editing === "mini") {
+        // where player 2 starts: the mirror of the Start
+        const st = findSpawn(grid);
+        ctx.save();
+        ctx.globalAlpha = 0.45;
+        Art.drawPlayer(ctx, (w - 1 - st.x + 0.15) * TS, (st.y + 0.1) * TS, TS * 0.7, TS * 0.9, 0, "playerGalaxy");
+        ctx.restore();
       } else if (editing === "plains") {
         ctx.save();
         ctx.globalAlpha = 0.45;
@@ -3534,14 +4469,19 @@
       for (let y = 0; y < grid.length; y++) {
         for (let x = 0; x < w; x++) {
           const ch = baseOf(grid[y][x]);
-          if (ch !== "O" && ch !== "K" && ch !== UP_LIFT_SHORT) continue;
+          if (ch !== "O" && ch !== "K" && ch !== UP_LIFT_SHORT && ch !== BG_CHANGE && ch !== MINIGAME) continue;
+          if (ch === MINIGAME && miniQuarter(grid, x, y).join() !== "0,0") continue;
           const n = notes[noteKey(x, y)];
-          let label = ch === "O" ? (n || STOP_DEFAULT) + "s" : ch === UP_LIFT_SHORT ? "↑" + (n || UP_DEFAULT) : String(n || "…");
+          let label = ch === "O" ? (n || STOP_DEFAULT) + "s" : ch === UP_LIFT_SHORT ? "↑" + (n || UP_DEFAULT)
+            : ch === BG_CHANGE ? ((Art.BACKGROUNDS.find((b) => b.key === n) || {}).label || "?").split(" ")[0]
+            : ch === MINIGAME ? ({ meteor: "☄️", pvp: "⚔️" }[String(n || MINI_DEFAULT).split(":")[0]] || "⚡") + (String(n || MINI_DEFAULT).endsWith("2p") ? "👥" : "🤖")
+            : String(n || "…");
           if (label.length > 16) label = label.slice(0, 15) + "…";
-          const mid = ch === "O" || ch === UP_LIFT_SHORT;
+          const mid = ch === "O" || ch === UP_LIFT_SHORT || ch === BG_CHANGE || ch === MINIGAME;
           ctx.textAlign = mid ? "center" : "left";
-          const lx = mid ? (x + 0.5) * TS : x * TS + 2;
-          const ly = mid ? y * TS + TS * 0.36 : y * TS;
+          const big = ch === MINIGAME; // centred on the whole 2x2 block
+          const lx = big ? (x + 1) * TS : mid ? (x + 0.5) * TS : x * TS + 2;
+          const ly = big ? y * TS + TS * 0.15 : mid ? y * TS + TS * 0.36 : y * TS;
           ctx.strokeText(label, lx, ly);
           ctx.fillText(label, lx, ly);
         }
@@ -3591,30 +4531,37 @@
 
   // blockdash.js's own names that the play files (blockdash-play-*.js) use
   const BD = {
-    AIR, ARENA_W, arenaBgOf, arenaGrid, ARROW_SPEED, Art, baseOf, bestKey, bgOf, BLAZE_DRIFT,
-    BLAZE_MAX, BLAZE_REACH, BLAZE_SHOOT, blinkOn, BLOCK_STEP, BOSS_BODY, BOSS_HP, BOSS_PX,
-    BOSS_SHOT_SPEED, BOSS_STAGE, BOSS_TOP, BOSS_X, BOUNCE_V, builtinLevels, BULLET_LIFE,
-    BULLET_SPEED, BULLET_TURN, BUTTON, BUTTON_ON, CAT_LOOK, CHASE_SPEED, clamp, COIN_VALUE,
-    COYOTE, CRASH, crashArenaGrid, crashBgOf, CUT_END, dailyLevelDone, dailyNote, dayKey,
-    DOOR_SWING, drawBackLayer, drawCone, drawExplosion, drawPlayer, drawTile, EFFECT_TIME,
-    el, ELEV_DOOR, ELEV_DOOR_OPEN, ELEVATOR, ELEVATOR_BOOST, ENDER_AHEAD, ENDER_BULLET_SPEED,
-    ENDER_NOTICE, ENTER, ENTER_DONE, FALL_ACCEL, FALL_MAX, FALL_PUSH, findSpawn,
-    FIREBALL_SPEED, FLOWED, FLY_THRUST, FLY_UP_V, FLYING_PETS, GALAXY_H, GALAXY_KEY,
-    GALAXY_LOOK, GALAXY_SHOOT, GALAXY_W, galaxyWon, getBest, GHOST_BONUS, GHOST_EVERY,
-    GLIDE_FALL, GLITCH_BLOCKS, GLITCH_COLORS, GLITCH_EVERY, GLITCH_FIX_TIME, GLITCH_HOP,
-    GLITCH_HP, GLITCH_IRON, GLITCH_SIZE, GLITCH_SOLID, GLITCH_SPOTS, GLITCH_STONE,
-    glitchLookOn, GRAVITY, H, HEALTH_MAX, HURT_SAFE, inCone, isDoor, isHidden, isHiddenTnt,
-    isLava, isLogged, isOpenDoor, isSolid, isWire, JUMP_BUFFER, JUMP_V, KEY, LAMP, lapSpeed,
-    LAVA_FALL, LAVA_RISE, LEVER, LEVER_ON, LIFT, loadBag, loadPets, LOGGABLE, MEGA_BASE,
-    MEGA_BLAST, MEGA_BOUNCE_V, MEGATITE_PAYS, MOB_H, MOB_W, musicOf, nextToWater, noteKey,
-    overOf, PET_SOUND, PLAINS_PORTAL, plainsGrid, PLAYER_H, PLAYER_W, POOF_AFTER, PUSH,
-    RAIN_SPEED, saveBag, savePets, setBest, SHIELD_TIME, SHOOT_EVERY, SHOVE, SHOVE_DIST,
-    SINK_MAX, SKELETON, SKELETON_SHOOT, SKELETON_SPEED, SLIME_MOB, SLIME_SIZES,
+    AIR, ARENA_W, arenaBgOf, arenaGrid, ARROW_SPEED, Art, baseOf, bestKey, BG_CHANGE, bgOf,
+    BLAZE_DRIFT, BLAZE_MAX, BLAZE_REACH, BLAZE_SHOOT, blinkOn, BLOCK_STEP, BOSS_BODY,
+    BOSS_HP, BOSS_PX, BOSS_SHOT_SPEED, BOSS_STAGE, BOSS_TOP, BOSS_X, BOUNCE_V, BOX, BOX_OPEN,
+    boxArenaGrid, builtinLevels, BULLET_LIFE, BULLET_SPEED, BULLET_TURN, BUTTON, BUTTON_ON,
+    CARDBOARD, CASTLE_WALL, CAT_BED, CAT_BED_BOUNCE, CAT_DOOR, CAT_LOOK, CAT_MOB, CAT_MOBS,
+    CAT_SPEED, CATNIP, CHASE_SPEED, CHEST, CHEST_OPEN, clamp, CLIMB_V, CLIMBABLE, COIN_VALUE,
+    CONCRETES, COYOTE, CRASH, crashArenaGrid, crashBgOf, CRITTERS, CUT_END, dailyLevelDone,
+    dailyNote, dayKey, DOOR_REACH, DOOR_SWING, drawBackLayer, drawCone, drawExplosion,
+    drawMiniQuarter, drawPlayer, drawTile, EFFECT_TIME, el, ELEV_DOOR, ELEV_DOOR_OPEN,
+    ELEVATOR, ELEVATOR_BOOST, ENDER_AHEAD, ENDER_BULLET_SPEED, ENDER_NOTICE, ENTER,
+    ENTER_DONE, FALL_ACCEL, FALL_MAX, FALL_PUSH, FAN, findSpawn, FIREBALL_SPEED, FLOWED,
+    FLY_THRUST, FLY_UP_V, FLYING_PETS, GALAXY_H, GALAXY_KEY, GALAXY_LOOK, GALAXY_SHOOT,
+    GALAXY_W, galaxyWon, getBest, GHOST_BONUS, GHOST_EVERY, GLIDE_FALL, GLITCH_BLOCKS,
+    GLITCH_COLORS, GLITCH_EVERY, GLITCH_FIX_TIME, GLITCH_HOP, GLITCH_HP, GLITCH_IRON,
+    GLITCH_SIZE, GLITCH_SOLID, GLITCH_SPOTS, GLITCH_STONE, glitchLookOn, GRAVITY, H,
+    HARM_VOID, HEALTH_MAX, HURT_SAFE, inCone, isDoor, isHidden, isHiddenTnt, isLava,
+    isLogged, isOpenDoor, isSolid, isWire, JUMP_BUFFER, JUMP_V, KEY, LAMP, lapSpeed,
+    LAVA_FALL, LAVA_RISE, LEVER, LEVER_ON, LIFT, loadBag, loadPets, LOGGABLE, makeCritter,
+    MEGA_BASE, MEGA_BLAST, MEGA_BOUNCE_V, MEGATITE_PAYS, MINI_DEFAULT, miniArenaGrid,
+    MINIGAME, miniGroup, MOB_H, MOB_W, musicOf, nextToWater, NINE_LIVES, NINE_SAFE, NIP_JUMP,
+    NIP_TIME, noteKey, overOf, PET_SOUND, PLAINS_PORTAL, plainsGrid, PLAT_RANGE, PLAT_SIDE,
+    PLAT_STEP, PLAT_UPDOWN, PLAYER_H, PLAYER_W, POOF_AFTER, PUSH, RAIN_SPEED, saveBag,
+    savePets, SCRATCH_POST, setBest, SHIELD_TIME, SHOOT_EVERY, SHOVE, SHOVE_DIST, SINK_MAX,
+    SKELETON, SKELETON_SHOOT, SKELETON_SPEED, SLEEPY_CAT, SLIME_MOB, SLIME_SIZES,
     SOLDIER_BLAST, SOLDIER_FUSE, SOLDIER_SPEED, SPAWN_EVERY, SPEED_BASE, SPEED_FAST,
     SPEED_SLOW, STILL_PETS, STOP_DEFAULT, SWIM_V, SWORDS, TELEPORT, TILES, TNT_SOLDIER,
-    toast, trailOn, UP_DEFAULT, UP_LIFT, UP_LIFT_SHORT, UP_SPEED, WARP_TIME, WATCH_CYCLE,
-    WATCH_OPEN, WATER, WATER_GRAVITY, WATER_SLOW, WIRE, WIRES, ZOMBIE_HP, ZOMBIE_LIVES,
-    ZOMBIE_SPEED, ZOMBIE_TRAP, ZOMBIE_TRAP_USED
+    toast, trailOn, unlockKitten, unlockPet, UP_DEFAULT, UP_LIFT, UP_LIFT_SHORT, UP_SPEED,
+    VAC_DIRT, VAC_ESCAPE, VAC_FAN, VAC_HP, VAC_LOW, VAC_PULL, VAC_REACH, VAC_SIZE, VAC_SUCK,
+    vacInsideGrid, VACUUM, VILLAGER, VILLAGER_HP, VILLAGER_SPEED, VOID, WALL_JUMP, WARP_TIME,
+    WATCH_CYCLE, WATCH_OPEN, WATER, WATER_GRAVITY, WATER_SLOW, WIRE, WIRES, YARN, ZOMBIE_HP,
+    ZOMBIE_LIVES, ZOMBIE_SPEED, ZOMBIE_TRAP, ZOMBIE_TRAP_USED
   };
 
   // `chain` links a level to the ones after it: { i, count, carried, playNext }.
@@ -3625,6 +4572,7 @@
     const S = {};
     const P = {};
     clear();
+    window.BDMusic.custom(cleanSong(level.song));
     window.BDMusic.level(musicOf(level));
 
     // These three describe the level being played. A Boss portal swaps them
@@ -3762,7 +4710,7 @@
       watchers: [], mobs: [], runT: 0, warp: null, free: false, moveL: false, moveR: false,
       stopT: 0, talk: null, talkAt: 0, poofed: false, inBoss: false, boss: null,
       introSeen: false, cutT: 0, downT: 0, knock: 0, plats: [], flipT: 0, fallers: [], camY: 0,
-      crash: false, armor: galaxyWon() ? 1 : 0, slides: [], blockT: 0, tpSkip: null, entersLeft: 0, doorsLanded: [], critters: [], arrows: [], hp: 4, hurtT: 0, risers: [], powered: new Set(),
+      crash: false, armor: galaxyWon() ? 1 : 0, slides: [], blockT: 0, tpSkip: null, entersLeft: 0, doorsLanded: [], critters: [], arrows: [], hp: 4, hurtT: 0, risers: [], bgNow: null, mini: null, box: null, inside: null, movPlats: [], platT: 0, nipT: 0, climb: null, wallT: 0, wallSide: 1, runDir: 1, lastWall: 0, wallJump: false, nineLives: 0, nineT: 0, safe: null, yarnGot: 0, yarnTotal: 0, powered: new Set(),
     });
 
     const showItems = () => {
@@ -3900,6 +4848,10 @@
       overShown = false;
       S.flipT = 0;
       canvas.style.transform = ""; // The Glitch's screen shake
+      canvas.style.filter = ""; // catnip's rainbow
+      S.nipT = 0;
+      if (S.box) P.leaveBox(false); // died in the Box arena: the level comes back for the respawn
+      S.inside = null; // not inside the giant vacuum any more
       if (fromStart || !S.checkpoint) {
         if (S.run && endRun(false)) ghostBonus();
         startRun();
@@ -3907,6 +4859,8 @@
       S.lifeStep = 0;
       trail.length = 0;
       if (fromStart) {
+        S.wallJump = false; // the cat powers last until you start the level again
+        S.nineLives = 0;
         S.checkpoint = null;
         S.inBoss = false;
         S.crash = false;
@@ -3915,10 +4869,19 @@
         ({ template: S.template, width: S.width, spawn: S.spawn, looks: S.looks } = home);
       }
       const at = S.checkpoint || S.spawn;
+      S.bgNow = S.checkpoint ? S.checkpoint.bg || null : null; // set by Background change blocks
+      S.climb = null;
+      S.wallT = 0;
+      S.runDir = 1;
+      S.lastWall = 0;
+      S.yarnGot = S.checkpoint ? S.checkpoint.yarn || 0 : 0;
+      S.yarnTotal = S.template.reduce((n, row) => n + row.filter((ch) => ch === YARN).length, 0);
       S.grid = (S.checkpoint ? S.checkpoint.grid : S.template).map((r) => r.slice());
       // Lava sources and shooters always restart, even after a save point:
       // grown lava is cleared and the sources start growing again.
       S.movers = [];
+      S.movPlats = [];
+      S.platT = 0;
       S.shooters = [];
       S.bullets = [];
       S.spawners = [];
@@ -3951,6 +4914,7 @@
           } else if (ch === "W" || ch === "Y") {
             S.watchers.push({ x, y, ph: (x * 0.37) % WATCH_CYCLE, stare: ch === "Y" });
           }
+          if (ch === PLAT_SIDE || ch === PLAT_UPDOWN) S.movPlats.push({ x, y, dx: ch === PLAT_SIDE ? 1 : 0, dy: ch === PLAT_UPDOWN ? -1 : 0, went: 0 });
           // creatures live outside the grid while you play; they restart on every respawn
           if (CRITTERS.includes(baseOf(ch))) {
             S.grid[y][x] = AIR;
@@ -3966,6 +4930,8 @@
       quench(S.grid);
       S.zombie = null;
       S.zombieQueued = false;
+      S.mini = null;
+      S.box = null;
       S.powered = new Set();
       S.slides = [];
       S.blockT = 0;
@@ -4078,6 +5044,7 @@
     };
 
     const onKeyDown = (e) => {
+      if (S.mini && P.miniKey(e.key, true)) { e.preventDefault(); return; }
       if (e.key === " " || e.key === "ArrowUp" || e.key === "w" || e.key === "W") {
         e.preventDefault();
         if (e.repeat || S.holding) return;
@@ -4093,6 +5060,7 @@
       }
     };
     const onKeyUp = (e) => {
+      if (S.mini && P.miniKey(e.key, false)) return;
       if (e.key === " " || e.key === "ArrowUp" || e.key === "w" || e.key === "W") S.holding = false;
       else if (e.key === "ArrowLeft" || e.key === "a" || e.key === "A") S.moveL = false;
       else if (e.key === "ArrowRight" || e.key === "d" || e.key === "D") S.moveR = false;
@@ -4100,7 +5068,20 @@
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener("keyup", onKeyUp);
 
-    const press = (e) => { e.preventDefault(); if (!pressJump()) S.holding = true; };
+    // a click on a Cat door next to you (inside a box) uses the door instead of jumping
+    const clickedDoor = (e) => {
+      if (e.currentTarget !== canvas || S.state !== "run") return false;
+      const r = canvas.getBoundingClientRect();
+      const gx = Math.floor(S.camX + ((e.clientX - r.left) / r.width) * canvas.width / TS);
+      const gy = Math.floor(S.camY + ((e.clientY - r.top) / r.height) * canvas.height / TS);
+      if (!S.grid[gy] || S.grid[gy][gx] !== CAT_DOOR) return false;
+      const near = Math.hypot(S.player.x + PLAYER_W / 2 - (gx + 0.5), S.player.y + PLAYER_H / 2 - (gy + 0.5)) < DOOR_REACH;
+      if (!S.box) toast("🚪 Cat doors take you out of a box");
+      else if (!near) toast("🚪 Get next to the cat door, then click it");
+      else P.leaveBox(true);
+      return true;
+    };
+    const press = (e) => { e.preventDefault(); if (clickedDoor(e)) return; if (!pressJump()) S.holding = true; };
     const hold = (btn, set) => {
       btn.addEventListener("pointerdown", (e) => { e.preventDefault(); set(true); });
       for (const ev of ["pointerup", "pointercancel", "pointerleave"]) btn.addEventListener(ev, () => set(false));
@@ -4126,5 +5107,6 @@
 
   // ---------- go ----------
   window.BDMusic.setUpgrades(loadBag().songs);
+  window.BDMusic.mine(loadMySongs());
   showMenu();
 })();

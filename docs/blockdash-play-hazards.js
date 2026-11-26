@@ -7,15 +7,17 @@ window.BDPlayHazards = (S, P, BD) => {
   "use strict";
   const {
     AIR, ARROW_SPEED, baseOf, BLAZE_DRIFT, BLAZE_MAX, BLAZE_REACH, BLAZE_SHOOT, BLOCK_STEP,
-    BOSS_SHOT_SPEED, BULLET_LIFE, BULLET_SPEED, BULLET_TURN, BUTTON_ON, CHASE_SPEED, clamp,
-    ELEV_DOOR, ELEV_DOOR_OPEN, ELEVATOR_BOOST, ENDER_AHEAD, ENDER_BULLET_SPEED, ENDER_NOTICE,
-    ENTER, ENTER_DONE, FALL_ACCEL, FALL_MAX, FALL_PUSH, FIREBALL_SPEED, FLOWED, GLITCH_EVERY,
-    GLITCH_HOP, GLITCH_IRON, GRAVITY, H, HURT_SAFE, inCone, isDoor, isSolid, isWire, JUMP_V,
-    LAMP, LAVA_FALL, LAVA_RISE, LEVER_ON, LIFT, LOGGABLE, MOB_H, MOB_W, nextToWater, noteKey,
-    PLAYER_H, PLAYER_W, PUSH, SHOOT_EVERY, SHOVE, SKELETON, SKELETON_SHOOT, SKELETON_SPEED,
-    SLIME_MOB, SLIME_SIZES, SOLDIER_BLAST, SOLDIER_FUSE, SOLDIER_SPEED, SPAWN_EVERY,
-    TELEPORT, TNT_SOLDIER, UP_DEFAULT, UP_LIFT, UP_LIFT_SHORT, UP_SPEED, WATCH_CYCLE,
-    WATCH_OPEN, WIRE, ZOMBIE_TRAP, ZOMBIE_TRAP_USED
+    BOSS_SHOT_SPEED, BULLET_LIFE, BULLET_SPEED, BULLET_TURN, BUTTON_ON, CAT_MOBS, CAT_SPEED,
+    CHASE_SPEED, clamp, ELEV_DOOR, ELEV_DOOR_OPEN, ELEVATOR_BOOST, ENDER_AHEAD,
+    ENDER_BULLET_SPEED, ENDER_NOTICE, ENTER, ENTER_DONE, FALL_ACCEL, FALL_MAX, FALL_PUSH,
+    FIREBALL_SPEED, FLOWED, GLITCH_EVERY, GLITCH_HOP, GLITCH_IRON, GRAVITY, H, HURT_SAFE,
+    inCone, isDoor, isSolid, isWire, JUMP_V, LAMP, LAVA_FALL, LAVA_RISE, LEVER_ON, LIFT,
+    LOGGABLE, MOB_H, MOB_W, nextToWater, noteKey, PLAT_RANGE, PLAT_SIDE, PLAT_STEP,
+    PLAT_UPDOWN, PLAYER_H, PLAYER_W, PUSH, SHOOT_EVERY, SHOVE, SKELETON, SKELETON_SHOOT,
+    SKELETON_SPEED, SLIME_MOB, SLIME_SIZES, SOLDIER_BLAST, SOLDIER_FUSE, SOLDIER_SPEED,
+    SPAWN_EVERY, TELEPORT, TNT_SOLDIER, toast, UP_DEFAULT, UP_LIFT, UP_LIFT_SHORT, UP_SPEED,
+    VAC_DIRT, VAC_ESCAPE, VAC_FAN, VAC_HP, VAC_LOW, VAC_PULL, VAC_REACH, VAC_SUCK, VACUUM,
+    VILLAGER, VILLAGER_SPEED, WATCH_CYCLE, WATCH_OPEN, WIRE, ZOMBIE_TRAP, ZOMBIE_TRAP_USED
   } = BD;
   const {
     die, explode, gotRod, sparkle, VIEW_COLS
@@ -240,6 +242,7 @@ window.BDPlayHazards = (S, P, BD) => {
     updateFallers(dt);
     updateRisers(dt);
     updateBlocks(dt);
+    updatePlats(dt);
     return false;
   };
 
@@ -269,7 +272,10 @@ window.BDPlayHazards = (S, P, BD) => {
     const born = [];
     for (const c of S.critters) {
       if (c.gone) continue;
-      if (!c.awake && onScreen(c.x)) c.awake = true;
+      // awake once any part is on screen; the giant vacuum also comes after
+      // you from off the screen, when you're anywhere near
+      if (!c.awake && (onScreen(c.x) || onScreen(c.x + c.w) ||
+        (c.kind === VACUUM && Math.abs(p.x - (c.x + c.w / 2)) < 30 && Math.abs(p.y - (c.y + c.h)) < c.h + 4))) c.awake = true;
       if (!c.awake) continue;
       const dir = p.x + PLAYER_W / 2 < c.x + c.w / 2 ? -1 : 1;
       const near = Math.abs(p.x + PLAYER_W / 2 - (c.x + c.w / 2));
@@ -289,6 +295,66 @@ window.BDPlayHazards = (S, P, BD) => {
           c.shootT = SKELETON_SHOOT;
           S.arrows.push({ x: c.x + c.w / 2, y: c.y + c.h - 0.45, dir, life: 3 }); // low: you are shorter than a skeleton
         }
+      } else if (c.kind === VACUUM) {
+        // the giant vacuum boss (see VAC_SUCK): the fight starts when it wakes
+        if (!c.boss) {
+          c.boss = { stage: 1, t: VAC_SUCK, hp: VAC_HP, hurtT: 0, dirt: [], dirtT: 0.6, stairs: [], free: S.free };
+          P.setFree(true);
+          toast("🌀 BOSS: THE GIANT VACUUM!");
+        }
+        const b = c.boss;
+        b.t -= dt;
+        if (b.hurtT > 0) b.hurtT -= dt;
+        c.face = dir;
+        if (b.stage === 1) {
+          // faster and faster after you (through anything), sucking you in
+          c.spd = Math.min(4.5, c.spd + 0.35 * dt);
+          c.x += dir * c.spd * dt;
+          c.step += dt;
+          if (near < VAC_REACH + c.w / 2) {
+            c.sucking = true;
+            const nx = p.x - dir * VAC_PULL * Math.max(0, 1 - near / (VAC_REACH + c.w / 2)) * dt;
+            const col = Math.floor(dir > 0 ? nx : nx + PLAYER_W);
+            if (![Math.floor(p.y + 0.02), Math.floor(p.y + PLAYER_H - 0.02)].some((r) => P.solidAt(col, r))) p.x = nx;
+          } else c.sucking = false;
+        } else c.sucking = false;
+        if (b.stage === 3) {
+          b.dirtT -= dt;
+          if (b.dirtT <= 0) {
+            // along your feet (jump it) or at head height when you jump (stay down)
+            b.dirtT = 0.85;
+            const feet = p.y + PLAYER_H;
+            b.dirt.push({ x: dir > 0 ? c.x + c.w : c.x, y: Math.random() < 0.6 ? feet - 0.45 : feet - 2.4, vx: dir * 6 });
+          }
+        }
+        for (const d of b.dirt) {
+          d.x += d.vx * dt;
+          if (Math.abs(d.x - (c.x + c.w / 2)) > 30 || P.solidAt(Math.floor(d.x), Math.floor(d.y))) d.gone = true;
+          else if (d.x > p.x && d.x < p.x + PLAYER_W && d.y > p.y && d.y < p.y + PLAYER_H) { d.gone = true; die("poof", true); return true; }
+        }
+        b.dirt = b.dirt.filter((d) => !d.gone);
+        if (b.t <= 0) vacNext(c, dir);
+      } else if (c.kind === VILLAGER) {
+        // walks after you, like the zombie
+        if (c.hurtT > 0) c.hurtT -= dt;
+        vx = dir * VILLAGER_SPEED;
+      } else if (CAT_MOBS.includes(c.kind)) {
+        // Cats never hurt you. A sleepy cat jumps up scared when you come
+        // close, then sees you're nice and walks about like the others.
+        if (c.meowT > 0) c.meowT -= dt;
+        if (c.mood === "sleep") {
+          if (near < 2.5 && Math.abs(p.y - c.y) < 3) { c.mood = "scared"; c.vy = -8; c.t = 1.2; window.BDMusic.sfx("cat"); }
+        } else if (c.mood === "scared") {
+          c.t -= dt;
+          if (c.t <= 0 && c.onGround) { c.mood = "happy"; c.t = 2.5; c.face = dir; }
+        } else {
+          if (c.t > 0) c.t -= dt; // hearts for a bit, once it's made friends
+          vx = c.face * CAT_SPEED;
+          c.step += dt;
+          // turn round at a wall or the edge of a drop
+          const ahead = c.face > 0 ? c.x + c.w + 0.05 : c.x - 0.05;
+          if (c.onGround && !mobSolid(ahead, c.y + c.h + 0.05, ahead + 0.01, c.y + c.h + 0.3)) { c.face = -c.face; vx = 0; }
+        }
       } else if (c.kind === TNT_SOLDIER) {
         if (c.fuse > 0) {
           c.fuse += dt;
@@ -306,9 +372,39 @@ window.BDPlayHazards = (S, P, BD) => {
         }
       }
       // walk or hop, falling onto the ground; a step up gets a little hop
+      // (the giant vacuum doesn't: it rolls along at its own height)
+      if (c.kind === VACUUM) {
+        if (!touches(c.x, c.y, c.x + c.w, c.y + c.h)) continue;
+        const b = c.boss;
+        if (b.stage === 2 && p.vy > 0 && p.y + PLAYER_H < c.y + 1.2) {
+          // stomped its top while its battery's out
+          b.hp--;
+          b.hurtT = 0.8;
+          p.vy = -JUMP_V * 0.9;
+          sparkle(c.x + c.w / 2, c.y, ["#d83a4a", "#ffffff", "#ffd54a"]);
+          if (b.hp <= 0) {
+            c.gone = true;
+            clearStairs(b);
+            P.setFree(b.free);
+            explode(c.x + c.w / 2, c.y + c.h / 2, ["#d83a4a", "#8a8aa0", "#ffd54a", "#ffffff"]);
+            toast("🏆 You beat the giant vacuum!");
+          } else {
+            toast(`💥 STOMP! ${b.hp} more!`);
+            vacNext(c, dir); // straight on to the dirt: it's angry
+          }
+        } else if (b.stage === 1 && S.nineT <= 0) {
+          // sucked in! You're inside it until you mash your way out
+          S.inside = { vac: c, got: 0, side: dir, t: VAC_FAN };
+          S.holding = false;
+        } else {
+          p.x = dir > 0 ? c.x + c.w : c.x - PLAYER_W; // otherwise it's just in your way
+        }
+        continue;
+      }
       if (vx) {
         const nx = c.x + vx * dt;
         if (!mobSolid(nx, c.y, nx + c.w, c.y + c.h)) c.x = nx;
+        else if (CAT_MOBS.includes(c.kind)) c.face = -c.face;
         else if (c.onGround && c.kind !== SLIME_MOB) c.vy = -JUMP_V * 0.7;
       }
       c.vy = Math.min(c.vy + GRAVITY * dt, 20);
@@ -324,6 +420,22 @@ window.BDPlayHazards = (S, P, BD) => {
       if (c.y > S.grid.length + 2) { c.gone = true; continue; }
 
       if (!touches(c.x, c.y, c.x + c.w, c.y + c.h)) continue;
+      if (c.kind === VACUUM) { die("poof", true); return true; } // sucked up!
+      if (CAT_MOBS.includes(c.kind)) {
+        // a friendly bump: meow!
+        if (c.meowT <= 0 && c.mood !== "sleep") { c.meowT = 1.6; window.BDMusic.sfx("cat"); }
+        continue;
+      }
+      if (c.kind === VILLAGER && p.vy > 0 && p.y + PLAYER_H < c.y + 0.5) {
+        // a stomp takes one of its lives; it flashes for a moment, then you can stomp again
+        p.vy = -JUMP_V * 0.85;
+        if (c.hurtT > 0) continue;
+        c.hp--;
+        c.hurtT = 0.6;
+        sparkle(c.x + c.w / 2, c.y + 0.3, ["#9a9aa8", "#ffffff", "#5a5a64"]);
+        if (c.hp <= 0) c.gone = true;
+        continue;
+      }
       if (p.vy > 0 && p.y + PLAYER_H < c.y + Math.min(0.45, c.h * 0.5)) {
         // stomped!
         p.vy = -JUMP_V * 0.85;
@@ -354,6 +466,49 @@ window.BDPlayHazards = (S, P, BD) => {
     }
     S.arrows = S.arrows.filter((a) => a.life > 0);
     return false;
+  };
+
+  // ----- The giant vacuum boss's stages -----
+  const clearStairs = (b) => {
+    for (const [x, y] of b.stairs) if (S.grid[y] && S.grid[y][x] === "J") S.grid[y][x] = AIR;
+    b.stairs = [];
+  };
+  // Stage 2: stairs of platforms beside it, on your side, up past its top
+  const buildStairs = (c, b, side) => {
+    const ground = Math.round(c.y + c.h);
+    const edge = side > 0 ? Math.ceil(c.x + c.w) : Math.floor(c.x) - 1;
+    for (let k = 0; ground - 2 * (k + 1) >= 0; k++) {
+      const y = ground - 2 * (k + 1);
+      if (y < c.y - 1.5) break; // the top step is just above its top
+      for (let i = 0; i < 2; i++) {
+        const x = edge + side * ((4 - Math.min(k, 4)) * 2 + i) - (side < 0 ? 0 : 0);
+        if (S.grid[y] && S.grid[y][x] === AIR) { S.grid[y][x] = "J"; b.stairs.push([x, y]); }
+      }
+    }
+  };
+  const vacNext = (c, side) => {
+    const b = c.boss;
+    if (b.stage === 2) clearStairs(b);
+    b.stage = b.stage === 3 ? 1 : b.stage + 1;
+    b.t = b.stage === 1 ? VAC_SUCK : b.stage === 2 ? VAC_LOW : VAC_DIRT;
+    if (b.stage === 1) { b.dirt = []; c.spd = 1.5; }
+    if (b.stage === 2) buildStairs(c, b, side);
+    if (b.stage === 3) b.dirtT = 1.6; // a moment to land before the first dirt
+    toast(b.stage === 1 ? "🌀 It's sucking again!" : b.stage === 2 ? "🔋 LOW BATTERY! Climb up and stomp it!" : "💩 Dirt! Dodge it!");
+  };
+  // Inside the vacuum, each jump press moves you forward; enough pops you
+  // out of its nozzle, and then its battery runs out (stage 2)
+  const mashOut = () => {
+    const ins = S.inside;
+    ins.got++;
+    if (ins.got < VAC_ESCAPE) return;
+    const c = ins.vac, p = S.player;
+    S.inside = null;
+    p.x = ins.side > 0 ? c.x + c.w + 0.4 : c.x - PLAYER_W - 0.4;
+    p.vy = -JUMP_V * 0.6;
+    S.nineT = 1;
+    sparkle(p.x + PLAYER_W / 2, p.y + PLAYER_H / 2, ["#c8b888", "#9a9aa8", "#ffffff"]);
+    if (c.boss.stage === 1) vacNext(c, ins.side);
   };
 
   // ----- Power -----
@@ -440,7 +595,8 @@ window.BDPlayHazards = (S, P, BD) => {
     const p = S.player;
     const groups = [...new Set(S.risers.map((r) => r.group))];
     for (const g of groups) {
-      const mine = S.risers.filter((r) => r.group === g);
+      const mine = S.risers.filter((r) => r.group === g && !r.done);
+      if (!mine.length) continue;
       const ridingNow = mine.some((r) => r.x < p.x + PLAYER_W && r.x + 1 > p.x && Math.abs(p.y + PLAYER_H - r.y) < 0.1);
       // holding jump while riding speeds it up, like the falling elevators
       const speed = UP_SPEED * (ridingNow && S.holding ? ELEVATOR_BOOST : 1);
@@ -471,8 +627,30 @@ window.BDPlayHazards = (S, P, BD) => {
         if (!to) continue;
         const dx = to.x - r.x, dy = to.y - r.y;
         // only if the whole elevator fits there: not off the level, not into blocks
-        const fits = mine.every((m) => m.x + dx >= 0 && m.x + dx < S.width && !P.solidAt(m.x + dx, Math.round(m.y + dy)));
-        if (!fits) continue;
+        const fitsAt = (ddx, ddy) => mine.every((m) => m.x + ddx >= 0 && m.x + ddx < S.width &&
+          Math.round(m.y + ddy) >= 0 && !P.solidAt(m.x + ddx, Math.round(m.y + ddy)));
+        const fits = fitsAt(dx, dy);
+        // Too big to come out with its top at the teleports? Then it comes out
+        // sitting just above them instead, and keeps going up from there.
+        const bottom = Math.max(...mine.map((m) => m.y));
+        const dyAbove = to.y - 1 - bottom;
+        if (!fits && fitsAt(dx, dyAbove)) {
+          for (const m of mine) { m.x += dx; m.y += dyAbove; }
+          if (riding) { p.x += dx; p.y += dyAbove; p.vy = 0; S.warp = { t: 0, from: S.camX }; }
+          g.tpSkip = new Set(mine.map((m) => noteKey(m.x, Math.floor(m.y + 0.5))));
+          break;
+        }
+        if (!fits) {
+          // it can't fit there at all: it drops you off instead
+          if (!riding) continue;
+          p.x = to.x + (1 - PLAYER_W) / 2;
+          p.y = to.y + 1 - PLAYER_H;
+          p.vy = 0;
+          S.warp = { t: 0, from: S.camX };
+          S.tpSkip = noteKey(to.x, to.y);
+          g.tpSkip = new Set(mine.map((m) => noteKey(m.x, Math.floor(m.y + 0.5))));
+          break;
+        }
         for (const m of mine) { m.x += dx; m.y += dy; }
         if (riding) { p.x += dx; p.y += dy; S.warp = { t: 0, from: S.camX }; }
         // the teleports it comes out on (a whole row, maybe) don't send it on again
@@ -519,6 +697,31 @@ window.BDPlayHazards = (S, P, BD) => {
     }
     S.grid[ny][nx] = ch;
     return true;
+  };
+
+  // Moving platforms go one square every PLAT_STEP, PLAT_RANGE squares and
+  // back (or back sooner if something's in the way). Standing on one, you
+  // ride along; one moving sideways into you pushes you.
+  const updatePlats = (dt) => {
+    if (!S.movPlats.length) return;
+    S.platT += dt;
+    if (S.platT < PLAT_STEP) return;
+    S.platT -= PLAT_STEP;
+    const p = S.player;
+    for (const m of S.movPlats) {
+      const ch = S.grid[m.y] && S.grid[m.y][m.x];
+      if (ch !== PLAT_SIDE && ch !== PLAT_UPDOWN) continue; // blown up or gone
+      const free = (x, y) => S.grid[y] && x >= 0 && x < S.width && S.grid[y][x] === AIR;
+      if (m.went >= PLAT_RANGE || !free(m.x + m.dx, m.y + m.dy)) { m.dx = -m.dx; m.dy = -m.dy; m.went = 0; }
+      const nx = m.x + m.dx, ny = m.y + m.dy;
+      if (!free(nx, ny)) continue;
+      const riding = Math.abs(p.y + PLAYER_H - m.y) < 0.15 && p.x < m.x + 1 && p.x + PLAYER_W > m.x;
+      S.grid[ny][nx] = ch;
+      S.grid[m.y][m.x] = AIR;
+      if (riding) { p.x += m.dx; p.y += m.dy; }
+      else if (m.dx && p.x < nx + 1 && p.x + PLAYER_W > nx && p.y < ny + 1 && p.y + PLAYER_H > ny) p.x += m.dx; // shoved along
+      m.x = nx; m.y = ny; m.went++;
+    }
   };
 
   // Every BLOCK_STEP: sliding Shove blocks move on, and Push and Shove blocks
@@ -671,6 +874,7 @@ window.BDPlayHazards = (S, P, BD) => {
   };
 
   return {
+    mashOut,
     moveBlock, updatePower,
     eyeOpen, touches, updateHazards
   };

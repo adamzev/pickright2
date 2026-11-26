@@ -847,5 +847,31 @@ window.BDArtPack = {
       null,null,null,null,null,"#000000",null,"#000000",null,"#000000",null,"#000000",null,null,null,null,
       null,null,null,null,null,"#000000",null,"#000000",null,"#000000",null,"#000000",null,null,null,null
     ]
+  },
+  // Cat flap: a teleport (link it with the Link tool like any teleport) that
+  // looks like a little cat door with a paw on it. Designed by the son.
+  "\ue5ca": {
+    "name": "Cat flap",
+    "base": "\u018c",
+    "w": 16,
+    "h": 16,
+    "px": [
+      null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,
+      null,null,"#c58bff","#c58bff","#c58bff","#c58bff","#c58bff","#c58bff","#c58bff","#c58bff","#c58bff","#c58bff","#c58bff","#c58bff",null,null,
+      null,"#c58bff","#3a2210","#3a2210","#3a2210","#3a2210","#3a2210","#3a2210","#3a2210","#3a2210","#3a2210","#3a2210","#3a2210","#3a2210","#c58bff",null,
+      null,"#c58bff","#3a2210","#a8743a","#a8743a","#a8743a","#a8743a","#a8743a","#a8743a","#a8743a","#a8743a","#a8743a","#a8743a","#3a2210","#c58bff",null,
+      null,"#c58bff","#3a2210","#a8743a","#5a2a9a","#5a2a9a","#5a2a9a","#5a2a9a","#5a2a9a","#5a2a9a","#5a2a9a","#5a2a9a","#a8743a","#3a2210","#c58bff",null,
+      null,"#c58bff","#3a2210","#a8743a","#5a2a9a","#8a4ad8","#8a4ad8","#8a4ad8","#8a4ad8","#8a4ad8","#8a4ad8","#5a2a9a","#a8743a","#3a2210","#c58bff",null,
+      null,"#c58bff","#3a2210","#a8743a","#5a2a9a","#8a4ad8","#8a4ad8","#ffffff","#8a4ad8","#ffffff","#8a4ad8","#5a2a9a","#a8743a","#3a2210","#c58bff",null,
+      null,"#c58bff","#3a2210","#a8743a","#5a2a9a","#8a4ad8","#ffffff","#8a4ad8","#ffffff","#8a4ad8","#8a4ad8","#5a2a9a","#a8743a","#3a2210","#c58bff",null,
+      null,"#c58bff","#3a2210","#a8743a","#5a2a9a","#8a4ad8","#8a4ad8","#8a4ad8","#8a4ad8","#8a4ad8","#8a4ad8","#5a2a9a","#a8743a","#3a2210","#c58bff",null,
+      null,"#c58bff","#3a2210","#a8743a","#5a2a9a","#8a4ad8","#8a4ad8","#ffffff","#ffffff","#ffffff","#8a4ad8","#5a2a9a","#a8743a","#3a2210","#c58bff",null,
+      null,"#c58bff","#3a2210","#a8743a","#5a2a9a","#8a4ad8","#ffffff","#ffffff","#ffffff","#ffffff","#ffffff","#5a2a9a","#a8743a","#3a2210","#c58bff",null,
+      null,"#c58bff","#3a2210","#a8743a","#5a2a9a","#8a4ad8","#8a4ad8","#ffffff","#ffffff","#ffffff","#8a4ad8","#5a2a9a","#a8743a","#3a2210","#c58bff",null,
+      null,"#c58bff","#3a2210","#a8743a","#5a2a9a","#5a2a9a","#5a2a9a","#5a2a9a","#5a2a9a","#5a2a9a","#5a2a9a","#5a2a9a","#a8743a","#3a2210","#c58bff",null,
+      null,"#c58bff","#3a2210","#a8743a","#a8743a","#a8743a","#a8743a","#a8743a","#a8743a","#a8743a","#a8743a","#a8743a","#a8743a","#3a2210","#c58bff",null,
+      null,"#c58bff","#3a2210","#3a2210","#3a2210","#3a2210","#3a2210","#3a2210","#3a2210","#3a2210","#3a2210","#3a2210","#3a2210","#3a2210","#c58bff",null,
+      null,null,"#c58bff","#c58bff","#c58bff","#c58bff","#c58bff","#c58bff","#c58bff","#c58bff","#c58bff","#c58bff","#c58bff","#c58bff",null,null
+    ]
   }
 };

@@ -1560,6 +1560,1032 @@ window.BDArt = (() => {
     "kkkkkkkkkkkkkkkk",
   ], { m: "#8ab4d8", k: "#2a3a54", a: "#6dff7a" });
 
+  // the Background change block's look in the Level Maker (it's invisible in play): a little framed picture
+  const bgChange = paintMap([
+    "kkkkkkkkkkkkkkkk",
+    "kyyyyyyyyyyyyyyk",
+    "kybbbbbbbbbbbbyk",
+    "kybbbbbbbwbbbbyk",
+    "kybbwbbbbbbbbbyk",
+    "kybbbbbbbbbmmbyk",
+    "kybbbbbbbbmmmmyk",
+    "kybbbgbbbbbmmbyk",
+    "kybbgggbbbbbbbyk",
+    "kybgggggbbbbbbyk",
+    "kyggggggggbbbbyk",
+    "kygggggggggggyyk",
+    "kyyyyyyyyyyyyyyk",
+    "kkkkkkkkkkkkkkkk",
+    "................",
+    "................",
+  ], { k: "#3a2a1a", y: "#c9a04a", b: "#4c9fe0", w: "#ffffff", g: "#5fb53a", m: "#ffd54a" });
+
+  // the Mini game block: one big 2x2 picture of a game controller
+  const miniGame = paintMap([
+    "pppppppppppppppppppppppppppppppp",
+    "pppppppppppppppppppppppppppppppp",
+    "ppqqqqqqqqqqqqqqqqqqqqqqqqqqqqpp",
+    "ppqqqqqqqqqqqqqqqqqqqqqqqqqqqqpp",
+    "ppqqqqqqqqqqqqqqqqqqqqqqqqqqqqpp",
+    "ppqqqqqqqqqqqqqqqqqqqqqqqqqqqqpp",
+    "ppqqqqqqqqqqqqqqqqqqqqqqqqqqqqpp",
+    "ppqqqqqqqqqqqqqqqqqqqqqqqqqqqqpp",
+    "ppqqqqqqqqqqqqqqqqqqqqqqqqqqqqpp",
+    "ppqqkkkkkkkkkkkkkkkkkkkkkkkkqqpp",
+    "ppqqkhhhhhhhhhhhhhhhhhhhhhhkqqpp",
+    "ppqqkhhhhhhhhhhhhhhhhhhhhhhkqqpp",
+    "ppqqkggggggggggggggggggggggkqqpp",
+    "ppqqkggggggggggggggggyyggggkqqpp",
+    "ppqqkgggwwwggggggggggyyggggkqqpp",
+    "ppqqkgggwwwggggggggggggggggkqqpp",
+    "ppqqkgwwwwwwwgggggbbggggrrgkqqpp",
+    "ppqqkgwwwwwwwddggddbggggrrgkqqpp",
+    "ppqqkgwwwwwwwggggggggggggggkqqpp",
+    "ppqqkgggwwwggggggggggeeggggkqqpp",
+    "ppqqkgggwwwggggggggggeeggggkqqpp",
+    "ppqqkggggggggggggggggggggggkqqpp",
+    "ppqqkggggggkkkkkkkkkkggggggkqqpp",
+    "ppqqkggggggkqqqqqqqqkggggggkqqpp",
+    "ppqqkggggggkqqqqqqqqkggggggkqqpp",
+    "ppqqkggggggkqqqqqqqqkggggggkqqpp",
+    "ppqqkggggggkqqqqqqqqkggggggkqqpp",
+    "ppqqkkkkkkkkqqqqqqqqkkkkkkkkqqpp",
+    "ppqqqqqqqqqqqqqqqqqqqqqqqqqqqqpp",
+    "ppqqqqqqqqqqqqqqqqqqqqqqqqqqqqpp",
+    "pppppppppppppppppppppppppppppppp",
+    "pppppppppppppppppppppppppppppppp",
+  ], { p: "#4a2a7a", q: "#7a4ac0", k: "#1b1b22", g: "#3a3a48", h: "#55556a", w: "#ffffff", r: "#ff4a4a", b: "#4a9fff", y: "#ffd54a", e: "#5fd35f", d: "#8a8aa0" });
+
+  // Cat: his own cat drawing (petCat in his Art Studio), walking
+  const catWalk = paintMap([
+    "................",
+    "................",
+    "a...........a.a.",
+    "aa.........aaaaa",
+    "aaa........aaaaa",
+    ".aaaaaaaaaabcacb",
+    "..aaaaaaaaaabbba",
+    "..aaaaaaaaaabdba",
+    "..aaaaaaaaa.....",
+    "....a.a.a.a.....",
+    "....a.a.a.a.....",
+    "....a.a.a.a.....",
+  ], { a: "#ff9800", b: "#ffe9c9", c: "#000000", d: "#a855e8" });
+  // the same cat, other foot forward
+  const catWalk2 = paintMap([
+    "................",
+    "................",
+    "a...........a.a.",
+    "aa.........aaaaa",
+    "aaa........aaaaa",
+    ".aaaaaaaaaabcacb",
+    "..aaaaaaaaaabbba",
+    "..aaaaaaaaaabdba",
+    "..aaaaaaaaa.....",
+    "...a.a...a.a....",
+    "...a.a...a.a....",
+    "...a.a...a.a....",
+  ], { a: "#ff9800", b: "#ffe9c9", c: "#000000", d: "#a855e8" });
+  // Sleepy cat: his cat curled up, eyes shut
+  const catSleep = paintMap([
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "............a.a.",
+    "...........aaaaa",
+    "a..........bbbbb",
+    "aaaaaaaaaaaccbcc",
+    "aaaaaaaaaaabbdbb",
+    ".aaaaaaaaaaaaaa.",
+  ], { a: "#ff9800", b: "#ffe9c9", c: "#000000", d: "#a855e8" });
+  // his cat jumping up scared: back arched, tail straight up
+  const catScared = paintMap([
+    "a...............",
+    "a...............",
+    "a.....aaaa..a.a.",
+    "aa..aaaaaaa.aaaa",
+    ".aaaaaaaaaaaaaaa",
+    ".aaaaaaaaaabcbcb",
+    "..aaaaaaaaabbbba",
+    "..aaa.....abdba.",
+    "..a.a.....a.a...",
+    "..a.a.....a.a...",
+    "..a.a.....a.a...",
+    "..a.a.....a.a...",
+  ], { a: "#ff9800", b: "#ffe9c9", c: "#000000", d: "#a855e8" });
+  // Kitten pet: a small one of his cat
+  const petKitten = paintMap([
+    "............",
+    "a.......a.a.",
+    "aa......aaaa",
+    ".aaaaaaabcbc",
+    ".aaaaaaabbbb",
+    ".aaaaaaabdba",
+    "..aaaaaa....",
+    "..a.a.a.a...",
+    "..a.a.a.a...",
+  ], { a: "#ff9800", b: "#ffe9c9", c: "#000000", d: "#a855e8" });
+  // Cat bed: bouncy
+  const catBed = paintMap([
+    "................",
+    "..pppppppppppp..",
+    ".pPPPPPPPPPPPPp.",
+    "pPPPPPPPPPPPPPPp",
+    "pPPccccccccccPPp",
+    "pPccccccccccccPp",
+    "pPccccccccccccPp",
+    "pPccccccccccccPp",
+    "pPPccccccccccPPp",
+    "pPPPPPPPPPPPPPPp",
+    "pPPPPPPPPPPPPPPp",
+    "pPPPPPPPPPPPPPPp",
+    ".pPPPPPPPPPPPPp.",
+    "..pppppppppppp..",
+    "..k..........k..",
+    "..k..........k..",
+  ], { p: "#6a2a7a", P: "#c86ad8", c: "#ffd0e8", k: "#3a1a40" });
+  // Scratching post: rope wound round a post; climb it
+  const scratchPost = paintMap([
+    "....kRrrRrrk....",
+    "....krrRrrRk....",
+    "....krRrrRrk....",
+    "....kRrrRrrk....",
+    "....krrRrrRk....",
+    "....krRrrRrk....",
+    "....kRrrRrrk....",
+    "....krrRrrRk....",
+    "....krRrrRrk....",
+    "....kRrrRrrk....",
+    "....krrRrrRk....",
+    "....krRrrRrk....",
+    "....kRrrRrrk....",
+    "....krrRrrRk....",
+    "..bbbbbbbbbbbb..",
+    ".bBBBBBBBBBBBBb.",
+  ], { k: "#6a4a2a", R: "#a8845a", r: "#d8b888", b: "#5a3a8a", B: "#8a6ad0" });
+  // Cat face block, in his cat's colours
+  const catFace = paintMap([
+    "oo............oo",
+    "ooo..........ooo",
+    "oOOooooooooooOOo",
+    "oOOOooooooooOOOo",
+    "oooooooooooooooo",
+    "oooooooooooooooo",
+    "ooocccoooocccooo",
+    "oooccwooooccwooo",
+    "oooccwooooccwooo",
+    "oooooooooooooooo",
+    "wwwwwoodddoowwww",
+    "oooooooodooooooo",
+    "wwwwwoodooddwwww",
+    "oooooooooooooooo",
+    "oooooooooooooooo",
+    "DDDDDDDDDDDDDDDD",
+  ], { o: "#ff9800", O: "#ffe9c9", c: "#000000", w: "#ffffff", d: "#a855e8", D: "#c86a00" });
+  // Carpet
+  const carpet = paintMap([
+    "ffffffffffffffff",
+    "f.f.f.f.f.f.f.f.",
+    "rrrrrrrrrrrrrrrr",
+    "rRRRRRRRRRRRRRRr",
+    "rRyRRRRyyRRRRyRr",
+    "rRRRRRyRRyRRRRRr",
+    "rRRRRyRRRRyRRRRr",
+    "rRyRRRyRRyRRRyRr",
+    "rRRRRRRyyRRRRRRr",
+    "rRRRRRRRRRRRRRRr",
+    "rRyRRRRyyRRRRyRr",
+    "rRRRRRyRRyRRRRRr",
+    "rRRRRyRRRRyRRRRr",
+    "rRRRRRyRRyRRRRRr",
+    "rRRRRRRyyRRRRRRr",
+    "rrrrrrrrrrrrrrrr",
+  ], { f: "#ffd54a", r: "#7a1a2a", R: "#b8323e", y: "#ffd54a" });
+  // Sofa (cushions on top, then the seat)
+  const sofa = paintMap([
+    "bBBBBBBBBBBBBBBb",
+    "BLLLLLLLLLLLLLLB",
+    "BLLLLLLLLLLLLLLB",
+    "BLLLkLLLLLLkLLLB",
+    "BLLLLLLLLLLLLLLB",
+    "BLLLLLLLLLLLLLLB",
+    "bBBBBBBBBBBBBBBb",
+    "bLLLLLLbbLLLLLLb",
+    "bLLLLLLbbLLLLLLb",
+    "bLLLLLLbbLLLLLLb",
+    "bLLLLLLbbLLLLLLb",
+    "bbbbbbbbbbbbbbbb",
+    "bBBBBBBBBBBBBBBb",
+    "bBBBBBBBBBBBBBBb",
+    "bbbbbbbbbbbbbbbb",
+    ".kk..........kk.",
+  ], { b: "#24407a", B: "#3a62b0", L: "#5a8ae0", k: "#3a2a1a" });
+  // Cat tree: a perch on a post, with a toy hanging off (stack them for a taller tree)
+  const catTree = paintMap([
+    "................",
+    ".tttttttttttttt.",
+    "tTTTTTTTTTTTTTTt",
+    "tTTTTTTTTTTTTTTt",
+    ".tttttttttttttt.",
+    "......kRrk......",
+    "......kRrk..y...",
+    "......krRk..y...",
+    "......kRrk..y...",
+    "......kRrk.yyy..",
+    "......krRk.yyy..",
+    "......kRrk......",
+    "......kRrk......",
+    "......krRk......",
+    "....bbbbbbbb....",
+    "...bBBBBBBBBb...",
+  ], { t: "#8a6ad0", T: "#c8b0ff", k: "#6a4a2a", R: "#a8845a", r: "#d8b888", y: "#ff5a8a", b: "#5a3a8a", B: "#8a6ad0" });
+  // Wall jump power: an up arrow and two cat paws
+  const wallJumpPower = paintMap([
+    "......gggg......",
+    "....gGGGGGGg....",
+    "...gGGwwGGGGg...",
+    "..gGGwwwwGGGGg..",
+    ".gGGwwwwwwGGGGg.",
+    ".gGGGGwwGGGGGGg.",
+    "gGGGGGwwGGGGGGGg",
+    "gGaGaGwwGaGaGGGg",
+    "gGaaaaGGGaaaaGGg",
+    "gGaaaaGGGaaaaGGg",
+    ".gGaaGGGGGaaGGg.",
+    ".gGGGGGGGGGGGGg.",
+    "..gGGGGGGGGGGg..",
+    "...gGGGGGGGGg...",
+    "....gGGGGGGg....",
+    "......gggg......",
+  ], { g: "#2a8a3a", G: "#5fd35f", w: "#ffffff", a: "#ff9800" });
+  // Nine lives power: a cat face and a 9
+  const nineLivesPower = paintMap([
+    "................",
+    "..a..........a..",
+    "..aa........aa..",
+    "..aaaaaaaaaaaa..",
+    ".aaaaaaaaaaaaaa.",
+    ".aaccaaaaaaccaa.",
+    ".aaccaaaaaaccaa.",
+    ".aaaaaaddaaaaaa.",
+    ".aaaaaaaaaaaaaa.",
+    "..aaaaaaaaaaaa..",
+    "...aaaaaaaaaa...",
+    "..........wwww..",
+    "..........w..w..",
+    "..........wwww..",
+    ".............w..",
+    "..........wwww..",
+  ], { a: "#ff9800", c: "#000000", d: "#a855e8", w: "#ffd54a" });
+  // Fish: worth coins, like a diamond
+  const fish = paintMap([
+    "................",
+    "................",
+    "................",
+    "................",
+    "..........bbb...",
+    "b.......bbbBBbb.",
+    "bb....bbBBBBBBbb",
+    "bbb.bbBBBBBBwBBb",
+    "bbbbBBBBBBBBkBBb",
+    "bbb.bbBBBBBBBBbb",
+    "bb....bbBBBBBb..",
+    "b.......bbbbb...",
+    "................",
+    "................",
+    "................",
+    "................",
+  ], { b: "#2a6ae0", B: "#6ab0ff", w: "#ffffff", k: "#000000" });
+  // Yarn ball: rare. Get them all in a level for a kitten pet
+  const yarn = paintMap([
+    "................",
+    "................",
+    "......pppp......",
+    "....pPPpPPpp....",
+    "...pPPpPPpPPp...",
+    "...pPpPPpPPpp...",
+    "..pPPpPPpPPpPp..",
+    "..pPpPPpPPpPPp..",
+    "..pPPpPPpPPpPp..",
+    "..ppPPpPPpPPpp..",
+    "...pPpPPpPPpp...",
+    "...pPPpPPpPPp...",
+    "....ppPPpPpp....",
+    "......pppp.ppp..",
+    "..............p.",
+    "................",
+  ], { p: "#c2185b", P: "#ff6aa8" });
+
+  // Cat leaves: a leafy block you climb, like a scratching post
+  const catLeaves = paintMap([
+    "gGgLgGggGgLgGgGg",
+    "GLGgGLgGgLGgGLgG",
+    "gGgGlgGLgGgGlgGg",
+    "LgGLgGgGgLgGLgGL",
+    "gGlgGgLGgGgGlgGg",
+    "GgGLgGgGlgGLgGgG",
+    "gLgGgGlgGgLgGgLg",
+    "GgGgLGgGLgGgGlGg",
+    "gGlgGgGgGgLgGgGL",
+    "LgGgGLgGlgGgLgGg",
+    "gGLgGgGgGLgGgGlg",
+    "GgGlgGLgGgGlgGgG",
+    "gLgGgGgGLgGgGLgG",
+    "GgGLgGlgGgGLgGgL",
+    "gGgGgLgGgLgGgGlg",
+    "LgGlgGgGLgGgGLgG",
+  ], { g: "#2e8a3a", G: "#3fa84a", L: "#7ad86a", l: "#1e5a2a" });
+
+  // Box: land on top and you jump inside (a little paw print on the side)
+  const boxBlock = paintMap([
+    "kkkkkkkkkkkkkkkk",
+    "kbbbbbbttbbbbbbk",
+    "kbbbbbbttbbbbbbk",
+    "kBBBBBBttBBBBBBk",
+    "kkkkkkkttkkkkkkk",
+    "kbbbbbbbbbbbbbbk",
+    "kbbbbbbbbbbbbbbk",
+    "kbbBbbbbbbbbBbbk",
+    "kbbbbbbbbbbbbbbk",
+    "kbbbbbsbbsbbbbbk",
+    "kbbbbbbssbbbbbbk",
+    "kbbbbbbbbbbbbbbk",
+    "kbbBbbbbbbbbBbbk",
+    "kbbbbbbbbbbbbbbk",
+    "kBBBBBBBBBBBBBBk",
+    "kkkkkkkkkkkkkkkk",
+  ], { k: "#6a4420", b: "#c8955a", B: "#a87840", t: "#e8d8a8", T: "#c8b888", s: "#2a1a10" });
+  // the same box once you've been in it: flaps open
+  const boxOpen = paintMap([
+    "kb............bk",
+    "kbb..........bbk",
+    ".kbb........bbk.",
+    "..kbk......kbk..",
+    "kkkkkkkkkkkkkkkk",
+    "kssssssssssssssk",
+    "kbbbbbbbbbbbbbbk",
+    "kbbBbbbbbbbbBbbk",
+    "kbbbbbbbbbbbbbbk",
+    "kbbbbbsbbsbbbbbk",
+    "kbbbbbbssbbbbbbk",
+    "kbbbbbbbbbbbbbbk",
+    "kbbBbbbbbbbbBbbk",
+    "kbbbbbbbbbbbbbbk",
+    "kBBBBBBBBBBBBBBk",
+    "kkkkkkkkkkkkkkkk",
+  ], { k: "#6a4420", b: "#c8955a", B: "#a87840", t: "#e8d8a8", T: "#c8b888", s: "#2a1a10" });
+  // Cardboard: for building the inside of the Box arena
+  const cardboard = paintMap([
+    "bbbbbbbbbbbbbbbb",
+    "bBbbbBbbbBbbbBbb",
+    "bbbbbbbbbbbbbbbb",
+    "bbBbbbBbbbBbbbBb",
+    "bbbbbbbbbbbbbbbb",
+    "bBbbbBbbbBbbbBbb",
+    "bbbbbbbbbbbbbbbb",
+    "kkkkkkkkkkkkkkkk",
+    "bbbbbbbbbbbbbbbb",
+    "bbBbbbBbbbBbbbBb",
+    "bbbbbbbbbbbbbbbb",
+    "bBbbbBbbbBbbbBbb",
+    "bbbbbbbbbbbbbbbb",
+    "bbBbbbBbbbBbbbBb",
+    "bbbbbbbbbbbbbbbb",
+    "BBBBBBBBBBBBBBBB",
+  ], { k: "#6a4420", b: "#c8955a", B: "#a87840", t: "#e8d8a8", T: "#c8b888", s: "#2a1a10" });
+  // Catnip: a sprig, with sparkles
+  const catnip = paintMap([
+    "................",
+    "......l.........",
+    ".....lLl..l.....",
+    "....lLLLllLl....",
+    "....lLGLlLLl..*.",
+    "...lLLGLLLl.....",
+    "...lLGGLLl......",
+    "..lLLGLLl.......",
+    "..lLGLLl...*....",
+    "...lGLl.........",
+    "....Gl..........",
+    "....G...........",
+    ".*..G...........",
+    "....G.......*...",
+    "...GGG..........",
+    "................",
+  ], { l: "#2e8a3a", L: "#7ad86a", G: "#3a6a2a", "*": "#ffd54a" });
+  // Wallpaper: paw prints, solid
+  const wallpaper = paintMap([
+    "pppppppppppppppp",
+    "pqqqpppppppqqqpp",
+    "pqqqpppppppqqqpp",
+    "pppppppppppppppp",
+    "ppppppqpqpqppppp",
+    "pppppppqqqpppppp",
+    "pppppppqqqpppppp",
+    "pppppppppppppppp",
+    "pqpqpqpppppppppp",
+    "ppqqqppppppqpqpq",
+    "ppqqqpppppppqqqp",
+    "pppppppppppppqqq",
+    "pppppppppppppppp",
+    "PPPPPPPPPPPPPPPP",
+    "pppppppppppppppp",
+    "DDDDDDDDDDDDDDDD",
+  ], { p: "#f4d9b0", q: "#c8955a", P: "#e8c090", D: "#a8743a" });
+  // Giant vacuum cleaner: a big red one with angry eyes, a hose and a nozzle
+  const vacuum = paintMap([
+    "................................",
+    "................................",
+    "..........kkkkkkkkk.............",
+    ".........kRRRRRRRRRk............",
+    "........kRRRRRRRRRRRk...........",
+    ".......kRRWWRRRRRRRRRk..........",
+    ".......kRWWWWRRRRRRRRk..........",
+    ".......kRRWWRRRRRRRRRk..........",
+    ".......kRRRRRRRRRRRRRk..........",
+    "......kRRRRRRRRRRRRRRRk.........",
+    "......kRRRRRwwRRRwwRRRk.........",
+    "......kRRRRwkkwRwkkwRRk.........",
+    "......kRRRRwkkwRwkkwRRk.........",
+    "......kRRRRRwwRRRwwRRRk.........",
+    "......kRRRRRRRRRRRRRRRk.........",
+    "......kRRRRkkkkkkkkRRRk.........",
+    "......kRRRRkWkWkWkkRRRk.........",
+    "......kRRRRRRRRRRRRRRRkhhhh.....",
+    "......kRRRRRRRRRRRRRRRkHHHHh....",
+    "......kgggggggggggggggk...hHh...",
+    "......kgggggggggggggggk....hHh..",
+    "......kggggggggggggggggk....hHh.",
+    ".....kkkkkkkkkkkkkkkkkkk.....hHh",
+    ".....kGGGGGGGGGGGGGGGGGk.....hHh",
+    ".....kGGGGGGGGGGGGGGGGGk...kkkkk",
+    ".....kkkkkkkkkkkkkkkkkkk..kNNNNk",
+    "......kk..........kk.....kNNNNNk",
+    ".....kOOk........kOOk....kkkkkkk",
+    "....kOooOk......kOooOk..........",
+    "....kOooOk......kOooOk..........",
+    ".....kOOk........kOOk...........",
+    "......kk..........kk............",
+  ], { k: "#1b1b22", R: "#d83a4a", W: "#ff9aa8", w: "#ffffff", g: "#8a8aa0", G: "#5a5a70", h: "#3a3a48", H: "#6a6a80", N: "#2a2a30", O: "#3a3a48", o: "#8a8aa0" });
+  // the giant vacuum in stage 2: its battery's flat, with a LOW battery sign on it
+  const vacuumLow = paintMap([
+    "................................",
+    "................................",
+    "..........kkkkkkkkk.............",
+    ".........kRRRRRRRRRk............",
+    "........kRRRRRRRRRRRk...........",
+    ".......kRRWWRRRRRRRRRk..........",
+    ".......kRWWWWRRRRRRRRk..........",
+    ".......kRRWWRRRRRRRRRk..........",
+    ".......kRRRRRRRRRRRRRk..........",
+    "......kkkkkkkkkkkkkkkkkk........",
+    "......kkwwwwwwwwwwwkkrkk........",
+    "......kkwrrkkkkkkkwwkrkk........",
+    "......kkwrrkkkkkkkwwkrkk........",
+    "......kkwrrkkkkkkkwwkkkk........",
+    "......kkwwwwwwwwwwwkkrkk........",
+    "......kkkkkkkkkkkkkkkkkk........",
+    "......kRRRRkWkWkWkkRRRk.........",
+    "......kRRRRRRRRRRRRRRRkhhhh.....",
+    "......kRRRRRRRRRRRRRRRkHHHHh....",
+    "......kgggggggggggggggk...hHh...",
+    "......kgggggggggggggggk....hHh..",
+    "......kggggggggggggggggk....hHh.",
+    ".....kkkkkkkkkkkkkkkkkkk.....hHh",
+    ".....kGGGGGGGGGGGGGGGGGk.....hHh",
+    ".....kGGGGGGGGGGGGGGGGGk...kkkkk",
+    ".....kkkkkkkkkkkkkkkkkkk..kNNNNk",
+    "......kk..........kk.....kNNNNNk",
+    ".....kOOk........kOOk....kkkkkkk",
+    "....kOooOk......kOooOk..........",
+    "....kOooOk......kOooOk..........",
+    ".....kOOk........kOOk...........",
+    "......kk..........kk............",
+  ], { k: "#1b1b22", R: "#d83a4a", W: "#ff9aa8", w: "#ffffff", r: "#ff4a4a", g: "#8a8aa0", G: "#5a5a70", h: "#3a3a48", H: "#6a6a80", N: "#2a2a30", O: "#3a3a48", o: "#8a8aa0" });
+  // the giant vacuum in stage 3: its handle (the hose) comes down flat, pointing
+  // at you like a cannon, to shoot dirt
+  const vacuumHandleDown = paintMap([
+    "................................",
+    "................................",
+    "..........kkkkkkkkk.............",
+    ".........kRRRRRRRRRk............",
+    "........kRRRRRRRRRRRk...........",
+    ".......kRRWWRRRRRRRRRk..........",
+    ".......kRWWWWRRRRRRRRk..........",
+    ".......kRRWWRRRRRRRRRk..........",
+    ".......kRRRRRRRRRRRRRk..........",
+    "......kRRRRRRRRRRRRRRRk.........",
+    "......kRRRRRwwRRRwwRRRk.........",
+    "......kRRRRwkkwRwkkwRRk.........",
+    "......kRRRRwkkwRwkkwRRk.........",
+    "......kRRRRRwwRRRwwRRRk.........",
+    "......kRRRRRRRRRRRRRRRk.........",
+    "......kRRRRkkkkkkkkRRRk.........",
+    "......kRRRRkWkWkWkkRRRk.........",
+    "......kRRRRRRRRRRRRRRRk.....kkkk",
+    "......kRRRRRRRRRRRRRRRk.....kNN.",
+    "......kgggggggggggggggkhhhhhkNN.",
+    "......kgggggggggggggggkHHHHHkNN.",
+    "......kgggggggggggggggghhhhhkNN.",
+    ".....kkkkkkkkkkkkkkkkkkk....kNN.",
+    ".....kGGGGGGGGGGGGGGGGGk....kkkk",
+    ".....kGGGGGGGGGGGGGGGGGk........",
+    ".....kkkkkkkkkkkkkkkkkkk........",
+    "......kk..........kk............",
+    ".....kOOk........kOOk...........",
+    "....kOooOk......kOooOk..........",
+    "....kOooOk......kOooOk..........",
+    ".....kOOk........kOOk...........",
+    "......kk..........kk............",
+  ], { k: "#1b1b22", R: "#d83a4a", W: "#ff9aa8", w: "#ffffff", g: "#8a8aa0", G: "#5a5a70", h: "#3a3a48", H: "#6a6a80", N: "#2a2a30", O: "#3a3a48", o: "#8a8aa0" });
+
+  // Diamond block: in the colours of his own diamond drawing
+  const diamondBlock = paintMap([
+    "DDDDDDDDDDDDDDDD",
+    "DLLLLLLLLLLLLLMD",
+    "DLWWMMMMMMMMMMMD",
+    "DLWMMLMMMMMMMMMD",
+    "DLMMLMMMMMMLMMMD",
+    "DLMLMMMMMMLMMMMD",
+    "DLMMMMMMMMMMMMMD",
+    "DLMMMMMMLMMMMMMD",
+    "DLMMMMMLMMMMMMMD",
+    "DLMMMMMMMMMMMLMD",
+    "DLMMMLMMMMMMLMMD",
+    "DLMMLMMMMMMMMMMD",
+    "DLMMMMMMMMMMMMWD",
+    "DLMMMMMMMMMMMWWD",
+    "DMMMMMMMMMMMMMMD",
+    "DDDDDDDDDDDDDDDD",
+  ], { D: "#1a8f8a", M: "#3ad0c8", L: "#8ff5ee", W: "#ffffff" });
+  // Gold block
+  const goldBlock = paintMap([
+    "DDDDDDDDDDDDDDDD",
+    "DLLLLLLLLLLLLLMD",
+    "DLWWMMMMMMMMMMMD",
+    "DLWMMLMMMMMMMMMD",
+    "DLMMLMMMMMMLMMMD",
+    "DLMLMMMMMMLMMMMD",
+    "DLMMMMMMMMMMMMMD",
+    "DLMMMMMMLMMMMMMD",
+    "DLMMMMMLMMMMMMMD",
+    "DLMMMMMMMMMMMLMD",
+    "DLMMMLMMMMMMLMMD",
+    "DLMMLMMMMMMMMMMD",
+    "DLMMMMMMMMMMMMWD",
+    "DLMMMMMMMMMMMWWD",
+    "DMMMMMMMMMMMMMMD",
+    "DDDDDDDDDDDDDDDD",
+  ], { D: "#b8780f", M: "#f0b61f", L: "#ffe98a", W: "#ffffff" });
+  // Emerald block
+  const emeraldBlock = paintMap([
+    "DDDDDDDDDDDDDDDD",
+    "DLLLLLLLLLLLLLMD",
+    "DLWWMMMMMMMMMMMD",
+    "DLWMMLMMMMMMMMMD",
+    "DLMMLMMMMMMLMMMD",
+    "DLMLMMMMMMLMMMMD",
+    "DLMMMMMMMMMMMMMD",
+    "DLMMMMMMLMMMMMMD",
+    "DLMMMMMLMMMMMMMD",
+    "DLMMMMMMMMMMMLMD",
+    "DLMMMLMMMMMMLMMD",
+    "DLMMLMMMMMMMMMMD",
+    "DLMMMMMMMMMMMMWD",
+    "DLMMMMMMMMMMMWWD",
+    "DMMMMMMMMMMMMMMD",
+    "DDDDDDDDDDDDDDDD",
+  ], { D: "#0f6e2c", M: "#1fae4b", L: "#3fd66e", W: "#b4ffc9" });
+
+  // Cat door: a little wooden door with a cat-face window; click it to get out of a box
+  const catDoor = paintMap([
+    "....kkkkkkkk....",
+    "...kFFFFFFFFk...",
+    "..kFFFFFFFFFFk..",
+    "..kFFdFFFFdFFk..",
+    "..kFFddFFddFFk..",
+    "..kFFddddddFFk..",
+    "..kFdwwddwwdFk..",
+    "..kFdbwddbwdFk..",
+    "..kFddddddddFk..",
+    "..kFdddnndddFk..",
+    "..kFFddddddFFk..",
+    "..kFFFFFFFFFFk..",
+    "..kFFFFFFFFHFk..",
+    "..kFFFFFFFFFFk..",
+    "..kFFFFFFFFFFk..",
+    "..kkkkkkkkkkkk..",
+  ], { k: "#3a2210", F: "#a8743a", d: "#2a1a10", w: "#ffd54a", b: "#000000", n: "#ff9fb0", H: "#ffd54a" });
+
+  // Cat tree post: the trunk, climbable
+  const treePost = paintMap([
+    "....kRrrRrrk....",
+    "....krrRrrRk....",
+    "....krRrrRrk....",
+    "....kRrrRrrk....",
+    "....krrRrrRk....",
+    "....krRrrRrk....",
+    "....kRrrRrrk....",
+    "....krrRrrRk....",
+    "....krRrrRrk....",
+    "....kRrrRrrk....",
+    "....krrRrrRk....",
+    "....krRrrRrk....",
+    "....kRrrRrrk....",
+    "....krrRrrRk....",
+    "....krRrrRrk....",
+    "....kRrrRrrk....",
+  ], { k: "#6a4a2a", R: "#a8845a", r: "#d8b888", t: "#5a3a8a", T: "#8a6ad0", c: "#c8b0ff", d: "#2a1a40" });
+  // Cat tree platform: a carpet perch on top of a post; solid
+  const treePlatform = paintMap([
+    "tttttttttttttttt",
+    "tTcTTcTTTcTTcTTt",
+    "tTTTTTTTTTTTTTTt",
+    "tTTcTTTcTTTTcTTt",
+    "tttttttttttttttt",
+    ".....kRrRrk.....",
+    ".....krRrRk.....",
+    ".....kRrRrk.....",
+    ".....krRrRk.....",
+    ".....kRrRrk.....",
+    ".....krRrRk.....",
+    ".....kRrRrk.....",
+    ".....krRrRk.....",
+    ".....kRrRrk.....",
+    ".....krRrRk.....",
+    ".....kRrRrk.....",
+  ], { k: "#6a4a2a", R: "#a8845a", r: "#d8b888", t: "#5a3a8a", T: "#8a6ad0", c: "#c8b0ff", d: "#2a1a40" });
+  // Cat tree cat house: a carpet cubby with a round door; solid
+  const treeHouse = paintMap([
+    "..tttttttttttt..",
+    ".tTTcTTTTTcTTTt.",
+    "tTTTTTTTTTTTTTTt",
+    "tTTTTddddddTTTTt",
+    "tTTTddddddddTTTt",
+    "tTTddddddddddTTt",
+    "tTTddddddddddTTt",
+    "tTTddddddddddTTt",
+    "tcTddddddddddTct",
+    "tTTddddddddddTTt",
+    "tTTTTTTTTTTTTTTt",
+    "tTcTTTTTcTTTTcTt",
+    "tTTTTTTTTTTTTTTt",
+    "tttttttttttttttt",
+    ".....kRrRrk.....",
+    ".....krRrRk.....",
+  ], { k: "#6a4a2a", R: "#a8845a", r: "#d8b888", t: "#5a3a8a", T: "#8a6ad0", c: "#c8b0ff", d: "#2a1a40" });
+  // Cat tree base: wide carpet at the bottom, with the post going up; solid
+  const treeBase = paintMap([
+    ".....kRrRrk.....",
+    ".....krRrRk.....",
+    ".....kRrRrk.....",
+    ".....krRrRk.....",
+    ".....kRrRrk.....",
+    ".....krRrRk.....",
+    ".....kRrRrk.....",
+    ".....krRrRk.....",
+    "..tttttttttttt..",
+    ".tTTcTTTTTcTTTt.",
+    "tTTTTTTTTTTTTTTt",
+    "tTcTTTTcTTTTcTTt",
+    "tTTTTTTTTTTTTTTt",
+    "tTTTTcTTTTcTTTTt",
+    "tttttttttttttttt",
+    "tttttttttttttttt",
+  ], { k: "#6a4a2a", R: "#a8845a", r: "#d8b888", t: "#5a3a8a", T: "#8a6ad0", c: "#c8b0ff", d: "#2a1a40" });
+  // Cat tree slanted post, leaning right (/): climbable
+  const treeSlantR = paintMap([
+    ".............krR",
+    "............krRr",
+    "...........krRrk",
+    "..........krRrk.",
+    ".........krRrk..",
+    "........krRrk...",
+    ".......krRrk....",
+    "......krRrk.....",
+    ".....krRrk......",
+    "....krRrk.......",
+    "...krRrk........",
+    "..krRrk.........",
+    ".krRrk..........",
+    "krRrk...........",
+    "rRrk............",
+    "Rrk.............",
+  ], { k: "#6a4a2a", R: "#a8845a", r: "#d8b888", t: "#5a3a8a", T: "#8a6ad0", c: "#c8b0ff", d: "#2a1a40" });
+  // Cat tree slanted post, leaning left (\\): climbable
+  const treeSlantL = paintMap([
+    "Rrk.............",
+    "rrRk............",
+    "kRrrk...........",
+    ".krRrk..........",
+    "..krrRk.........",
+    "...kRrrk........",
+    "....krRrk.......",
+    ".....krrRk......",
+    "......kRrrk.....",
+    ".......krRrk....",
+    "........krrRk...",
+    ".........kRrrk..",
+    "..........krRrk.",
+    "...........krrRk",
+    "............kRrr",
+    ".............krR",
+  ], { k: "#6a4a2a", R: "#a8845a", r: "#d8b888", t: "#5a3a8a", T: "#8a6ad0", c: "#c8b0ff", d: "#2a1a40" });
+
+  // Void block: a solid block of empty space, with a few far-off stars
+  const voidBlock = paintMap([
+    "vvvvvvvvvvvvvvvv",
+    "vkkkkkkkkkkkkkkv",
+    "vkkkkkkkkkkkskkv",
+    "vkkkskkkkkkkkkkv",
+    "vkkkkkkkkkkkkkkv",
+    "vkkkkkkkpkkkkkkv",
+    "vkkkkkkkkkkkkkkv",
+    "vkskkkkkkkkkkkkv",
+    "vkkkkkkkkkkskkkv",
+    "vkkkkkkkkkkkkkkv",
+    "vkkkkpkkkkkkkkkv",
+    "vkkkkkkkkkkkkkkv",
+    "vkkkkkkkkkskkkkv",
+    "vkkskkkkkkkkkkkv",
+    "vkkkkkkkkkkkkkkv",
+    "vvvvvvvvvvvvvvvv",
+  ], { v: "#1a1030", k: "#05030c", s: "#8a84aa", p: "#5a2a9a" });
+  // Harmful void block: a red-edged swirl of void; touch it and you're out
+  const harmVoid = paintMap([
+    "r.r.r.r.r.r.r.r.",
+    ".rkkkkkkkkkkkkr.",
+    "rkkpPPPPPPPPpkkr",
+    ".kpPkkkkkkkkPpk.",
+    "rkPkkpPPPPpkkPkr",
+    ".kPkpPkkkkPpkPk.",
+    "rkPkPkkrrkkPkPkr",
+    ".kPkPkrkkrkPkPk.",
+    "rkPkPkrkkrkPkPkr",
+    ".kPkPkkrrkkPkPk.",
+    "rkPkpPkkkkPpkPkr",
+    ".kPkkpPPPPpkkPk.",
+    "rkpPkkkkkkkkPpkr",
+    ".kkpPPPPPPPPpkk.",
+    "rkkkkkkkkkkkkkkr",
+    ".r.r.r.r.r.r.r.r",
+  ], { k: "#05030c", p: "#5a2a9a", P: "#b46bff", r: "#ff3a5a" });
+
+  // Fan: where the fan goes inside the giant vacuum (Inside the vacuum tab)
+  const fanBlock = paintMap([
+    "................",
+    "......kk........",
+    "......kGk.......",
+    "......kGGk......",
+    "...kk.kGGk......",
+    "..kGGkkGk.......",
+    "..kGGGkhhkkk....",
+    ".....khhhhGGk...",
+    "....kkhhhhGGGk..",
+    "...kGGkhhk..kk..",
+    "...kGGGk........",
+    "....kGGk........",
+    "....kGGk........",
+    "....kGk.........",
+    "....kk..........",
+    "................",
+  ], { k: "#2a2a34", G: "#6a6a80", h: "#8a8aa0" });
+
+  // Concrete in 16 colours: flat, with a few specks and a darker bottom edge
+  const concreteLook = (col, dark, speck) => paintMap([
+    "cccccccccccccccc",
+    "cccccccccccccccc",
+    "ccccccdccccccccc",
+    "cccccccccccccccc",
+    "cccccccccccdcccc",
+    "cccccccccccccccc",
+    "ccdccccccccccccc",
+    "cccccccccccccccc",
+    "ccccccccdccccccc",
+    "cccccccccccccccc",
+    "ccccccccccccccdc",
+    "cccdcccccccccccc",
+    "cccccccccccccccc",
+    "ccccccccdccccccc",
+    "cccccccccccccccc",
+    "eeeeeeeeeeeeeeee",
+  ], { c: col, d: speck, e: dark });
+  const concretes = [
+    concreteLook("#f0f0f0", "#c0c0c0", "#d8d8d8"),
+    concreteLook("#a0a0a8", "#808086", "#909097"),
+    concreteLook("#5a5a64", "#484850", "#51515a"),
+    concreteLook("#1e1e24", "#18181c", "#1b1b20"),
+    concreteLook("#7a4a2a", "#613b21", "#6d4225"),
+    concreteLook("#c82a2a", "#a02121", "#b42525"),
+    concreteLook("#f07a1a", "#c06114", "#d86d17"),
+    concreteLook("#f0c81a", "#c0a014", "#d8b417"),
+    concreteLook("#7ad82a", "#61ac21", "#6dc225"),
+    concreteLook("#3a7a2a", "#2e6121", "#346d25"),
+    concreteLook("#1a8a9a", "#146e7b", "#177c8a"),
+    concreteLook("#4ab0e8", "#3b8cb9", "#429ed0"),
+    concreteLook("#2a3ab0", "#212e8c", "#25349e"),
+    concreteLook("#7a2ab0", "#61218c", "#6d259e"),
+    concreteLook("#b02ab0", "#8c218c", "#9e259e"),
+    concreteLook("#f08ab8", "#c06e93", "#d87ca5"),
+  ];
+  // Castle wall: grey stone bricks
+  const castleWall = paintMap([
+    "sssssssksssssssk",
+    "sSSSSSSksSSSSSSk",
+    "sSSSSSSksSSSSSSk",
+    "kkkkkkkkkkkkkkkk",
+    "sssksssssssksssk",
+    "SSSkSSSSSSSkSSSk",
+    "SSSkSSSSSSSkSSSk",
+    "kkkkkkkkkkkkkkkk",
+    "sssssssksssssssk",
+    "sSSSSSSksSSSSSSk",
+    "sSSSSSSksSSSSSSk",
+    "kkkkkkkkkkkkkkkk",
+    "sssksssssssksssk",
+    "SSSkSSSSSSSkSSSk",
+    "SSSkSSSSSSSkSSSk",
+    "kkkkkkkkkkkkkkkk",
+  ], { s: "#a0a0a8", S: "#8a8a94", k: "#5a5a64", d: "#2a2a34", f: "#c82a2a", F: "#f05a4a", p: "#6a4a2a", w: "#3a3a48" });
+  // Battlements: the bumpy top of a castle wall
+  const battlements = paintMap([
+    "sssss......sssss",
+    "sSSSk......sSSSk",
+    "sSSSk......sSSSk",
+    "sSSSk......sSSSk",
+    "kkkkkkkkkkkkkkkk",
+    "sssksssssssksssk",
+    "SSSkSSSSSSSkSSSk",
+    "SSSkSSSSSSSkSSSk",
+    "kkkkkkkkkkkkkkkk",
+    "sssssssksssssssk",
+    "sSSSSSSksSSSSSSk",
+    "sSSSSSSksSSSSSSk",
+    "kkkkkkkkkkkkkkkk",
+    "sssksssssssksssk",
+    "SSSkSSSSSSSkSSSk",
+    "SSSkSSSSSSSkSSSk",
+  ], { s: "#a0a0a8", S: "#8a8a94", k: "#5a5a64", d: "#2a2a34", f: "#c82a2a", F: "#f05a4a", p: "#6a4a2a", w: "#3a3a48" });
+  // Castle window: a dark arched window in the wall (decoration)
+  const castleWindow = paintMap([
+    "sssssssksssssssk",
+    "sSSSSddddddSSSSk",
+    "sSSSddwwwwddSSSk",
+    "kkkddwwwwwwddkkk",
+    "sssdwwwwwwwwdssk",
+    "SSSdwwwwwwwwdSSk",
+    "SSSdwwwwwwwwdSSk",
+    "kkkdwwwwwwwwdkkk",
+    "sssdwwwwwwwwdssk",
+    "sSSdwwwwwwwwdSSk",
+    "sSSdwwwwwwwwdSSk",
+    "kkkdddddddddddkk",
+    "sssksssssssksssk",
+    "SSSkSSSSSSSkSSSk",
+    "SSSkSSSSSSSkSSSk",
+    "kkkkkkkkkkkkkkkk",
+  ], { s: "#a0a0a8", S: "#8a8a94", k: "#5a5a64", d: "#2a2a34", f: "#c82a2a", F: "#f05a4a", p: "#6a4a2a", w: "#3a3a48" });
+  // Flag: a red flag on a pole (decoration)
+  const flagBlock = paintMap([
+    "..p.............",
+    "..pfffffff......",
+    "..pFFFFFFFf.....",
+    "..pfffffffff....",
+    "..pFFFFFFFf.....",
+    "..pfffffff......",
+    "..p.............",
+    "..p.............",
+    "..p.............",
+    "..p.............",
+    "..p.............",
+    "..p.............",
+    "..p.............",
+    "..p.............",
+    ".kpk............",
+    "kkkkk...........",
+  ], { s: "#a0a0a8", S: "#8a8a94", k: "#5a5a64", d: "#2a2a34", f: "#c82a2a", F: "#f05a4a", p: "#6a4a2a", w: "#3a3a48" });
+  // Treasure chest: touch it for a random prize
+  const chestBlock = paintMap([
+    "................",
+    "................",
+    "..kkkkkkkkkkkk..",
+    ".kBBBBBBBBBBBBk.",
+    ".kBbbbbbbbbbbBk.",
+    ".kBbbbbbbbbbbBk.",
+    ".kggggggggggggk.",
+    ".kGGGGGkkGGGGGk.",
+    ".kbbbbbgggbbbbk.",
+    ".kbbbbbgdgbbbbk.",
+    ".kbbbbbbgbbbbbk.",
+    ".kbbbbbbbbbbbbk.",
+    ".kbbbbbbbbbbbbk.",
+    ".kggggggggggggk.",
+    ".kkkkkkkkkkkkkk.",
+    "................",
+  ], { k: "#3a2210", b: "#8a5a2a", B: "#a8743a", g: "#ffd54a", G: "#c8a020", d: "#1b1b22", y: "#fff0a0" });
+  // the treasure chest once it's opened
+  const chestOpenBlock = paintMap([
+    "..kkkkkkkkkkkk..",
+    ".kBBBBBBBBBBBBk.",
+    ".kBbbbbbbbbbbBk.",
+    ".kggggggggggggk.",
+    ".kkkkkkkkkkkkkk.",
+    ".kyyyyyyyyyyyyk.",
+    ".kddddddddddddk.",
+    ".kGGGGGGGGGGGGk.",
+    ".kbbbbbbbbbbbbk.",
+    ".kbbbbbbbbbbbbk.",
+    ".kbbbbbbbbbbbbk.",
+    ".kbbbbbbbbbbbbk.",
+    ".kbbbbbbbbbbbbk.",
+    ".kggggggggggggk.",
+    ".kkkkkkkkkkkkkk.",
+    "................",
+  ], { k: "#3a2210", b: "#8a5a2a", B: "#a8743a", g: "#ffd54a", G: "#c8a020", d: "#1b1b22", y: "#fff0a0" });
+  // Side-to-side platform: a metal plate with a yellow ← → arrow
+  const platSide = paintMap([
+    "kkkkkkkkkkkkkkkk",
+    "kMMMMMMMMMMMMMMk",
+    "kmmmmmmmmmmmmmmk",
+    "kmmyymmmmmmyymmk",
+    "kmyyyyyyyyyyyymk",
+    "kmmyymmmmmmyymmk",
+    "kmmmmmmmmmmmmmmk",
+    "kkkkkkkkkkkkkkkk",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+  ], { k: "#2a2a34", m: "#8a8aa0", M: "#b8b8c8", y: "#ffd54a" });
+  // Up-and-down platform: a metal plate with a yellow ↑ ↓ arrow
+  const platUpDown = paintMap([
+    "kkkkkkkkkkkkkkkk",
+    "kMMMMMMyMMMMMMMk",
+    "kmmmmmyyymmmmmmk",
+    "kmmmmyyyyymmmmmk",
+    "kmmmmmmymmmmmmmk",
+    "kmmmmyyyyymmmmmk",
+    "kmmmmmyyymmmmmmk",
+    "kkkkkkkymkkkkkkk",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+    "................",
+  ], { k: "#2a2a34", m: "#8a8aa0", M: "#b8b8c8", y: "#ffd54a" });
+  // Grey villager: a grey-skinned villager with red eyes, acts like a zombie
+  const villagerMob = paintMap([
+    "....kkkkkk....",
+    "...kSSSSSSk...",
+    "...kSSSSSSk...",
+    "..kSSSSSSSSk..",
+    "..kSrrSSrrSk..",
+    "..kSkkSSkkSk..",
+    "..kSSSnnSSSk..",
+    "..kSSSnnSSSk..",
+    "...kSSnnSSk...",
+    "...kSSSSSSk...",
+    "....kkkkkk....",
+    "..kRRRRRRRRk..",
+    ".kRRRSSSSRRRk.",
+    ".kRRSSSSSSRRk.",
+    ".kSkRRRRRRkSk.",
+    ".kSkRRRRRRkSk.",
+    ".kSkRRRRRRkSk.",
+    "..kkRRRRRRkk..",
+    "...kRRRRRRk...",
+    "...kRRRRRRk...",
+    "...kRRkkRRk...",
+    "...kRRk.kRRk..",
+    "...kGGk..kGGk.",
+    "...kGGk..kGGk.",
+    "...kkkk..kkkk.",
+  ], { k: "#1b1b22", S: "#8a8a94", n: "#6a6a74", r: "#d82a2a", R: "#4a6a3a", G: "#3a3a48" });
+  // Horse pet: for winning a castle level
+  const petHorse = paintMap([
+    "............kk..",
+    "...........kBBk.",
+    "..........kBBBBk",
+    "..........kBBwBk",
+    "..........kBBBBk",
+    ".kkkkkkkkkBBBBk.",
+    "kBBBBBBBBBBBkk..",
+    "kbBBBBBBBBBBk...",
+    ".kBBBBBBBBBBk...",
+    ".kBk.kBk.kBkBk..",
+    ".kBk.kBk.kBkBk..",
+    ".kkk.kkk.kkkkk..",
+  ], { k: "#2a1a10", B: "#a8743a", b: "#5a3a1a", w: "#ffffff" });
+
   const water = paintMap([
     "bbbbbbbbbbbbbbbb",
     "bbbbbbbbbbbbbbbb",
@@ -2201,6 +3227,7 @@ window.BDArt = (() => {
     armorSuit: armorSuit,
     armorCat: armorCat,
     petCat: petCat,
+    petKitten,
     petDog: petDog,
     petFrog: petFrog,
     petParrot: petParrot,
@@ -2299,6 +3326,70 @@ window.BDArt = (() => {
     "\u01aa": tntSoldier,
     "\u01ab": upLift,
     "\u01ac": upLiftShort,
+    "\u01ad": bgChange,
+    "\u01ae": miniGame,
+    "\u01af": catBed,
+    "\u01b0": scratchPost,
+    "\u01b1": catSleep,
+    "\u01b2": catWalk,
+    "\u01b3": wallJumpPower,
+    "\u01b4": nineLivesPower,
+    "\u01b5": fish,
+    "\u01b6": yarn,
+    "\u01b7": catFace,
+    "\u01b8": carpet,
+    "\u01b9": sofa,
+    "\u01ba": catTree,
+    "\u01bb": catLeaves,
+    "\u01bc": boxBlock,
+    "\u01bd": cardboard,
+    "\u01be": boxOpen,
+    "\u01bf": catnip,
+    "\u01c0": vacuum,
+    vacuumLow,
+    vacuumHandleDown,
+    "\u01c1": wallpaper,
+    "\u01c2": diamondBlock,
+    "\u01c3": goldBlock,
+    "\u01c4": emeraldBlock,
+    "\u01c5": catDoor,
+    "\u01c6": treePost,
+    "\u01c7": treePlatform,
+    "\u01c8": treeHouse,
+    "\u01c9": treeBase,
+    "\u01ca": treeSlantR,
+    "\u01cb": treeSlantL,
+    "\u01cc": voidBlock,
+    "\u01cd": harmVoid,
+    "\u01ce": fanBlock,
+    "\u01d0": concretes[0],
+    "\u01d1": concretes[1],
+    "\u01d2": concretes[2],
+    "\u01d3": concretes[3],
+    "\u01d4": concretes[4],
+    "\u01d5": concretes[5],
+    "\u01d6": concretes[6],
+    "\u01d7": concretes[7],
+    "\u01d8": concretes[8],
+    "\u01d9": concretes[9],
+    "\u01da": concretes[10],
+    "\u01db": concretes[11],
+    "\u01dc": concretes[12],
+    "\u01dd": concretes[13],
+    "\u01de": concretes[14],
+    "\u01df": concretes[15],
+    "\u01e0": castleWall,
+    "\u01e1": battlements,
+    "\u01e2": castleWindow,
+    "\u01e3": flagBlock,
+    "\u01e4": chestBlock,
+    "\u01e5": chestOpenBlock,
+    "\u01e6": platSide,
+    "\u01e7": platUpDown,
+    "\u01e8": villagerMob,
+    petHorse,
+    catWalk2,
+    catScared,
     "\u0197": wireRed,
     "\u019d": wireGreen,
     "\u019e": wireBlue,
@@ -2420,6 +3511,69 @@ window.BDArt = (() => {
     { key: "\u01aa", label: "TNT Soldier" },
     { key: "\u01ab", label: "Up elevator" },
     { key: "\u01ac", label: "Up elevator (short)" },
+    { key: "\u01ad", label: "Background change" },
+    { key: "\u01ae", label: "Mini game" },
+    { key: "\u01af", label: "Cat bed" },
+    { key: "\u01b0", label: "Scratching post" },
+    { key: "\u01b1", label: "Sleepy cat" },
+    { key: "\u01b2", label: "Cat" },
+    { key: "catWalk2", label: "Cat (other step)" },
+    { key: "catScared", label: "Cat (scared)" },
+    { key: "\u01b3", label: "Wall jump power" },
+    { key: "\u01b4", label: "Nine lives power" },
+    { key: "\u01b5", label: "Fish" },
+    { key: "\u01b6", label: "Yarn ball" },
+    { key: "\u01b7", label: "Cat face block" },
+    { key: "\u01b8", label: "Carpet" },
+    { key: "\u01b9", label: "Sofa" },
+    { key: "\u01ba", label: "Cat tree" },
+    { key: "\u01bb", label: "Cat leaves" },
+    { key: "\u01bc", label: "Box" },
+    { key: "\u01be", label: "Box (opened)" },
+    { key: "\u01bd", label: "Cardboard" },
+    { key: "\u01bf", label: "Catnip" },
+    { key: "\u01c0", label: "Giant vacuum cleaner" },
+    { key: "vacuumLow", label: "Giant vacuum (low battery)" },
+    { key: "vacuumHandleDown", label: "Giant vacuum (handle down)" },
+    { key: "\u01c1", label: "Wallpaper" },
+    { key: "\u01c2", label: "Diamond block" },
+    { key: "\u01c3", label: "Gold block" },
+    { key: "\u01c4", label: "Emerald block" },
+    { key: "\u01c5", label: "Cat door" },
+    { key: "\u01cc", label: "Void block" },
+    { key: "\u01cd", label: "Harmful void block" },
+    { key: "\u01ce", label: "Fan" },
+    { key: "\u01d0", label: "White concrete" },
+    { key: "\u01d1", label: "Light grey concrete" },
+    { key: "\u01d2", label: "Grey concrete" },
+    { key: "\u01d3", label: "Black concrete" },
+    { key: "\u01d4", label: "Brown concrete" },
+    { key: "\u01d5", label: "Red concrete" },
+    { key: "\u01d6", label: "Orange concrete" },
+    { key: "\u01d7", label: "Yellow concrete" },
+    { key: "\u01d8", label: "Lime concrete" },
+    { key: "\u01d9", label: "Green concrete" },
+    { key: "\u01da", label: "Cyan concrete" },
+    { key: "\u01db", label: "Light blue concrete" },
+    { key: "\u01dc", label: "Blue concrete" },
+    { key: "\u01dd", label: "Purple concrete" },
+    { key: "\u01de", label: "Magenta concrete" },
+    { key: "\u01df", label: "Pink concrete" },
+    { key: "\u01e0", label: "Castle wall" },
+    { key: "\u01e1", label: "Battlements" },
+    { key: "\u01e2", label: "Castle window" },
+    { key: "\u01e3", label: "Flag" },
+    { key: "\u01e4", label: "Treasure chest" },
+    { key: "\u01e5", label: "Treasure chest (open)" },
+    { key: "\u01e6", label: "Side-to-side platform" },
+    { key: "\u01e7", label: "Up-and-down platform" },
+    { key: "\u01e8", label: "Grey villager" },
+    { key: "\u01c6", label: "Cat tree post" },
+    { key: "\u01c7", label: "Cat tree platform" },
+    { key: "\u01c8", label: "Cat tree cat house" },
+    { key: "\u01c9", label: "Cat tree base" },
+    { key: "\u01ca", label: "Cat tree slant /" },
+    { key: "\u01cb", label: "Cat tree slant \\" },
     { key: "\u0197", label: "Red wire" },
     { key: "wireOn0", label: "Red wire (powered)" },
     { key: "\u019d", label: "Green wire" },
@@ -2452,6 +3606,8 @@ window.BDArt = (() => {
     { key: "explosion1", label: "Boom 1" },
     { key: "explosion2", label: "Boom 2" },
     { key: "petCat", label: "Cat pet" },
+    { key: "petKitten", label: "Kitten pet" },
+    { key: "petHorse", label: "Horse pet" },
     { key: "petDog", label: "Dog pet" },
     { key: "petFrog", label: "Frog pet" },
     { key: "petParrot", label: "Parrot pet" },
@@ -2906,6 +4062,10 @@ window.BDArt = (() => {
     { key: "endStorage", label: "📦 End storage rooms" },
     { key: "deepCave", label: "⛏ Deep cave" },
     { key: "night", label: "🌙 Night" },
+    { key: "space", label: "🪐 Outer space" },
+    { key: "catsky", label: "☁️ Cat sky" },
+    { key: "cathouse", label: "🏠 Giant cat house" },
+    { key: "castle", label: "🏰 Castle" },
     // mega: bought in the shop, then pickable in the Level Maker
     { key: "megaOverworld", label: "✨ Mega Overworld", mega: true, base: "overworld" },
     { key: "megaNether", label: "✨ Mega Nether", mega: true, base: "nether" },
@@ -3245,6 +4405,19 @@ window.BDArt = (() => {
   };
 
   // effect: null | "fast" | "slow" (lightning / wither rose tints)
+  // The giant vacuum's fan: four blades spinning round a hub. Inside the
+  // vacuum it's drawn wherever the level put its Fan blocks.
+  const drawFan = (ctx, fx, fy, fr, t, px = Math.max(3, Math.round(fr / 20))) => {
+    ctx.save();
+    ctx.translate(fx, fy);
+    ctx.rotate(t * 9);
+    ctx.fillStyle = "#6a6a80";
+    for (let k = 0; k < 4; k++) { ctx.rotate(Math.PI / 2); ctx.fillRect(-px * 2, 0, px * 4, fr); }
+    ctx.restore();
+    ctx.fillStyle = "#8a8aa0";
+    ctx.fillRect(fx - px * 3, fy - px * 3, px * 6, px * 6);
+  };
+
   const drawBackground = (ctx, kind, W, H, scroll, ts, t, effect) => {
     if (MEGA_LAYERS[kind]) {
       if (kind !== "megaOverworld") drawBackground(ctx, bgBase(kind), W, H, scroll, ts, t, null);
@@ -3413,6 +4586,251 @@ window.BDArt = (() => {
         ctx.fillStyle = "rgba(180, 100, 255, 0.5)";
         ctx.fillRect(x + 17, groundY - h - 10, 12, 10);
       }
+    } else if (kind === "vacuum" || kind === "vacuumBare") {
+      // inside the giant vacuum: dark metal walls with ribs, a big fan
+      // spinning at the back, and dust and junk swirling round
+      const px = Math.max(3, Math.round(ts / 8));
+      ctx.fillStyle = skyGrad(ctx, H, "#2a2a34", "#4a4a58");
+      ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = "rgba(0, 0, 0, 0.25)";
+      for (let x = 0; x < W; x += ts * 1.5) ctx.fillRect(x, 0, px * 2, H); // ribs
+      // the fan (unless the level's own inside says where its fans go)
+      const fx = W / 2, fy = H * 0.38, fr = ts * 2.6;
+      if (kind === "vacuum") drawFan(ctx, fx, fy, fr, t, px);
+      // dust and junk going round
+      for (let i = 0; i < 26; i++) {
+        const a = t * (0.8 + (i % 5) * 0.2) + i * 1.7, r = ts * (1.5 + (i % 7) * 0.9);
+        const jx = fx + Math.cos(a) * r * 1.6, jy = fy + Math.sin(a) * r * 0.8;
+        ctx.fillStyle = ["#9a9aa8", "#c8b888", "#7a6a5a", "#d8d8e0"][i % 4];
+        const sz = i % 3 ? px : px * 2;
+        ctx.fillRect(Math.round(jx), Math.round(jy), sz, sz);
+      }
+    } else if (kind === "box") {
+      // inside a cardboard box: brown walls with ridges, tape, and the open
+      // top letting in the sky (that's the way out)
+      const px = Math.max(3, Math.round(ts / 8));
+      ctx.fillStyle = "#8ec5ff";
+      ctx.fillRect(0, 0, W, ts * 1.2);
+      ctx.fillStyle = "#b8854a";
+      ctx.fillRect(0, ts * 1.2, W, H - ts * 1.2);
+      ctx.fillStyle = "#a87840";
+      for (let x = 0; x < W; x += px * 4) ctx.fillRect(x, ts * 1.2, px, H); // ridges
+      ctx.fillStyle = "#e8d8a8";
+      ctx.fillRect(W / 2 - ts * 0.4, ts * 1.2, ts * 0.8, H); // tape down the middle
+      ctx.fillStyle = "rgba(0, 0, 0, 0.18)";
+      ctx.fillRect(0, ts * 1.2, W, px * 2); // shadow under the rim
+      // the flaps, folded open at the top corners
+      ctx.fillStyle = "#c8955a";
+      for (let k = 0; k < 6; k++) {
+        ctx.fillRect(0, ts * 1.2 - (k + 1) * px * 2, ts * 2.5 - k * px * 3, px * 2);
+        ctx.fillRect(W - ts * 2.5 + k * px * 3, ts * 1.2 - (k + 1) * px * 2, ts * 2.5 - k * px * 3, px * 2);
+      }
+      ctx.fillStyle = "#ffffff";
+      ctx.font = `bold ${Math.round(ts * 0.4)}px ui-monospace, monospace`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("⬆ out ⬆", W / 2, ts * 0.6);
+    } else if (kind === "castle") {
+      // a big stone castle on a hill: towers with battlements and flags,
+      // arched windows, a gate, and green hills in front
+      const px = Math.max(3, Math.round(ts / 8));
+      ctx.fillStyle = skyGrad(ctx, H, "#6ab0f0", "#cfe8ff");
+      ctx.fillRect(0, 0, W, H);
+      const span = W + 900;
+      const cx = Math.round(wrapX(W * 0.35 + 400, scroll, 0.15, span, 450)), base = groundY - ts * 0.5;
+      const block = (x, y, w, h, col) => { ctx.fillStyle = col; ctx.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h)); };
+      const merlons = (x, y, w) => { for (let k = 0; x + k * px * 4 < x + w; k += 2) block(x + k * px * 4, y - px * 3, px * 4, px * 3, "#9a9aa4"); };
+      // the keep in the middle, then two towers
+      block(cx - ts * 3, base - ts * 5, ts * 6, ts * 5, "#9a9aa4"); merlons(cx - ts * 3, base - ts * 5, ts * 6);
+      for (const side of [-1, 1]) {
+        const tx = cx + side * ts * 4 - ts;
+        block(tx, base - ts * 7, ts * 2, ts * 7, "#8a8a94"); merlons(tx, base - ts * 7, ts * 2);
+        block(tx + ts * 0.95, base - ts * 9, px, ts * 2, "#5a3a1a"); // flagpole
+        block(tx + ts * 0.95 + px, base - ts * 9, ts * 0.8, ts * 0.45, Math.sin(t * 4 + side) > 0 ? "#c82a2a" : "#e04a3a");
+        block(tx + ts * 0.7, base - ts * 5.5, ts * 0.6, ts * 0.9, "#3a3a48"); // window
+      }
+      for (const wx of [-1.6, 0.9]) block(cx + wx * ts, base - ts * 3.8, ts * 0.7, ts, "#3a3a48");
+      block(cx - ts * 0.9, base - ts * 2, ts * 1.8, ts * 2, "#4a2a10"); // the gate
+      block(cx - ts * 0.9, base - ts * 2, ts * 1.8, px * 2, "#2a1a08");
+      // hills in front
+      const hspan = W + 300;
+      for (let i = 0; i < 7; i++) {
+        const hx = Math.round(wrapX(i * 190, scroll, 0.3, hspan, 160));
+        block(hx, groundY - ts * 0.9, ts * 4, ts * 2, "#5aa83a");
+        block(hx + px * 3, groundY - ts * 1.3, ts * 4 - px * 6, px * 4, "#6ac04a");
+      }
+    } else if (kind === "catsky") {
+      // Ultra Cat world: a soft sky with cat-shaped clouds and a cat moon,
+      // all square pixels like the rest of the game
+      const px = Math.max(3, Math.round(ts / 8));
+      ctx.fillStyle = skyGrad(ctx, H, "#8ec5ff", "#ffd6ec");
+      ctx.fillRect(0, 0, W, H);
+      // the cat moon: a pale moon with ears and a sleepy face
+      const mx = Math.round(wrapX(W * 0.8, scroll, 0.03, W + 400, 200)), my = Math.round(H * 0.18), mr = Math.round(ts * 1.1 / px) * px;
+      ctx.fillStyle = "#fff6d0";
+      for (let y = -mr; y < mr; y += px) for (let x = -mr; x < mr; x += px) {
+        if ((x + px / 2) ** 2 + (y + px / 2) ** 2 <= mr * mr) ctx.fillRect(mx + x, my + y, px, px);
+      }
+      // two pointy ears on top, a little in from each side
+      for (const side of [-1, 1]) {
+        const ex = mx + side * Math.round(mr * 0.55 / px) * px;
+        for (let k = 0; k < 3; k++) {
+          const w = (2 * k + 1) * px; // a little triangle, point up
+          ctx.fillRect(ex - (w - px) / 2, my - mr + px * (k - 2), w, px);
+        }
+      }
+      ctx.fillStyle = "#c8a040";
+      ctx.fillRect(mx - px * 3, my - px, px * 2, px / 2 + 1); ctx.fillRect(mx + px, my - px, px * 2, px / 2 + 1); // shut eyes
+      ctx.fillRect(mx - px / 2, my + px, px, px / 2 + 1);
+      // cat clouds: a fluffy block with two pointy ears
+      const cspan = W + 600;
+      for (let i = 0; i < 5; i++) {
+        const cx = Math.round(wrapX(i * 340 + 80, scroll, 0.08 + (i % 2) * 0.05, cspan, 220)), cy = Math.round(H * (0.12 + (i % 3) * 0.12));
+        const cw = px * (14 + (i % 3) * 4), ch = px * 5;
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(cx, cy, cw, ch);
+        ctx.fillRect(cx + px, cy - px, cw - px * 2, px);
+        ctx.fillRect(cx + px * 2, cy + ch, cw - px * 4, px);
+        for (const ex of [cx + px * 2, cx + cw - px * 5]) { // ears
+          ctx.fillRect(ex, cy - px * 2, px * 3, px);
+          ctx.fillRect(ex + px, cy - px * 3, px, px);
+        }
+        ctx.fillStyle = "#d8e4ff";
+        ctx.fillRect(cx + px * 3, cy + px * 2, px, px); ctx.fillRect(cx + cw - px * 4, cy + px * 2, px, px); // eyes
+        ctx.fillStyle = "#ffb0c8";
+        ctx.fillRect(cx + cw / 2 - px / 2, cy + px * 3, px, px); // nose
+      }
+      // far hills, pink and purple
+      const hspan = W + 300;
+      for (let i = 0; i < 8; i++) {
+        // a blocky hill: wide at the bottom, stepping in to a narrow top
+        const hx = Math.round(wrapX(i * 170, scroll, 0.18, hspan, 160)), tall = 3 + (i % 3);
+        for (let k = 0; k < tall; k++) {
+          ctx.fillStyle = k === tall - 1 ? "#f2c0e4" : "#e7a6d6";
+          ctx.fillRect(hx + k * px * 3, groundY - (k + 1) * px * 4, ts * 4 - k * px * 6, px * 4);
+        }
+      }
+    } else if (kind === "cathouse") {
+      // inside a giant cat house: you're tiny, so the sofa, the yarn and the
+      // cat tree are huge. A window shows the cat sky outside.
+      const px = Math.max(3, Math.round(ts / 8));
+      ctx.fillStyle = "#f4d9b0";
+      ctx.fillRect(0, 0, W, H);
+      // striped wallpaper with paw prints
+      const off = Math.round(-(scroll * 0.15) % (ts * 2));
+      for (let x = off - ts * 2; x < W + ts * 2; x += ts * 2) {
+        ctx.fillStyle = "#ecc99a";
+        ctx.fillRect(x, 0, ts, H);
+        ctx.fillStyle = "rgba(160, 100, 60, 0.25)";
+        for (let y = ts; y < H - ts * 2; y += ts * 2) {
+          const py = y + (Math.floor(x / ts) % 2) * ts;
+          ctx.fillRect(x + px * 2, py, px * 3, px * 3); // the pad
+          for (let k = 0; k < 3; k++) ctx.fillRect(x + px * (1 + k * 2), py - px * 2, px, px); // toes
+        }
+      }
+      const span = W + 1200;
+      // the window, with the cat sky outside
+      const wx = Math.round(wrapX(W * 0.6, scroll, 0.2, span, 400)), wy = Math.round(H * 0.12), ww = ts * 4, wh = ts * 3;
+      ctx.fillStyle = "#8a5a2a"; ctx.fillRect(wx - px * 2, wy - px * 2, ww + px * 4, wh + px * 4);
+      ctx.fillStyle = "#8ec5ff"; ctx.fillRect(wx, wy, ww, wh);
+      ctx.fillStyle = "#ffffff"; ctx.fillRect(wx + px * 3, wy + px * 4, px * 8, px * 3); ctx.fillRect(wx + px * 4, wy + px * 3, px, px); ctx.fillRect(wx + px * 9, wy + px * 3, px, px);
+      ctx.fillStyle = "#8a5a2a"; ctx.fillRect(wx + ww / 2 - px / 2, wy, px, wh); ctx.fillRect(wx, wy + wh / 2 - px / 2, ww, px);
+      // a giant sofa
+      const sx = Math.round(wrapX(W * 0.15, scroll, 0.3, span, 500)), sy = groundY - ts * 3;
+      ctx.fillStyle = "#24407a"; ctx.fillRect(sx, sy - ts * 1.5, ts * 7, ts * 4.5);
+      ctx.fillStyle = "#3a62b0"; ctx.fillRect(sx + px * 2, sy - ts * 1.5 + px * 2, ts * 7 - px * 4, ts * 1.6);
+      ctx.fillStyle = "#5a8ae0"; ctx.fillRect(sx + ts * 0.5, sy + ts * 0.4, ts * 3, ts); ctx.fillRect(sx + ts * 3.5, sy + ts * 0.4, ts * 3, ts);
+      // a giant yarn ball
+      const yx = Math.round(wrapX(W * 0.95, scroll, 0.3, span, 500)), yr = ts * 1.4, ycy = groundY - yr;
+      for (let y = -yr; y < yr; y += px) for (let x = -yr; x < yr; x += px) {
+        if ((x + px / 2) ** 2 + (y + px / 2) ** 2 > yr * yr) continue;
+        ctx.fillStyle = (Math.floor((x + y) / (px * 2)) % 2) ? "#ff6aa8" : "#c2185b";
+        ctx.fillRect(yx + x, ycy + y, px, px);
+      }
+      ctx.fillStyle = "#c2185b"; ctx.fillRect(yx + yr - px, groundY - px, ts * 2, px); // loose thread
+      // a giant cat tree
+      const tx = Math.round(wrapX(W * 1.35, scroll, 0.3, span, 500));
+      ctx.fillStyle = "#d8b888"; ctx.fillRect(tx + ts, groundY - ts * 6, ts, ts * 6);
+      ctx.fillStyle = "#8a6ad0"; ctx.fillRect(tx, groundY - ts * 6.4, ts * 3, ts * 0.6); ctx.fillRect(tx - ts * 0.5, groundY - ts * 3.4, ts * 2.5, ts * 0.6);
+      // the floor: wooden boards
+      ctx.fillStyle = "#a8743a"; ctx.fillRect(0, groundY, W, H - groundY);
+      ctx.fillStyle = "#8a5a2a";
+      const boff = Math.round(-scroll % (ts * 3));
+      for (let x = boff; x < W; x += ts * 3) ctx.fillRect(x, groundY, px, H - groundY);
+    } else if (kind === "space") {
+      // black space: stars, glowing nebula clouds, a ringed planet, little
+      // planets, the Earth, and a shooting star now and then
+      ctx.fillStyle = skyGrad(ctx, H, "#02010a", "#0a0620");
+      ctx.fillRect(0, 0, W, H);
+      const nspan = W + 600;
+      for (const [i, c] of [[0, "rgba(180, 60, 200, 0.16)"], [1, "rgba(60, 120, 230, 0.14)"], [2, "rgba(230, 80, 140, 0.12)"]]) {
+        const nx = wrapX(i * 520 + 120, scroll, 0.06, nspan, 300), ny = H * (0.2 + i * 0.22);
+        for (let k = 0; k < 6; k++) {
+          ctx.fillStyle = c;
+          const r = ts * (2.2 + ((k * 37 + i * 11) % 7) * 0.4);
+          ctx.fillRect(nx + Math.cos(k * 1.3) * ts * 2 - r / 2, ny + Math.sin(k * 1.9) * ts - r / 2, r, r * 0.6);
+        }
+      }
+      const sspan = W + 300;
+      for (let i = 0; i < 110; i++) {
+        const x = wrapX(i * 89, scroll, 0.05 + (i % 3) * 0.03, sspan, 20);
+        const y = (i * 61) % H;
+        ctx.globalAlpha = 0.4 + 0.5 * Math.sin(t * 2.5 + i * 1.3);
+        ctx.fillStyle = i % 9 ? "#ffffff" : i % 2 ? "#a8d0ff" : "#ffd6f0";
+        ctx.fillRect(x, y, i % 6 ? 2 : 3, i % 6 ? 2 : 3);
+      }
+      ctx.globalAlpha = 1;
+      const pspan = W + 900;
+      // Everything here is made of square pixels, like the rest of the game.
+      const px = Math.max(3, Math.round(ts / 8)); // one "pixel" of a planet
+      // the whole ball is placed by one rounded corner, so its pixels never
+      // shimmer against each other as it glides along
+      const blockyBall = (cx, cy, r, color) => {
+        const bx = Math.round(cx), by = Math.round(cy);
+        ctx.fillStyle = color;
+        for (let y = -r; y < r; y += px) {
+          for (let x = -r; x < r; x += px) {
+            if ((x + px / 2) ** 2 + (y + px / 2) ** 2 <= r * r) ctx.fillRect(bx + x, by + y, px, px);
+          }
+        }
+      };
+      const snap = (v) => Math.round(v / px) * px;
+      // a big ringed planet, with stripes and a blocky ring
+      const rx = Math.round(wrapX(W * 0.25 + 300, scroll, 0.1, pspan, 300)), ry = Math.round(H * 0.3), rr = snap(ts * 1.6);
+      blockyBall(rx, ry, rr, "#c98a4a");
+      ctx.fillStyle = "#e0a868"; ctx.fillRect(rx - rr + px, ry - snap(rr * 0.4), rr * 2 - px * 2, px * 2);
+      ctx.fillStyle = "#a8683a"; ctx.fillRect(rx - rr + px, ry + snap(rr * 0.2), rr * 2 - px * 2, px * 2);
+      // its ring: a blocky oval; the back half hides behind the planet
+      ctx.fillStyle = "#f0dca8";
+      for (let a = 0; a < Math.PI * 2; a += 0.04) {
+        const x = Math.cos(a) * rr * 2, y = Math.sin(a) * rr * 0.45;
+        if (y < 0 && x * x + y * y < rr * rr) continue; // behind the planet
+        ctx.fillRect(rx + snap(x), ry + snap(y), px, px);
+      }
+      // the Earth: blue, with blocky land and a cloud
+      const ex = Math.round(wrapX(W * 0.78 + 300, scroll, 0.08, pspan, 300)), ey = Math.round(H * 0.22), er = snap(ts * 1.1);
+      blockyBall(ex, ey, er + px, "rgba(120, 180, 255, 0.3)");
+      blockyBall(ex, ey, er, "#2a6ae0");
+      ctx.fillStyle = "#4fb53a";
+      ctx.fillRect(ex - px * 4, ey - px * 3, px * 4, px * 3); ctx.fillRect(ex - px * 3, ey, px * 2, px * 2);
+      ctx.fillRect(ex + px, ey + px, px * 3, px * 3); ctx.fillRect(ex + px * 2, ey - px * 2, px * 2, px);
+      ctx.fillStyle = "rgba(255, 255, 255, 0.8)"; ctx.fillRect(ex - px * 5, ey - px * 6, px * 5, px);
+      // little planets
+      for (const [i, col] of [[0, "#8a6ae0"], [1, "#e06a6a"], [2, "#6ae0c0"]]) {
+        const lx = Math.round(wrapX(i * 640 + W * 0.55 + 120, scroll, 0.14, pspan, 120)), ly = Math.round(H * (0.55 - i * 0.12));
+        blockyBall(lx, ly, snap(ts * (0.35 + i * 0.12)) || px * 2, col);
+      }
+      // a shooting star every few seconds
+      const cyc = (t % 4) / 4;
+      if (cyc < 0.25) {
+        const k = cyc / 0.25, sx = W * (0.9 - k * 0.7), sy = H * (0.08 + k * 0.3);
+        for (let n = 0; n < 8; n++) {
+          ctx.globalAlpha = 1 - n / 8;
+          ctx.fillStyle = "#ffffff";
+          ctx.fillRect(Math.round(sx + n * px * 1.4), Math.round(sy - n * px * 0.6), px, px);
+        }
+        ctx.globalAlpha = 1;
+      }
     } else if (kind === "night") {
       // a dark blue sky, twinkling stars, the moon, and hills in shadow
       ctx.fillStyle = skyGrad(ctx, H, "#070b24", "#1f2f63");
@@ -3528,6 +4946,7 @@ window.BDArt = (() => {
     drawExplosion,
     drawCloud,
     drawEraser,
+    drawFan,
     drawBackground,
     BACKGROUNDS,
     bgBase,

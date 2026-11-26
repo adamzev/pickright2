@@ -7,9 +7,10 @@ window.BDPlayBosses = (S, P, BD) => {
   "use strict";
   const {
     AIR, ARENA_W, arenaBgOf, arenaGrid, BOSS_BODY, BOSS_HP, BOSS_PX, BOSS_STAGE, BOSS_TOP,
-    BOSS_X, BULLET_LIFE, clamp, crashArenaGrid, CUT_END, ENDER_BULLET_SPEED, findSpawn,
-    GALAXY_H, GALAXY_SHOOT, GALAXY_W, GLITCH_BLOCKS, GLITCH_COLORS, GLITCH_FIX_TIME,
-    GLITCH_HP, GLITCH_SIZE, GLITCH_SOLID, GLITCH_SPOTS, GRAVITY, H, JUMP_V, MOB_H, MOB_W,
+    BOSS_X, BOX_OPEN, boxArenaGrid, BULLET_LIFE, clamp, crashArenaGrid, CRITTERS, CUT_END,
+    ENDER_BULLET_SPEED, findSpawn, GALAXY_H, GALAXY_SHOOT, GALAXY_W, GLITCH_BLOCKS,
+    GLITCH_COLORS, GLITCH_FIX_TIME, GLITCH_HP, GLITCH_SIZE, GLITCH_SOLID, GLITCH_SPOTS,
+    GRAVITY, H, JUMP_V, makeCritter, MINI_DEFAULT, miniArenaGrid, MOB_H, MOB_W,
     PLAINS_PORTAL, plainsGrid, PLAYER_H, PLAYER_W, RAIN_SPEED, toast, ZOMBIE_HP,
     ZOMBIE_LIVES, ZOMBIE_SPEED
   } = BD;
@@ -420,6 +421,308 @@ window.BDPlayBosses = (S, P, BD) => {
     return false;
   };
 
+  // ----- The Box arena -----
+  // Land on a Box and you're inside it: the level is put aside (like for a
+  // mini game) for the level's Box arena. Out of the top, you're back on the
+  // box, which is open now so you don't fall straight back in.
+  const BOX_KEEP = ["movers", "shooters", "bullets", "spawners", "blazes", "fireballs", "watchers", "mobs", "plats", "fallers", "slides", "doorsLanded", "critters", "arrows", "risers"];
+  const startBox = (bx, by) => {
+    const back = { player: { ...S.player }, free: S.free, flying: S.flying };
+    for (const k of WORLD.concat(["risers"])) back[k] = S[k];
+    [S.template, S.looks] = strip(boxArenaGrid(level.box));
+    S.grid = S.template.map((r) => r.slice());
+    S.width = ARENA_W;
+    for (const k of BOX_KEEP) S[k] = [];
+    S.powered = new Set();
+    // creatures someone put in the box come alive in there
+    S.grid.forEach((row, y) => row.forEach((ch, x) => {
+      if (CRITTERS.includes(ch)) { row[x] = AIR; S.critters.push(makeCritter(ch, x, y)); }
+    }));
+    const at = findSpawn(S.grid);
+    S.player.x = at.x + (1 - PLAYER_W) / 2;
+    S.player.y = at.y + (1 - PLAYER_H);
+    S.player.vy = 0;
+    S.camX = 0;
+    S.camY = 0;
+    S.flying = false;
+    S.climb = null;
+    S.runDir = 1;
+    setFree(true);
+    S.box = { x: bx, y: by, back };
+    S.warp = null;
+    P.sparkle(at.x + 0.5, at.y + 0.5, ["#c8955a", "#ffd9a0", "#ffffff"]);
+  };
+  // onTop: you climbed out, so you land on the (now open) box. Without it
+  // (you got out by dying), the level is just put back for the respawn.
+  const leaveBox = (onTop) => {
+    const b = S.box;
+    if (!b) return;
+    for (const k of WORLD.concat(["risers"])) S[k] = b.back[k];
+    setFree(b.back.free);
+    S.flying = b.back.flying;
+    S.box = null;
+    S.climb = null;
+    if (!onTop) return;
+    S.grid[b.y][b.x] = BOX_OPEN;
+    S.player = { ...b.back.player, x: b.x + (1 - PLAYER_W) / 2, y: b.y - PLAYER_H, vy: -JUMP_V * 0.6, onGround: false };
+    P.sparkle(b.x + 0.5, b.y, ["#c8955a", "#ffd9a0", "#ffffff"]);
+  };
+
+  // ----- Mini games: Laser dodge and Meteor dodge -----
+  // The level is put aside (like for the Zombie trap) while you're in the
+  // level's mini game arena with player 2 (arrow keys) or the computer.
+  const MINI_COUNT = 3, P2_SPEED = 6.5;
+  // Meteor dodge is in space: no platforms, and you float (up, down, or stay put)
+  const SPACE_FLY = 6;
+  // PvP: 5 hits each; a sword swing reaches just over a block, shots fly straight
+  const PVP_HP = 5, SWORD_REACH = 1.4, SWORD_WAIT = 0.45, SHOT_WAIT = 0.7, SHOT_SPEED = 13, PVP_SAFE = 0.6;
+  const startMini = (setting) => {
+    const [game, opp] = String(setting || MINI_DEFAULT).split(":");
+    const back = {};
+    for (const k of WORLD) back[k] = S[k];
+    back.player = { ...S.player };
+    back.risers = S.risers;
+    back.free = S.free;
+    [S.template, S.looks] = game === "meteor"
+      ? strip(Array.from({ length: H }, () => Array(ARENA_W).fill(AIR)))
+      : strip(miniArenaGrid(level.mini));
+    S.grid = S.template.map((r) => r.slice());
+    S.width = ARENA_W;
+    for (const k of ["movers", "shooters", "bullets", "spawners", "blazes", "fireballs", "watchers", "mobs", "plats", "fallers", "slides", "doorsLanded", "critters", "arrows", "risers"]) S[k] = [];
+    S.powered = new Set();
+    const at = game === "meteor" ? { x: 3, y: Math.floor(H / 2) } : findSpawn(S.grid);
+    S.player.x = at.x + (1 - PLAYER_W) / 2;
+    S.player.y = at.y + (1 - PLAYER_H);
+    S.player.vy = 0;
+    S.camX = 0;
+    S.camY = 0;
+    setFree(true);
+    S.moveL = S.moveR = S.holding = false;
+    const x2 = S.width - 1 - at.x;
+    S.mini = { game, opp, back, phase: "count", t: 0, play: 0, spawnT: 0.8, hazards: [], cpuT: 0,
+      p2: { x: x2 + (1 - PLAYER_W) / 2, y: at.y + (1 - PLAYER_H), vy: 0, onGround: false, left: false, right: false, hold: false, alive: true,
+        face: -1, hp: PVP_HP, swordT: 0, shotT: 0, swing: 0, safeT: 0, wantSword: false, wantShot: false },
+      p1: { down: false, face: 1, hp: PVP_HP, swordT: 0, shotT: 0, swing: 0, safeT: 0, wantSword: false, wantShot: false },
+      shots: [] };
+    S.state = "mini";
+  };
+  // the arrow keys belong to player 2 in a two-player game
+  const miniKey = (key, down) => {
+    const m = S.mini;
+    if (!m) return false;
+    if (m.game === "meteor") {
+      // going down: Shift or S (or ↓ when there's no player 2)
+      if (key === "Shift" || key === "s" || key === "S" || (key === "ArrowDown" && m.opp !== "2p")) { m.p1.down = down; return true; }
+      if (key === "ArrowDown" || key === "ArrowUp") {
+        if (m.opp !== "2p") return false; // ↑ is your jump key then
+        if (key === "ArrowDown") m.p2.down = down; else m.p2.hold = down;
+        return true;
+      }
+    }
+    if (m.game === "pvp" && (key === "s" || key === "S" || key === "e" || key === "E")) {
+      if (down) { if (key === "s" || key === "S") m.p1.wantSword = true; else m.p1.wantShot = true; }
+      return true;
+    }
+    if (m.opp !== "2p") return false;
+    const p2 = m.p2;
+    if (key === "ArrowLeft") p2.left = down;
+    else if (key === "ArrowRight") p2.right = down;
+    else if (key === "ArrowUp") p2.hold = down;
+    else if (key === "ArrowDown" && m.game === "pvp") { if (down) p2.wantSword = true; }
+    else if ((key === "Enter" || key === "/") && m.game === "pvp") { if (down) p2.wantShot = true; }
+    else return false;
+    return true;
+  };
+  const updateMiniIntro = (dt) => {
+    const m = S.mini;
+    m.t += dt;
+    if (m.t >= MINI_COUNT) { m.phase = "play"; m.t = 0; S.state = "run"; }
+  };
+  const boxHit = (x, y, w, h, bx, by, bw, bh) => x < bx + bw && x + w > bx && y < by + bh && y + h > by;
+  const hazardHits = (h, x, y) => (h.kind === "laser" ? h.warn <= 0 && h.beam > 0 && x < h.x + 1 && x + PLAYER_W > h.x
+    : boxHit(x, y, PLAYER_W, PLAYER_H, h.x, h.y, 0.9, 0.9));
+  // the computer: when something's coming down on it, it moves out of the way
+  // (a moment late, so it can be beaten); otherwise it ambles about
+  // in PvP the computer walks up and swings, or shoots when you're level with it
+  const cpuFight = (m, p2) => {
+    const p = S.player, dx = p.x - p2.x, dy = p.y - p2.y;
+    p2.left = p2.right = false;
+    const close = Math.abs(dx) < SWORD_REACH && Math.abs(dy) < 0.9;
+    if (close) { if (Math.random() < 0.3) p2.wantSword = true; }
+    else if (Math.abs(dy) < 0.6 && Math.random() < 0.12) p2.wantShot = true;
+    if (!close && Math.random() < 0.6) { if (dx > 0) p2.right = true; else p2.left = true; }
+    else if (close && Math.random() < 0.3) { if (dx > 0) p2.left = true; else p2.right = true; } // back off a bit
+    p2.hold = dy < -1 ? Math.random() < 0.6 : Math.random() < 0.1;
+    if (dx) p2.face = dx > 0 ? 1 : -1;
+  };
+  const cpuThink = (m, p2, dt) => {
+    m.cpuT -= dt;
+    if (m.cpuT > 0) return;
+    m.cpuT = 0.18 + Math.random() * 0.12;
+    // in PvP it thinks slower, so you get time to hit back
+    if (m.game === "pvp") { m.cpuT += 0.2; cpuFight(m, p2); return; }
+    const mid = p2.x + PLAYER_W / 2;
+    const threat = m.hazards.find((h) => (h.kind === "laser" ? h.warn > 0 && Math.abs(h.x + 0.5 - mid) < 1.3
+      : h.y < p2.y && Math.abs(h.x + 0.45 - mid) < 1.4));
+    p2.left = p2.right = false;
+    if (threat && Math.random() > 0.12) {
+      const away = (threat.kind === "laser" ? threat.x + 0.5 : threat.x + 0.45) < mid ? 1 : -1;
+      const dir = (away > 0 && p2.x > S.width - 2) || (away < 0 && p2.x < 1) ? -away : away;
+      if (dir > 0) p2.right = true; else p2.left = true;
+    } else if (Math.random() < 0.3) {
+      if (Math.random() < 0.5) p2.left = true; else p2.right = true;
+    }
+    p2.hold = Math.random() < 0.08;
+    if (m.game === "meteor") { const r = Math.random(); p2.hold = r < 0.25; p2.down = r > 0.75; }
+  };
+  const moveP2 = (m, dt) => {
+    const p2 = m.p2;
+    if (!p2.alive) return;
+    if (m.opp === "cpu") cpuThink(m, p2, dt);
+    const dir = (p2.right ? 1 : 0) - (p2.left ? 1 : 0);
+    if (dir && !(m.opp === "cpu" && m.game === "pvp")) p2.face = dir;
+    if (dir) {
+      const nx = clamp(p2.x + dir * P2_SPEED * dt, 0, S.width - PLAYER_W);
+      const col = Math.floor(dir > 0 ? nx + PLAYER_W : nx);
+      if (![Math.floor(p2.y + 0.02), Math.floor(p2.y + PLAYER_H - 0.02)].some((r) => P.solidAt(col, r))) p2.x = nx;
+    }
+    if (m.game === "meteor") {
+      p2.y = clamp(p2.y + (p2.hold ? -SPACE_FLY : p2.down ? SPACE_FLY : 0) * dt, 0, H - PLAYER_H);
+      return;
+    }
+    if (p2.hold && p2.onGround) p2.vy = -JUMP_V;
+    p2.vy = Math.min(p2.vy + GRAVITY * dt, 20);
+    let ny = p2.y + p2.vy * dt;
+    const cols = [Math.floor(p2.x + 0.02), Math.floor(p2.x + PLAYER_W - 0.02)];
+    p2.onGround = false;
+    if (p2.vy > 0) {
+      const feet = Math.floor(ny + PLAYER_H);
+      if (cols.some((x) => P.solidAt(x, feet))) { ny = feet - PLAYER_H; p2.vy = 0; p2.onGround = true; }
+    } else if (p2.vy < 0) {
+      const head = Math.floor(ny);
+      if (cols.some((x) => P.solidAt(x, head))) { ny = head + 1; p2.vy = 0; }
+    }
+    p2.y = ny;
+  };
+  const spawnHazard = (m) => {
+    // most aim at someone; some land anywhere
+    const p = S.player, p2 = m.p2;
+    const aim = Math.random() < 0.65 ? (Math.random() < 0.5 || !p2.alive ? p.x : p2.x) + (Math.random() - 0.5) * 3
+      : Math.random() * S.width;
+    if (m.game === "laser") {
+      m.hazards.push({ kind: "laser", x: clamp(Math.floor(aim), 0, S.width - 1), warn: 0.9, beam: 0.35 });
+    } else {
+      m.hazards.push({ kind: "meteor", x: clamp(aim - 0.45, 0, S.width - 0.9), y: -1.5, vy: 6 + Math.random() * 3 + m.play * 0.06 });
+    }
+  };
+  // One PvP step: sword swings, shots, and hits. Returns who got knocked out.
+  const pvpStep = (m, dt) => {
+    const p = S.player, a = m.p1, b = m.p2;
+    if (S.moveR && !S.moveL) a.face = 1; else if (S.moveL && !S.moveR) a.face = -1;
+    const bodies = [[a, p.x, p.y], [b, b.x, b.y]];
+    for (const [who, x, y] of bodies) {
+      who.swordT -= dt; who.shotT -= dt; who.swing = Math.max(0, who.swing - dt); who.safeT -= dt;
+      const [, ox, oy] = bodies.find((o) => o[0] !== who);
+      const foe = who === a ? b : a;
+      const slow = who === b && m.opp === "cpu" ? 1.8 : 1; // the computer swings and shoots less often
+      if (who.wantSword && who.swordT <= 0) {
+        who.swordT = SWORD_WAIT * slow; who.swing = 0.2;
+        const ahead = (ox - x) * who.face;
+        if (ahead > -0.3 && ahead < SWORD_REACH && Math.abs(oy - y) < 0.9) hitFoe(foe, who.face);
+      }
+      if (who.wantShot && who.shotT <= 0) {
+        who.shotT = SHOT_WAIT * slow;
+        m.shots.push({ x: x + PLAYER_W / 2 + who.face * 0.5, y: y + PLAYER_H * 0.45, vx: who.face * SHOT_SPEED, from: who });
+      }
+      who.wantSword = who.wantShot = false;
+    }
+    for (const s of m.shots) {
+      s.x += s.vx * dt;
+      if (s.x < 0 || s.x > S.width || P.solidAt(Math.floor(s.x), Math.floor(s.y))) { s.gone = true; continue; }
+      const foe = s.from === a ? b : a;
+      const [fx, fy] = foe === a ? [p.x, p.y] : [b.x, b.y];
+      if (s.x > fx && s.x < fx + PLAYER_W && s.y > fy && s.y < fy + PLAYER_H) { s.gone = true; hitFoe(foe, Math.sign(s.vx)); }
+    }
+    m.shots = m.shots.filter((s) => !s.gone);
+    return [a.hp <= 0, b.hp <= 0];
+  };
+  const hitFoe = (foe, dir) => {
+    if (foe.safeT > 0 || foe.hp <= 0) return;
+    foe.hp--;
+    foe.safeT = PVP_SAFE;
+    // a little knock back
+    const m = S.mini;
+    if (foe === m.p2) { m.p2.x = clamp(m.p2.x + dir * 0.6, 0, S.width - PLAYER_W); m.p2.vy = -5; }
+    else { S.player.x = clamp(S.player.x + dir * 0.6, 0, S.width - PLAYER_W); S.player.vy = -5; }
+    const [x, y] = foe === m.p2 ? [m.p2.x, m.p2.y] : [S.player.x, S.player.y];
+    P.sparkle(x + PLAYER_W / 2, y + PLAYER_H / 2, ["#ff4a4a", "#ffffff"]);
+  };
+  // Returns true when the step should stop here (the game's over or ending).
+  const updateMini = (dt) => {
+    const m = S.mini, p = S.player;
+    if (m.phase === "won" || m.phase === "lost") {
+      m.t += dt;
+      if (m.t > 1.8) {
+        const lost = m.phase === "lost";
+        for (const k of WORLD) S[k] = m.back[k];
+        S.player = m.back.player;
+        S.risers = m.back.risers;
+        S.player.vy = 0;
+        setFree(m.back.free);
+        S.mini = null;
+        S.state = "run";
+        if (lost) P.die("boom", false);
+      }
+      return true;
+    }
+    m.play += dt;
+    moveP2(m, dt);
+    if (m.game === "pvp") {
+      const [out1, out2] = pvpStep(m, dt);
+      if (out2) {
+        m.p2.alive = false;
+        P.explode(m.p2.x + PLAYER_W / 2, m.p2.y + PLAYER_H / 2, ["#b46bff", "#7ee8ff", "#ffffff"]);
+        m.phase = "won"; m.t = 0; m.shots = []; S.moveL = S.moveR = false;
+        return true;
+      }
+      if (out1) {
+        P.explode(p.x + PLAYER_W / 2, p.y + PLAYER_H / 2, ["#ffd54a", "#ff8a3d", "#e04a2f"]);
+        m.phase = "lost"; m.t = 0; m.shots = []; S.moveL = S.moveR = false;
+        return true;
+      }
+      return false;
+    }
+    m.spawnT -= dt;
+    if (m.spawnT <= 0) { m.spawnT = Math.max(0.3, 1.1 - m.play * 0.025); spawnHazard(m); }
+    for (const h of m.hazards) {
+      if (h.kind === "laser") {
+        if (h.warn > 0) h.warn -= dt;
+        else h.beam -= dt;
+        if (h.beam <= 0) h.gone = true;
+      } else {
+        h.y += h.vy * dt;
+        if (h.y > H || P.solidAt(Math.floor(h.x + 0.45), Math.floor(h.y + 0.9))) {
+          h.gone = true;
+          P.sparkle(h.x + 0.45, h.y + 0.6, ["#ff8a3d", "#ffd54a", "#8c8c8c"]);
+        }
+      }
+    }
+    const hit1 = m.hazards.some((h) => !h.gone && hazardHits(h, p.x, p.y));
+    const hit2 = m.p2.alive && m.hazards.some((h) => !h.gone && hazardHits(h, m.p2.x, m.p2.y));
+    m.hazards = m.hazards.filter((h) => !h.gone);
+    if (hit2) {
+      m.p2.alive = false;
+      P.explode(m.p2.x + PLAYER_W / 2, m.p2.y + PLAYER_H / 2, ["#b46bff", "#7ee8ff", "#ffffff"]);
+    }
+    if (hit1 && !hit2) {
+      P.explode(p.x + PLAYER_W / 2, p.y + PLAYER_H / 2, ["#ffd54a", "#ff8a3d", "#e04a2f"]);
+      m.phase = "lost"; m.t = 0; S.moveL = S.moveR = false;
+      return true;
+    }
+    if (hit2) { m.phase = "won"; m.t = 0; m.hazards = []; S.moveL = S.moveR = false; return true; }
+    return false;
+  };
+
   const updateBoss = (dt) => {
     if (S.boss.galaxy) return updateGalaxy(dt);
     if (S.boss.glitch) return updateGlitch(dt);
@@ -523,7 +826,8 @@ window.BDPlayBosses = (S, P, BD) => {
   };
 
   return {
-    dragonAt, endCut, enterBoss, enterCrash, startBoss, startZombie, updateBoss,
-    updateBossDown, updateCut, updateZombie, updateZombieIntro
+    dragonAt, endCut, enterBoss, enterCrash, leaveBox, miniKey, startBoss,
+    startBox, startMini, startZombie, updateBoss, updateBossDown, updateCut,
+    updateMini, updateMiniIntro, updateZombie, updateZombieIntro
   };
 };

@@ -7,8 +7,8 @@ window.BDPlayLife = (S, P, BD) => {
   "use strict";
   const {
     bestKey, builtinLevels, dailyLevelDone, dailyNote, dayKey, el, GALAXY_KEY, galaxyWon,
-    getBest, GHOST_BONUS, H, loadBag, loadPets, musicOf, noteKey, PLAYER_H, PLAYER_W,
-    saveBag, savePets, setBest, SHIELD_TIME, TELEPORT, toast
+    getBest, GHOST_BONUS, H, JUMP_V, loadBag, loadPets, musicOf, NINE_SAFE, noteKey,
+    PLAYER_H, PLAYER_W, saveBag, savePets, setBest, SHIELD_TIME, TELEPORT, toast, unlockPet
   } = BD;
   const {
     bag, chain, endRun, fromEditor, hasEyes, hasPearls, hasRods, jumpBtn, level, msgSlot,
@@ -102,6 +102,22 @@ window.BDPlayLife = (S, P, BD) => {
   const die = (kind = "boom", byMob = false) => {
     if (S.state !== "run") return;
     if (byMob && shielded()) return;
+    if (S.nineT > 0) return; // a life just saved you: a moment to get clear
+    if (S.nineLives > 0) {
+      // Nine lives: this one doesn't count. Bounce back (or, falling, go back
+      // to where you last stood).
+      S.nineLives--;
+      S.nineT = NINE_SAFE;
+      // back to the last ground you stood on, a little way back, so a pit,
+      // lava or a wall can't keep you stuck. A mob's hit just knocks you back.
+      if (!byMob && S.safe) {
+        S.player.x = Math.max(0, S.safe.x - 1.5); S.player.y = S.safe.y; S.player.vy = 0;
+      } else { S.knock = -6; S.player.vy = -JUMP_V * 0.6; }
+      S.climb = null;
+      sparkle(S.player.x + PLAYER_W / 2, S.player.y + PLAYER_H / 2, ["#ff9800", "#ffd54a", "#ffffff"]);
+      toast(S.nineLives ? `😺 Saved! ${S.nineLives} li${S.nineLives === 1 ? "fe" : "ves"} left` : "😺 Saved! That was your last extra life");
+      return;
+    }
     S.state = "dead";
     S.deathKind = kind;
     S.deadT = 0;
@@ -139,6 +155,8 @@ window.BDPlayLife = (S, P, BD) => {
     if (S.run && !S.run.deaths) dailyNote("perfect");
     if (S.inBoss && !S.crash) dailyNote("boss");
     if (S.inBoss && !level.glitch && !S.crash) { B.earn("boss"); if (!sword) B.earn("bare"); }
+    // a castle level won (the Castle background): the horse pet, the first time
+    if ((S.bgNow || level.bg) === "castle" && unlockPet("petHorse")) toast("🐴 You beat a castle! The horse pet is yours: pick it on the title screen");
     // escaping the Galactic Monstrosity: armor and the Galaxy skin, the first time
     const galaxyFirst = S.crash && !galaxyWon();
     if (galaxyFirst) { try { localStorage.setItem(GALAXY_KEY, "1"); } catch (e) { /* ignore */ } }

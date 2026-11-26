@@ -5,14 +5,18 @@
 // helpers shared between the play files, BD blockdash.js's own constants.
 window.BDPlayPhysics = (S, P, BD) => {
   "use strict";
+  const SPACE_FLY_V = 6; // how fast you float up or down in Meteor dodge
   const {
-    AIR, baseOf, blinkOn, BOSS_X, BOUNCE_V, BUTTON, BUTTON_ON, clamp, COIN_VALUE, COYOTE,
-    CRASH, dailyNote, EFFECT_TIME, ELEV_DOOR, ELEVATOR, FLY_THRUST, FLY_UP_V, GLIDE_FALL,
-    GLITCH_STONE, GRAVITY, H, isDoor, isHiddenTnt, isLava, isSolid, JUMP_BUFFER, JUMP_V, KEY,
-    lapSpeed, LEVER, LEVER_ON, MEGA_BASE, MEGA_BLAST, MEGA_BOUNCE_V, MEGATITE_PAYS, noteKey,
-    PET_SOUND, PLAYER_H, PLAYER_W, POOF_AFTER, PUSH, SHOVE, SHOVE_DIST, SINK_MAX, SPEED_BASE,
-    SPEED_FAST, SPEED_SLOW, STOP_DEFAULT, SWIM_V, TELEPORT, TILES, toast, WARP_TIME, WATER,
-    WATER_GRAVITY, WATER_SLOW
+    AIR, baseOf, BG_CHANGE, blinkOn, BOSS_X, BOUNCE_V, BOX, BUTTON, BUTTON_ON, CAT_BED,
+    CAT_BED_BOUNCE, CAT_DOOR, CATNIP, CHEST, CHEST_OPEN, clamp, CLIMB_V, CLIMBABLE,
+    COIN_VALUE, COYOTE, CRASH, dailyNote, DOOR_REACH, EFFECT_TIME, ELEV_DOOR, ELEVATOR,
+    FLY_THRUST, FLY_UP_V, GLIDE_FALL, GLITCH_STONE, GRAVITY, H, HARM_VOID, isDoor,
+    isHiddenTnt, isLava, isSolid, JUMP_BUFFER, JUMP_V, KEY, lapSpeed, LEVER, LEVER_ON,
+    MEGA_BASE, MEGA_BLAST, MEGA_BOUNCE_V, MEGATITE_PAYS, MINIGAME, miniGroup, NINE_LIVES,
+    NIP_JUMP, NIP_TIME, noteKey, PET_SOUND, PLAYER_H, PLAYER_W, POOF_AFTER, PUSH,
+    SCRATCH_POST, SHOVE, SHOVE_DIST, SINK_MAX, SPEED_BASE, SPEED_FAST, SPEED_SLOW,
+    STOP_DEFAULT, SWIM_V, TELEPORT, TILES, toast, unlockKitten, WALL_JUMP, WARP_TIME, WATER,
+    WATER_GRAVITY, WATER_SLOW, YARN
   } = BD;
   const {
     blink, boom, die, ember, endCut, endlessOver, enterBoss, fill, gotRod, level, megaAt,
@@ -61,6 +65,17 @@ window.BDPlayPhysics = (S, P, BD) => {
   // Holding jump doesn't count, so you don't chain through every Blink.
   // Returns true when the press was used up closing a dialog, so the caller
   // doesn't also treat it as "holding jump".
+  // Inside a box, next to a Cat door: jump (Space) goes out through it instead
+  const catDoorNear = () => {
+    if (!S.box) return false;
+    const cx = S.player.x + PLAYER_W / 2, cy = S.player.y + PLAYER_H / 2;
+    for (let y = Math.floor(cy - DOOR_REACH); y <= Math.floor(cy + DOOR_REACH); y++) {
+      for (let x = Math.floor(cx - DOOR_REACH); x <= Math.floor(cx + DOOR_REACH); x++) {
+        if (S.grid[y] && S.grid[y][x] === CAT_DOOR && Math.hypot(cx - (x + 0.5), cy - (y + 0.5)) < DOOR_REACH) return true;
+      }
+    }
+    return false;
+  };
   const pressJump = () => {
     if (S.state === "cut") { S.boss.x = BOSS_X; endCut(); return true; } // skip the intro
     if (S.state === "talk") {
@@ -68,6 +83,8 @@ window.BDPlayPhysics = (S, P, BD) => {
       if (S.time - S.talkAt > 0.35) { S.state = "run"; S.talk = null; }
       return true;
     }
+    if (S.state === "run" && catDoorNear()) { P.leaveBox(true); return true; }
+    if (S.inside) { P.mashOut(); return true; } // inside the giant vacuum: each press moves you forward
     if (S.state === "run") {
       for (let y = Math.floor(S.player.y); y <= Math.floor(S.player.y + PLAYER_H - 0.01); y++) {
         for (let x = Math.floor(S.player.x); x <= Math.floor(S.player.x + PLAYER_W - 0.01); x++) {
@@ -107,6 +124,12 @@ window.BDPlayPhysics = (S, P, BD) => {
   const onMovingElevator = () => S.fallers.concat(S.risers).some((f) => f.elevator &&
     S.player.x < f.x + 1 && S.player.x + PLAYER_W > f.x && Math.abs(S.player.y + PLAYER_H - topOf(f)) < 0.1);
 
+  // Wall jumping, made easy to do: a slow slide, a moment after leaving the
+  // wall when jump still works, and a little extra spring.
+  const WALL_GRACE = 0.35, WALL_SLIDE = 1.2, WALL_SPRING = 1.1;
+  // Off a wall, but never the same side twice in a row before you land: you
+  // bounce between walls, you can't climb up just one.
+  const canWallJump = () => S.wallJump && S.wallT > 0 && !S.player.onGround && (S.wallSide || 1) !== S.lastWall;
   const doJump = () => {
     if (S.state !== "run" || S.stopT > 0) return;
     if (onMovingElevator()) return; // holding jump speeds the elevator up instead (see the falling blocks)
@@ -118,8 +141,18 @@ window.BDPlayPhysics = (S, P, BD) => {
       S.buffer = 0;
       return;
     }
-    if (S.player.onGround || S.coyote > 0) {
-      S.player.vy = -JUMP_V;
+    if (canWallJump()) {
+      // a wall jump: up and away from the wall, running the other way until
+      // you hit the next wall (and jump off that) or land
+      S.player.vy = -JUMP_V * WALL_SPRING;
+      S.lastWall = S.wallSide || 1;
+      const away = -(S.wallSide || 1);
+      if (S.free) S.knock = away * 6;
+      else S.runDir = away;
+      S.wallT = 0;
+      S.buffer = 0;
+    } else if (S.player.onGround || S.coyote > 0) {
+      S.player.vy = -JUMP_V * (S.nipT > 0 ? NIP_JUMP : 1); // catnip: mega jumps
       S.player.onGround = false;
       S.coyote = 0;
       S.buffer = 0;
@@ -131,6 +164,13 @@ window.BDPlayPhysics = (S, P, BD) => {
   // --- physics ---
   const update = (dt) => {
     S.time += dt;
+    if (S.inside) {
+      // inside the giant vacuum: everything waits while you mash your way
+      // out; too slow and the fan gets you
+      S.inside.t -= dt;
+      if (S.inside.t <= 0) { S.inside = null; S.nineT = 0; die("fan"); }
+      return;
+    }
     S.runT += dt;
 
     for (const p of S.particles) {
@@ -163,6 +203,7 @@ window.BDPlayPhysics = (S, P, BD) => {
     }
     if (S.state === "cut") { updateCut(dt); return; }
     if (S.state === "zombie") { P.updateZombieIntro(dt); return; }
+    if (S.state === "mini") { P.updateMiniIntro(dt); return; }
     if (S.state === "bossdown") { updateBossDown(dt); return; }
     if (S.state !== "run") return;
 
@@ -184,10 +225,18 @@ window.BDPlayPhysics = (S, P, BD) => {
     }
 
     S.stepBox = { x0: S.player.x, y0: S.player.y, x1: S.player.x + PLAYER_W, y1: S.player.y + PLAYER_H };
+    if (S.wallT > 0) S.wallT -= dt;
+    if (S.nineT > 0) S.nineT -= dt;
+    if (S.nipT > 0) S.nipT -= dt;
+    // catnip's silly (flipped) controls wear off too; in a boss fight The
+    // Glitch's flip counts itself down (blockdash-play-bosses.js)
+    if (S.flipT > 0 && !S.inBoss) S.flipT -= dt;
 
     // horizontal — always forward, unless a Free move block handed you the controls
     const oldX = S.player.x;
-    const dir = S.free ? ((S.moveR ? 1 : 0) - (S.moveL ? 1 : 0)) * (S.flipT > 0 ? -1 : 1) : 1;
+    // climbing a scratching post, you go straight up, not along
+    // after a wall jump you run back the other way (runDir) until you land
+    const dir = S.climb != null ? 0 : S.free ? ((S.moveR ? 1 : 0) - (S.moveL ? 1 : 0)) * (S.flipT > 0 ? -1 : 1) : S.runDir || 1;
     // Holding jump on an elevator speeds it up; once it lands, that held jump
     // stops counting (press again to jump), so you don't leap into the doorway.
     const riding = onMovingElevator();
@@ -207,7 +256,7 @@ window.BDPlayPhysics = (S, P, BD) => {
       if (Math.abs(S.knock) < 0.5) S.knock = 0;
     }
     if (S.player.x < 0) S.player.x = 0;
-    if (S.inBoss || S.zombie) S.player.x = Math.min(S.player.x, S.width - PLAYER_W);
+    if (S.inBoss || S.zombie || S.mini || S.box) S.player.x = Math.min(S.player.x, S.width - PLAYER_W);
     const y0 = Math.floor(S.player.y + 0.02);
     const y1 = Math.floor(S.player.y + PLAYER_H - 0.02);
     const rightCol = Math.floor(S.player.x + PLAYER_W);
@@ -235,15 +284,27 @@ window.BDPlayPhysics = (S, P, BD) => {
         if (!pushBlock(rightCol, hitRow, 1)) S.player.x = oldX;
       } else {
         S.player.x = oldX;
-        // ran straight into a wall — only deadly when you can't stop yourself
-        if (!S.free) { die(); return; }
+        if (S.wallJump) {
+          // the Wall jump power: slide slowly down the wall; jump to spring off it
+          S.wallT = WALL_GRACE;
+          S.wallSide = 1;
+          if (S.player.vy > WALL_SLIDE) S.player.vy = WALL_SLIDE;
+        } else if (!S.free) { die(); return; } // ran straight into a wall — only deadly when you can't stop yourself
       }
     }
     if (S.player.x < oldX) {
       const leftCol = Math.floor(S.player.x);
       for (let y = y0; y <= y1; y++) {
         if (solidAt(leftCol, y)) {
-          if (!(isPushy(S.grid[y][leftCol]) && pushBlock(leftCol, y, -1))) S.player.x = oldX;
+          if (!(isPushy(S.grid[y][leftCol]) && pushBlock(leftCol, y, -1))) {
+            S.player.x = oldX;
+            if (S.wallJump && !S.player.onGround) {
+              // a wall on your left, after springing off the one on your right
+              S.wallT = WALL_GRACE;
+              S.wallSide = -1;
+              if (S.player.vy > WALL_SLIDE) S.player.vy = WALL_SLIDE;
+            }
+          }
           break;
         }
       }
@@ -264,8 +325,16 @@ window.BDPlayPhysics = (S, P, BD) => {
     }
 
     // vertical
-    if (wet && !S.flying) S.player.vy = Math.min(S.player.vy + WATER_GRAVITY * dt, SINK_MAX);
-    else S.player.vy += GRAVITY * dt;
+    const floating = S.mini && S.mini.game === "meteor"; // floating in space: up, down, or stay
+    if (floating) S.player.vy = S.holding ? -SPACE_FLY_V : S.mini.p1.down ? SPACE_FLY_V : 0;
+    else if (wet && !S.flying) S.player.vy = Math.min(S.player.vy + WATER_GRAVITY * dt, SINK_MAX);
+    else if (S.climb != null) {
+      // up the scratching post until your feet are past its top, then a little
+      // hop, so you step off onto whatever's beside the top
+      const row = Math.floor(S.player.y + PLAYER_H - 0.05);
+      if (S.grid[row] && CLIMBABLE.includes(S.grid[row][S.climb])) S.player.vy = -CLIMB_V;
+      else { S.climb = null; S.player.vy = -JUMP_V * 0.45; }
+    } else S.player.vy += GRAVITY * dt;
     if (S.flying) {
       if (S.holding) {
         S.player.vy = Math.max(S.player.vy - FLY_THRUST * dt, -FLY_UP_V);
@@ -282,6 +351,7 @@ window.BDPlayPhysics = (S, P, BD) => {
       }
     }
     S.player.y += S.player.vy * dt;
+    if (floating) S.player.y = Math.max(0, Math.min(S.player.y, S.grid.length - PLAYER_H));
     if (S.flying && S.player.y < 0) { S.player.y = 0; S.player.vy = Math.max(0, S.player.vy); }
     S.player.onGround = false;
     const cx0 = Math.floor(S.player.x + 0.02);
@@ -295,7 +365,18 @@ window.BDPlayPhysics = (S, P, BD) => {
           if (S.grid[footRow][x] === "m" || S.grid[footRow][x] === "0") {
             S.player.vy = S.grid[footRow][x] === "0" ? -MEGA_BOUNCE_V : -BOUNCE_V;
             S.rot = 0;
+          } else if (S.grid[footRow][x] === BOX && !S.box) {
+            P.startBox(x, footRow);
+            return;
+          } else if (S.grid[footRow][x] === CAT_BED) {
+            S.player.vy = -JUMP_V * CAT_BED_BOUNCE; // boing!
+            S.rot = 0;
+            sparkle(x + 0.5, footRow, ["#ffd0e8", "#c86ad8", "#ffffff"]);
           } else {
+            S.runDir = 1; // landed: running forwards again after any wall jumps
+            S.lastWall = 0;
+            // somewhere to come back to (Nine lives): real ground, not the bottom of a pit
+            if (footRow < S.grid.length && !isLava(S.grid[footRow - 1] ? S.grid[footRow - 1][x] : AIR)) S.safe = { x: S.player.x, y: S.player.y };
             S.player.vy = 0;
             S.player.onGround = true;
             S.rot = 0;
@@ -313,6 +394,7 @@ window.BDPlayPhysics = (S, P, BD) => {
         if (solidAt(x, headRow)) {
           S.player.y = headRow + 1;
           S.player.vy = 0;
+          S.climb = null;
           break;
         }
       }
@@ -334,9 +416,9 @@ window.BDPlayPhysics = (S, P, BD) => {
     S.coyote = S.player.onGround ? COYOTE : Math.max(0, S.coyote - dt);
     if (S.buffer > 0) {
       S.buffer -= dt;
-      if (S.player.onGround) doJump();
+      if (S.player.onGround || canWallJump()) doJump(); // a jump pressed just before you reached the wall counts too
     }
-    if (S.holding && S.player.onGround) doJump();
+    if (S.holding && (S.player.onGround || canWallJump()) && !(S.mini && S.mini.game === "meteor")) doJump();
     if (S.flying) S.rot = S.holding ? -0.25 : 0.1; // nose up when climbing
     else if (wet) S.rot = 0; // no spinning while you swim
     else if (!S.player.onGround) S.rot += dt * 7;
@@ -379,6 +461,56 @@ window.BDPlayPhysics = (S, P, BD) => {
         if (ch === "8") { boom("megaboom"); return; }
         if (isHiddenTnt(ch)) { boom(); return; }
         if (ch === "A") { die("poof"); return; }
+        if (ch === HARM_VOID) { die("delete"); return; }
+        if (CLIMBABLE.includes(ch) && S.climb == null) { S.climb = x; S.rot = 0; }
+        if (ch === WALL_JUMP) {
+          S.grid[y][x] = AIR;
+          if (!S.wallJump) toast("🧗 Wall jump! Jump off a wall to spring the other way: bounce between walls to climb. Yours for the whole level");
+          S.wallJump = true;
+          sparkle(x + 0.5, y + 0.5, ["#5fd35f", "#ffffff", "#ff9800"]);
+        }
+        if (ch === CHEST) {
+          // a random prize: coins, a power, or a TNT surprise
+          S.grid[y][x] = CHEST_OPEN;
+          const r = Math.random();
+          sparkle(x + 0.5, y + 0.3, ["#ffd54a", "#ffffff", "#c8955a"]);
+          if (r < 0.15) { toast("🎁 It was… a TNT SURPRISE!"); boom(); return; }
+          if (r < 0.6) {
+            S.score += 30;
+            scoreEl.textContent = "💎 " + S.score;
+            toast("🎁 Treasure! +30 💎");
+          } else {
+            const power = ["wings", "nine", "wall", "nip"][Math.floor(Math.random() * 4)];
+            if (power === "wings") { S.flying = true; toast("🎁 Wings! Hold jump to fly"); }
+            if (power === "nine") { S.nineLives = 9; toast("🎁 Nine lives!"); }
+            if (power === "wall") { S.wallJump = true; toast("🎁 Wall jump power!"); }
+            if (power === "nip") { S.nipT = NIP_TIME; S.effect = "fast"; S.effectT = NIP_TIME; S.flipT = NIP_TIME; toast("🎁 Catnip! ZOOMIES!"); }
+          }
+        }
+        if (ch === CATNIP) {
+          S.grid[y][x] = AIR;
+          S.nipT = NIP_TIME;
+          S.effect = "fast"; // zoomies
+          S.effectT = NIP_TIME;
+          S.flipT = NIP_TIME; // and silly controls (in Free move)
+          toast("🌿 CATNIP! ZOOMIES!");
+          sparkle(x + 0.5, y + 0.5, ["#7ad86a", "#ff6aa8", "#ffd54a", "#7ee8ff"]);
+        }
+        if (ch === NINE_LIVES) {
+          S.grid[y][x] = AIR;
+          S.nineLives = 9;
+          toast("😺 Nine lives! The next 9 things that would get you won't");
+          sparkle(x + 0.5, y + 0.5, ["#ff9800", "#ffd54a", "#ffffff"]);
+        }
+        if (ch === YARN) {
+          S.grid[y][x] = AIR;
+          S.yarnGot++;
+          sparkle(x + 0.5, y + 0.5, ["#ff6aa8", "#c2185b", "#ffffff"]);
+          if (S.yarnGot >= S.yarnTotal) {
+            toast(unlockKitten() ? "🧶 You got ALL the yarn! A kitten pet is yours: pick it on the title screen 🐱"
+              : "🧶 You got all the yarn!");
+          } else toast(`🧶 Yarn ${S.yarnGot} of ${S.yarnTotal}`);
+        }
         // The three invisible blocks work once each, then clear themselves
         // (they come back when the level resets).
         if (ch === "K") {
@@ -397,6 +529,16 @@ window.BDPlayPhysics = (S, P, BD) => {
         // (riding an elevator, you don't use teleports yourself: it takes you through)
         if (ch === TELEPORT && S.tpSkip !== noteKey(x, y) && !onMovingElevator()) {
           if (blink(x, y, TELEPORT)) return;
+        }
+        if (ch === MINIGAME) {
+          const setting = notes[noteKey(x, y)];
+          for (const [gx, gy] of miniGroup(S.grid, x, y)) S.grid[gy][gx] = AIR;
+          P.startMini(setting);
+          return;
+        }
+        if (ch === BG_CHANGE) {
+          const want = notes[noteKey(x, y)];
+          if (want && want !== S.bgNow) S.bgNow = want;
         }
         if (ch === CRASH) {
           S.grid[y][x] = AIR;
@@ -421,7 +563,7 @@ window.BDPlayPhysics = (S, P, BD) => {
           setBoost(false);
           setFree(false); // like wings, free moving ends at a save point
           S.grid[y][x] = "checkpointOn";
-          S.checkpoint = { x, y, score: S.score, megas: S.megas, rods: S.rods, pearls: S.pearls, eyes: S.eyes, keys: S.keys, grid: S.grid.map((r) => r.slice()) };
+          S.checkpoint = { x, y, score: S.score, megas: S.megas, rods: S.rods, pearls: S.pearls, eyes: S.eyes, keys: S.keys, grid: S.grid.map((r) => r.slice()), bg: S.bgNow, yarn: S.yarnGot };
           // glitchy iron still falling goes back where it is, to fall again after a respawn
           for (const f of S.fallers) {
             const fy = Math.floor(f.y);
@@ -512,8 +654,10 @@ window.BDPlayPhysics = (S, P, BD) => {
     if (updateHazards(dt)) return;
     if (S.boss && updateBoss(dt)) return;
     if (S.zombie && S.zombie.phase !== "flash" && P.updateZombie(dt)) return;
+    if (S.mini && S.mini.phase !== "count" && P.updateMini(dt)) return;
     if (S.zombieQueued && !S.zombie) { P.startZombie(); return; }
 
+    if (S.box && S.player.y < 0.15) { P.leaveBox(true); return; } // climbed out of the box
     if (S.player.y > S.grid.length + 1) {
       die();
       return;
