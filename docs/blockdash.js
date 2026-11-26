@@ -1365,6 +1365,7 @@
 
   const levelData = (l) => {
     const o = bgOf(l) === "overworld" ? { name: l.name, rows: l.rows } : { name: l.name, bg: l.bg, rows: l.rows };
+    if (STAT_ID.test(l.statId || "")) o.statId = l.statId;
     const notes = cleanNotes(l.rows, l.notes);
     if (Object.keys(notes).length) o.notes = notes;
     if (Array.isArray(l.arena) && l.arena.length) o.arena = l.arena;
@@ -1386,6 +1387,7 @@
 
   // Normalise anything that claims to be a level into { name, rows } with
   // H to MAX_H rows of equal length, or throw.
+  const STAT_ID = /^[a-z0-9-]{1,40}$/; // an official level's fixed id for its play counts
   const normalizeLevel = (o, fallbackName) => {
     if (!o || typeof o !== "object" || !Array.isArray(o.rows) || !o.rows.length) {
       throw new Error("not a level");
@@ -1395,6 +1397,7 @@
     const clean = gridToRows(rowsToGrid(rows));
     return {
       name: String(o.name || fallbackName || "Untitled"),
+      ...(STAT_ID.test(o.statId || "") ? { statId: o.statId } : {}),
       rows: clean,
       bg: bgOf(o),
       ...(arenaBgOf(o) !== bgOf(o) ? { arenaBg: o.arenaBg } : {}),
@@ -1552,6 +1555,7 @@
         `${lvl.name}<span class="meta">${g[0].length} blocks long · ` +
         `${countBlocks(g)} blocks placed${best ? ` · best ${best}` : ""}</span>`),
     );
+    window.BDPlayCounts?.show(card.querySelector(".meta"), lvl);
     actions.forEach((b) => card.appendChild(b));
     return card;
   };
@@ -4742,6 +4746,7 @@
     const P = {};
     clear();
     window.BDStats?.started(level, fromEditor);
+    if (!fromEditor) window.BDPlayCounts?.record(level, "start");
     window.BDMusic.custom(cleanSong(level.song));
     window.BDMusic.level(musicOf(level));
 

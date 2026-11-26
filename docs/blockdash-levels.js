@@ -2,9 +2,14 @@
 //
 // Converted from a blockdash-levels.json download (Level pack tools → Download
 // all). It's a .js file only so the game can load it without a server fetch.
+//
+// statId: a fixed id for the level's play counts (blockdash-playcounts.js).
+// Keep it when re-converting, even if the level is renamed, or its count
+// starts again from zero. A new official level gets a new one.
 window.BLOCKDASH_LEVELS = [
   {
     "name": "overworld",
+    "statId": "overworld",
     "rows": [
       ".....................................................................................h....",
       ".....................................................................................h....",
@@ -36,6 +41,7 @@ window.BLOCKDASH_LEVELS = [
   },
   {
     "name": "in to the nether",
+    "statId": "nether",
     "bg": "nether",
     "rows": [
       "........................DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDC........................",
@@ -55,6 +61,7 @@ window.BLOCKDASH_LEVELS = [
   },
   {
     "name": "Fortress",
+    "statId": "fortress",
     "bg": "nether",
     "rows": [
       "....................................................................",
@@ -74,6 +81,7 @@ window.BLOCKDASH_LEVELS = [
   },
   {
     "name": "all eyes on you",
+    "statId": "all-eyes-on-you",
     "bg": "endStorage",
     "rows": [
       "............................................................................h...C....................................eeeeeeeeeeee..................E",
@@ -107,6 +115,7 @@ window.BLOCKDASH_LEVELS = [
   },
   {
     "name": "THE END?",
+    "statId": "the-end",
     "bg": "deepCave",
     "rows": [
       "pppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp",
