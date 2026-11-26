@@ -3607,24 +3607,42 @@
     };
     nameRow.append(nameInput, testBtn, savedLabel);
     namePanel.appendChild(nameRow);
+    // the emoji: one button showing it, which opens a pop-up of choices
     const emojiRow = el("div", "row tight");
     emojiRow.style.marginTop = "8px";
+    emojiRow.style.position = "relative";
     const emojiBtns = [];
-    const showEmoji = () => emojiBtns.forEach(([e, b]) => b.classList.toggle("green", e === emoji));
+    const emojiPick = el("button", "small", "");
+    const emojiPop = el("div", "panel");
+    Object.assign(emojiPop.style, { position: "absolute", top: "100%", left: "0", zIndex: "20", marginTop: "4px",
+      display: "none", flexWrap: "wrap", gap: "6px", maxWidth: "min(560px, 90vw)" });
+    const popOpen = () => emojiPop.style.display !== "none";
+    const setPop = (open) => { emojiPop.style.display = open ? "flex" : "none"; };
+    const showEmoji = () => {
+      emojiBtns.forEach(([e, b]) => b.classList.toggle("green", e === emoji));
+      emojiPick.textContent = (emoji || "None") + " ▾";
+    };
+    emojiPick.onclick = () => setPop(!popOpen());
+    // a click anywhere else closes it
+    const closeEmoji = (e) => {
+      if (!emojiPop.isConnected) { document.removeEventListener("pointerdown", closeEmoji, true); return; }
+      if (popOpen() && !emojiPop.contains(e.target) && e.target !== emojiPick) setPop(false);
+    };
+    document.addEventListener("pointerdown", closeEmoji, true);
     const emojiIn = el("input");
     emojiIn.type = "text";
     emojiIn.placeholder = "or type one";
     emojiIn.style.width = "7em";
     emojiIn.value = emoji;
     emojiIn.oninput = () => { emoji = cleanEmoji(emojiIn.value); showEmoji(); autosave(); };
-    emojiRow.appendChild(el("span", "hint", "Emoji:"));
+    emojiRow.append(el("span", "hint", "Emoji:"), emojiPick, emojiPop);
     for (const e of ["", "🐱", "🐶", "🔥", "❄️", "🌋", "🏰", "🌌", "🚀", "👾", "💀", "👻", "🧟", "🐉", "🌊", "🌳", "💎", "⚡", "⭐", "🎃", "🍕", "🤖", "🏁"]) {
       const b = el("button", "small", e || "None");
-      b.onclick = () => { emoji = e; emojiIn.value = e; showEmoji(); autosave(); };
+      b.onclick = () => { emoji = e; emojiIn.value = e; showEmoji(); autosave(); setPop(false); };
       emojiBtns.push([e, b]);
-      emojiRow.appendChild(b);
+      emojiPop.appendChild(b);
     }
-    emojiRow.appendChild(emojiIn);
+    emojiPop.appendChild(emojiIn);
     showEmoji();
     namePanel.appendChild(emojiRow);
     const bgRow = el("div", "row");
@@ -3753,6 +3771,7 @@
     const boxTab = el("button", "small", "📦 Box arena");
     const vacTab = el("button", "small", "🌀 Inside the vacuum");
     const editHint = el("span", "hint", "");
+    let showArenaInTab = () => {}; // set up with the tabs below
     const setEditing = (m) => {
       if (m === editing) return;
       parked[editing] = grid;
@@ -3776,6 +3795,7 @@
       miniTab.classList.toggle("green", m === "mini");
       boxTab.classList.toggle("green", m === "box");
       vacTab.classList.toggle("green", m === "vac");
+      showArenaInTab();
       showBg();
       refreshPalette();
       autosave();
@@ -3798,6 +3818,37 @@
     };
     editRow.append(levelTab, arenaTab, crashTab, plainsTab, miniTab, boxTab, vacTab, layerBtn, editHint);
     namePanel.appendChild(editRow);
+
+    // Background and Arenas each show just what's picked, on one button that
+    // pops up the choices (like the emoji), so the panel stays short
+    const popOut = (row, items, pickFrom = items) => {
+      row.style.position = "relative";
+      const pick = el("button", "small", "");
+      const pop = el("div", "panel");
+      Object.assign(pop.style, { position: "absolute", top: "100%", left: "0", zIndex: "20", marginTop: "4px",
+        display: "none", flexWrap: "wrap", gap: "6px", maxWidth: "min(680px, 92vw)" });
+      row.insertBefore(pick, items[0]);
+      for (const it of items) pop.appendChild(it);
+      row.appendChild(pop);
+      const sync = () => {
+        const on = pickFrom.find((b) => b.classList.contains("green"));
+        pick.textContent = (on ? on.textContent : "Pick one") + " ▾";
+      };
+      pick.onclick = () => { pop.style.display = pop.style.display === "none" ? "flex" : "none"; };
+      pop.addEventListener("click", () => setTimeout(() => { sync(); pop.style.display = "none"; }, 0));
+      const close = (e) => {
+        if (!pop.isConnected) { document.removeEventListener("pointerdown", close, true); return; }
+        if (pop.style.display !== "none" && !pop.contains(e.target) && e.target !== pick) pop.style.display = "none";
+      };
+      document.addEventListener("pointerdown", close, true);
+      sync();
+      return sync;
+    };
+    const syncBgPick = popOut(bgRow, bgBtns);
+    // the background layer button shows over Level while it's on
+    const editItems = [levelTab, arenaTab, crashTab, plainsTab, miniTab, boxTab, vacTab, layerBtn];
+    const syncEditPick = popOut(editRow, editItems, [layerBtn, ...editItems.slice(0, -1)]);
+    showArenaInTab = () => setTimeout(() => { syncBgPick(); syncEditPick(); }, 0); // after the buttons update
     root.appendChild(namePanel);
 
     // palette
