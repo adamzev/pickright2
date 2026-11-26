@@ -120,6 +120,7 @@ window.BDPlayLife = (S, P, BD) => {
     }
     S.state = "dead";
     S.deathKind = kind;
+    window.BDStats?.died(level, kind, S.player.x);
     S.deadT = 0;
     window.BDBadges.add("deaths");
     if (S.run) S.run.deaths++;
@@ -146,6 +147,7 @@ window.BDPlayLife = (S, P, BD) => {
   const win = () => {
     if (S.state !== "run") return;
     const beatGhost = endRun(true);
+    window.BDStats?.won(level, S.run && S.run.deaths);
     const M = window.BDMusic, B = window.BDBadges;
     B.cleared(bestKey(level), builtinLevels().map(bestKey));
     // first, so their coins are in the bag before the bag is re-read below

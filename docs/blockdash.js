@@ -2257,6 +2257,7 @@
   };
 
   const showShop = () => {
+    window.BDStats?.screen("shop");
     clear();
     const bag = loadBag();
     const head = el("div", "row");
@@ -2406,6 +2407,7 @@
   };
 
   const showMenu = () => {
+    window.BDStats?.screen("menu");
     window.BDMusic.level(null);
     // pets and coins from before badges existed still count
     window.BDBadges.coins(loadBag().coins);
@@ -3502,6 +3504,7 @@
   // ---------- screen: editor ----------
 
   const showEditor = (existing, index) => {
+    window.BDStats?.screen("level maker");
     clear();
 
     let grid = existing ? rowsToGrid(existing.rows) : newGrid(48);
@@ -4634,6 +4637,7 @@
     const S = {};
     const P = {};
     clear();
+    window.BDStats?.started(level, fromEditor);
     window.BDMusic.custom(cleanSong(level.song));
     window.BDMusic.level(musicOf(level));
 
