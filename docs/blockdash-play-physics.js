@@ -9,7 +9,7 @@ window.BDPlayPhysics = (S, P, BD) => {
   const {
     AIR, baseOf, BG_CHANGE, blinkOn, BOSS_X, BOUNCE_V, BOX, BUTTON, BUTTON_ON, CAT_BED,
     CAT_BED_BOUNCE, CAT_DOOR, CATNIP, CHEST, CHEST_OPEN, clamp, CLIMB_V, CLIMBABLE,
-    COIN_VALUE, COYOTE, CRASH, dailyNote, DOOR_REACH, EFFECT_TIME, ELEV_DOOR, ELEVATOR,
+    COIN_VALUE, COYOTE, CRASH, dailyNote, DOOR_REACH, EFFECT_TIME, ELEV_DOOR, ELEVATOR, FLIP,
     FLY_THRUST, FLY_UP_V, GLIDE_FALL, GLITCH_STONE, GRAVITY, H, HARM_VOID, isDoor,
     isHiddenTnt, isLava, isSolid, JUMP_BUFFER, JUMP_V, KEY, lapSpeed, LEVER, LEVER_ON,
     MEGA_BASE, MEGA_BLAST, MEGA_BOUNCE_V, MEGATITE_PAYS, MINIGAME, miniGroup, NINE_LIVES,
@@ -374,6 +374,15 @@ window.BDPlayPhysics = (S, P, BD) => {
             sparkle(x + 0.5, footRow, ["#ffd0e8", "#c86ad8", "#ffffff"]);
           } else {
             S.runDir = 1; // landed: running forwards again after any wall jumps
+            if (S.grid[footRow][x] === FLIP && !S.flipTraps.some((f) => f.x === x && f.y === footRow)) {
+              // the trap floor starts to go, and every flip floor joined to it in the row goes too
+              let x0 = x, x1 = x;
+              while (S.grid[footRow][x0 - 1] === FLIP) x0--;
+              while (S.grid[footRow][x1 + 1] === FLIP) x1++;
+              for (let fx = x0; fx <= x1; fx++) {
+                if (!S.flipTraps.some((f) => f.x === fx && f.y === footRow)) S.flipTraps.push({ x: fx, y: footRow, t: 0, open: false });
+              }
+            }
             S.lastWall = 0;
             // somewhere to come back to (Nine lives): real ground, not the bottom of a pit
             if (footRow < S.grid.length && !isLava(S.grid[footRow - 1] ? S.grid[footRow - 1][x] : AIR)) S.safe = { x: S.player.x, y: S.player.y };

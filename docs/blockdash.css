@@ -549,3 +549,9 @@ button.tool-btn.sel {
 
 /* hidden by a 🔍 search box */
 .search-hide { display: none !important; }
+
+/* block categories: joined tabs over a green line (the Level Maker makeover's
+   option C look); the picked one is green */
+.cat-tabs { display: flex; flex-wrap: wrap; gap: 0; border-bottom: 3px solid var(--grass); margin-bottom: 10px; }
+.cat-tabs button { margin: 0; }
+.cat-hide { display: none !important; }

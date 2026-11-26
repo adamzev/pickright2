@@ -8,13 +8,13 @@ window.BDPlayDraw = (S, P, BD) => {
   const {
     AIR, arenaBgOf, Art, baseOf, bgOf, BLINK_TIME, blinkOn, BOSS_PX, BOSS_TOP, CAT_LOOK,
     CAT_MOB, CAT_MOBS, clamp, crashBgOf, DOOR_SWING, drawBackLayer, drawCone, drawExplosion,
-    drawMiniQuarter, drawPlayer, drawTile, el, ELEV_DOOR, ELEV_DOOR_OPEN, FAN, FLOWED,
-    FLYING_PETS, GALAXY_H, GALAXY_LOOK, GALAXY_W, GHOST_EVERY, GLITCH_COLORS, GLITCH_SIZE,
-    GLITCH_STONE, glitchLookOn, H, HEALTH_MAX, isDoor, isHidden, isLogged, isOpenDoor,
-    isSolid, isWire, LAMP, LOGGABLE, MINIGAME, MOB_H, MOB_W, noteKey, overOf, PLAINS_PORTAL,
-    PLAYER_H, PLAYER_W, POOF_AFTER, SKELETON, SLEEPY_CAT, SLIME_MOB, STILL_PETS, SWORDS,
-    TNT_SOLDIER, trailOn, VAC_ESCAPE, vacInsideGrid, VACUUM, VILLAGER, WARP_TIME,
-    WATCH_CYCLE, WIRE, WIRES, ZOMBIE_HP, ZOMBIE_LIVES
+    drawMiniQuarter, drawPlayer, drawTile, drawTree, el, ELEV_DOOR, ELEV_DOOR_OPEN, FAN,
+    FLIP, FLOWED, FLYING_PETS, GALAXY_H, GALAXY_LOOK, GALAXY_W, GHOST_EVERY, GLITCH_COLORS,
+    GLITCH_SIZE, GLITCH_STONE, glitchLookOn, H, HEALTH_MAX, isDoor, isHidden, isLogged,
+    isOpenDoor, isSolid, isWire, LAMP, LOGGABLE, MINIGAME, MOB_H, MOB_W, noteKey, overOf,
+    PLAINS_PORTAL, PLAYER_H, PLAYER_W, POOF_AFTER, SKELETON, SLEEPY_CAT, SLIME_MOB,
+    STILL_PETS, SWORDS, TNT_SOLDIER, trailOn, TREE, VAC_ESCAPE, vacInsideGrid, VACUUM,
+    VILLAGER, WARP_TIME, WATCH_CYCLE, WIRE, WIRES, ZOMBIE_HP, ZOMBIE_LIVES
   } = BD;
   const {
     bossMax, canvas, ctx, dragonAt, eyeOpen, hero, level, pet, petBase, showBoost, sword,
@@ -640,6 +640,11 @@ window.BDPlayDraw = (S, P, BD) => {
         const ch = S.grid[y][x];
         if (baseOf(ch) === MINIGAME) {
           drawMiniQuarter(ctx, S.grid, x, y, (x - S.camX) * TS, y * TS, TS);
+        } else if (baseOf(ch) === TREE) {
+          drawTree(ctx, ch, (x - S.camX) * TS, y * TS, TS);
+        } else if (ch === FLIP && S.flipTraps.some((f) => f.x === x && f.y === y)) {
+          // about to flip: it shakes
+          drawTile(ctx, ch, (x - S.camX) * TS + Math.sin(S.time * 60) * TS * 0.06, y * TS, TS, S.time, false);
         } else if (isDoor(ch) || baseOf(ch) === ELEV_DOOR || ch === ELEV_DOOR_OPEN) {
           Art.drawSprite(ctx, ch, (x - S.camX) * TS, (y - 1) * TS, TS, TS * 2);
         } else if (isOpenDoor(ch)) {

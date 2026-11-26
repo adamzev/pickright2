@@ -2586,6 +2586,118 @@ window.BDArt = (() => {
     ".kkk.kkk.kkkkk..",
   ], { k: "#2a1a10", B: "#a8743a", b: "#5a3a1a", w: "#ffffff" });
 
+  // Flip floor: a castle floor stone with a thin line across the middle (where it turns)
+  const flipFloor = paintMap([
+    "kkkkkkkkkkkkkkkk",
+    "ksSSSSSSSSSSSSsk",
+    "kSSSSSSSSSSSSSSk",
+    "kSSSSSSSSSSSSSSk",
+    "kSSSSSSSSSSSSSSk",
+    "kSSSSSSSSSSSSSSk",
+    "kSSSSSSSSSSSSSSk",
+    "hhhhhhhhhhhhhhhh",
+    "kSSSSSSSSSSSSSSk",
+    "kSSSSSSSSSSSSSSk",
+    "kSSSSSSSSSSSSSSk",
+    "kSSSSSSSSSSSSSSk",
+    "kSSSSSSSSSSSSSSk",
+    "kSSSSSSSSSSSSSSk",
+    "ksSSSSSSSSSSSSsk",
+    "kkkkkkkkkkkkkkkk",
+  ], { s: "#a0a0a8", S: "#8a8a94", k: "#5a5a64", d: "#2a2a34", h: "#4a4a54" });
+  // the flip floor turned on its side: a gap you fall through
+  const flipFloorOpen = paintMap([
+    "......d.........",
+    ".......d........",
+    "......dSd.......",
+    "......dSd.......",
+    "......dSd.......",
+    "......dSd.......",
+    "......dSd.......",
+    "hhhhhhdSdhhhhhhh",
+    "......dSd.......",
+    "......dSd.......",
+    "......dSd.......",
+    "......dSd.......",
+    "......dSd.......",
+    ".......d........",
+    "......d.........",
+    "................",
+  ], { s: "#a0a0a8", S: "#8a8a94", k: "#5a5a64", d: "#2a2a34", h: "#4a4a54" });
+  // Tree: a big round tree (drawn 3 wide and 4 tall from one square)
+  const treeDecor = paintMap([
+    "........................",
+    "........................",
+    "........................",
+    "........................",
+    ".........ddddd..........",
+    "......ddgggggdd.........",
+    "....ddgGGGlGGGgdd.......",
+    "...dgGGlGGGGGlGGgd......",
+    "..dgGGGGGGlGGGGGGgd.....",
+    "..dGGlGGGGGGGGlGGGd.....",
+    ".dgGGGGGGlGGGGGGGGgd....",
+    ".dGGGlGGGGGGGlGGGGGd....",
+    "dgGGGGGGGGGGGGGGlGGgd...",
+    "dGGGGlGGGlGGGGGGGGGGd...",
+    "dGlGGGGGGGGGlGGGGlGGd...",
+    "dgGGGGGGlGGGGGGGGGGgd...",
+    ".dGGGlGGGGGGGlGGGGGd....",
+    ".dgGGGGGGGGGGGGGGGgd....",
+    "..dgGGlGGGGGGlGGGgd.....",
+    "...ddgGGGGGGGGGgdd......",
+    ".....ddggtTtggdd........",
+    "........tTt.............",
+    "........tTt.............",
+    "........tTT.............",
+    "........tTt.............",
+    "........tTt.............",
+    "........TTt.............",
+    "........tTt.............",
+    "........tTt.............",
+    "........tTt.............",
+    ".......ttTtt............",
+    "......tTTtTTt...........",
+  ], { t: "#5a3a1a", T: "#7a4a2a", g: "#2e8a3a", G: "#3fa84a", l: "#7ad86a", d: "#1e5a2a" });
+  // Vines: hang them under a block
+  const vinesDecor = paintMap([
+    "..g......g...g..",
+    "..G.....gG...G..",
+    "..g......g...g..",
+    "..Gl.....G..lG..",
+    "...g.....g...g..",
+    "...G....lG...G..",
+    "...g.....g..g...",
+    "..lG.....G..G...",
+    "...g....g...g...",
+    "...G....G...Gl..",
+    "...g....g....g..",
+    "..lG....Gl...G..",
+    "...g.....g...g..",
+    "...G.....G......",
+    "...g......g.....",
+    "..l........l....",
+  ], { t: "#5a3a1a", T: "#7a4a2a", g: "#2e8a3a", G: "#3fa84a", l: "#7ad86a", d: "#1e5a2a" });
+  // Tall grass
+  const tallGrass = paintMap([
+    "................",
+    "................",
+    "................",
+    "................",
+    "..g.......g.....",
+    "..G..g....G...g.",
+    "..G..G..g.G...G.",
+    ".gG..G..G.Gg..G.",
+    ".GG.gG..G.GG.gG.",
+    ".GGgGG.gG.GGgGG.",
+    "gGGGGGgGGgGGGGGg",
+    "GGlGGGGGlGGGGlGG",
+    "GGGGlGGGGGGlGGGG",
+    "gGGGGGGlGGGGGGGg",
+    "GGlGGGGGGGlGGGGG",
+    "GGGGGlGGGGGGGGlG",
+  ], { t: "#5a3a1a", T: "#7a4a2a", g: "#2e8a3a", G: "#3fa84a", l: "#7ad86a", d: "#1e5a2a" });
+
   const water = paintMap([
     "bbbbbbbbbbbbbbbb",
     "bbbbbbbbbbbbbbbb",
@@ -3387,6 +3499,11 @@ window.BDArt = (() => {
     "\u01e6": platSide,
     "\u01e7": platUpDown,
     "\u01e8": villagerMob,
+    "\u01e9": flipFloor,
+    "\u01ea": flipFloorOpen,
+    "\u01eb": treeDecor,
+    "\u01ec": vinesDecor,
+    "\u01ed": tallGrass,
     petHorse,
     catWalk2,
     catScared,
@@ -3568,6 +3685,11 @@ window.BDArt = (() => {
     { key: "\u01e6", label: "Side-to-side platform" },
     { key: "\u01e7", label: "Up-and-down platform" },
     { key: "\u01e8", label: "Grey villager" },
+    { key: "\u01e9", label: "Flip floor" },
+    { key: "\u01ea", label: "Flip floor (flipped)" },
+    { key: "\u01eb", label: "Tree" },
+    { key: "\u01ec", label: "Vines" },
+    { key: "\u01ed", label: "Tall grass" },
     { key: "\u01c6", label: "Cat tree post" },
     { key: "\u01c7", label: "Cat tree platform" },
     { key: "\u01c8", label: "Cat tree cat house" },
@@ -4631,34 +4753,53 @@ window.BDArt = (() => {
       ctx.textBaseline = "middle";
       ctx.fillText("⬆ out ⬆", W / 2, ts * 0.6);
     } else if (kind === "castle") {
-      // a big stone castle on a hill: towers with battlements and flags,
-      // arched windows, a gate, and green hills in front
+      // inside the castle: a great hall of stone bricks with pillars, tall
+      // arched windows (sky outside), red banners on rods and torches on
+      // brackets. Everything moves with the wall, so nothing drifts.
       const px = Math.max(3, Math.round(ts / 8));
-      ctx.fillStyle = skyGrad(ctx, H, "#6ab0f0", "#cfe8ff");
-      ctx.fillRect(0, 0, W, H);
-      const span = W + 900;
-      const cx = Math.round(wrapX(W * 0.35 + 400, scroll, 0.15, span, 450)), base = groundY - ts * 0.5;
       const block = (x, y, w, h, col) => { ctx.fillStyle = col; ctx.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h)); };
-      const merlons = (x, y, w) => { for (let k = 0; x + k * px * 4 < x + w; k += 2) block(x + k * px * 4, y - px * 3, px * 4, px * 3, "#9a9aa4"); };
-      // the keep in the middle, then two towers
-      block(cx - ts * 3, base - ts * 5, ts * 6, ts * 5, "#9a9aa4"); merlons(cx - ts * 3, base - ts * 5, ts * 6);
-      for (const side of [-1, 1]) {
-        const tx = cx + side * ts * 4 - ts;
-        block(tx, base - ts * 7, ts * 2, ts * 7, "#8a8a94"); merlons(tx, base - ts * 7, ts * 2);
-        block(tx + ts * 0.95, base - ts * 9, px, ts * 2, "#5a3a1a"); // flagpole
-        block(tx + ts * 0.95 + px, base - ts * 9, ts * 0.8, ts * 0.45, Math.sin(t * 4 + side) > 0 ? "#c82a2a" : "#e04a3a");
-        block(tx + ts * 0.7, base - ts * 5.5, ts * 0.6, ts * 0.9, "#3a3a48"); // window
+      const RATE = 0.2;
+      block(0, 0, W, H, "#5a5a64");
+      const bw = ts * 1.2, bh = ts * 0.6, off = -(scroll * RATE) % (bw * 2);
+      for (let row = 0; row * bh < H; row++) {
+        const sx = off + (row % 2 ? bw / 2 : 0) - bw;
+        for (let x = sx; x < W + bw; x += bw) {
+          block(x + px / 2, row * bh + px / 2, bw - px, bh - px, (row * 7 + Math.floor((x - off) / bw)) % 5 ? "#6a6a74" : "#727280");
+        }
       }
-      for (const wx of [-1.6, 0.9]) block(cx + wx * ts, base - ts * 3.8, ts * 0.7, ts, "#3a3a48");
-      block(cx - ts * 0.9, base - ts * 2, ts * 1.8, ts * 2, "#4a2a10"); // the gate
-      block(cx - ts * 0.9, base - ts * 2, ts * 1.8, px * 2, "#2a1a08");
-      // hills in front
-      const hspan = W + 300;
-      for (let i = 0; i < 7; i++) {
-        const hx = Math.round(wrapX(i * 190, scroll, 0.3, hspan, 160));
-        block(hx, groundY - ts * 0.9, ts * 4, ts * 2, "#5aa83a");
-        block(hx + px * 3, groundY - ts * 1.3, ts * 4 - px * 6, px * 4, "#6ac04a");
+      // a stone beam along the ceiling
+      block(0, 0, W, ts * 0.5, "#4a4a54");
+      block(0, ts * 0.5, W, px, "#3a3a44");
+      // bays repeat every BAY along the wall: a pillar, a torch on it, a window, a banner
+      const BAY = ts * 6, start = -(scroll * RATE) % BAY - BAY;
+      for (let bx = start; bx < W + BAY; bx += BAY) {
+        // pillar, floor to ceiling
+        block(bx, ts * 0.5, ts * 0.9, H, "#7a7a86");
+        block(bx + ts * 0.9, ts * 0.5, px, H, "#4a4a54");
+        // torch on an iron bracket fixed to the pillar
+        const tx = bx + ts * 0.35, ty = H * 0.42;
+        block(tx - px, ty + ts * 0.5, px * 4, px, "#2a2a30"); // bracket
+        block(tx, ty, px * 2, ts * 0.55, "#5a3a1a"); // handle
+        const flick = Math.sin(t * 13 + bx * 0.01) * px;
+        block(tx - px, ty - px * 3 + flick / 2, px * 4, px * 3, "#ff8a3d");
+        block(tx, ty - px * 4 + flick, px * 2, px * 2, "#ffd54a");
+        // tall arched window with a stone sill
+        const wx = bx + ts * 1.9, ww = ts * 1.6, wy = H * 0.14, wh = ts * 3.6;
+        block(wx - px, wy - px, ww + px * 2, wh + px * 2, "#3a3a44");
+        block(wx, wy, ww, wh, "#8ec5ff");
+        for (let k = 0; k < 4; k++) { block(wx, wy + px * k, px * (4 - k), px, "#3a3a44"); block(wx + ww - px * (4 - k), wy + px * k, px * (4 - k), px, "#3a3a44"); } // arched corners
+        block(wx + ww / 2 - px / 2, wy, px, wh, "#3a3a44");
+        block(wx - px * 3, wy + wh, ww + px * 6, px * 2, "#8a8a96"); // sill
+        // banner hanging from a rod bolted to the wall
+        const nx = bx + ts * 4.1, ny = wy + ts * 0.3;
+        block(nx - px * 2, ny, ts * 0.9 + px * 4, px, "#5a3a1a");
+        block(nx - px * 2, ny - px, px, px * 3, "#2a2a30"); block(nx + ts * 0.9 + px, ny - px, px, px * 3, "#2a2a30"); // bolts
+        block(nx, ny + px, ts * 0.9, ts * 2.6, "#b82a2a");
+        for (let k = 0; k < 3; k++) block(nx + px * k, ny + px + ts * 2.6 + px * k, ts * 0.9 - px * k * 2, px, "#b82a2a");
+        block(nx + ts * 0.3, ny + ts * 0.9, ts * 0.3, ts * 0.3, "#ffd54a");
       }
+      // skirting and a shadow along the floor
+      block(0, groundY - ts * 0.5, W, ts * 0.5, "#4a4a54");
     } else if (kind === "catsky") {
       // Ultra Cat world: a soft sky with cat-shaped clouds and a cat moon,
       // all square pixels like the rest of the game

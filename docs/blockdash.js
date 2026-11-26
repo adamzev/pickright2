@@ -168,6 +168,11 @@
     "\u01e6": { name: "Side-to-side platform", solid: true },
     "\u01e7": { name: "Up-and-down platform", solid: true },
     "\u01e8": { name: "Grey villager" },
+    "\u01e9": { name: "Flip floor", solid: true },
+    "\u01ea": { name: "Flip floor (flipped)" }, // only ever made in play
+    "\u01eb": { name: "Tree" },
+    "\u01ec": { name: "Vines" },
+    "\u01ed": { name: "Tall grass" },
     // wires are solid bars: you can stand on them
     "\u0197": { name: "Red wire", solid: true },
     "\u019d": { name: "Green wire", solid: true },
@@ -322,6 +327,13 @@
   const PLAT_SIDE = "\u01e6", PLAT_UPDOWN = "\u01e7", PLAT_STEP = 0.35, PLAT_RANGE = 4;
   // Grey villager: walks after you like the zombie; VILLAGER_HP stomps
   const VILLAGER = "\u01e8", VILLAGER_SPEED = 1.6, VILLAGER_HP = 3;
+  // Flip floor (a castle trap, the son's idea): looks like floor; stand on it
+  // and it wobbles for FLIP_WOBBLE, flips open for FLIP_OPEN (you fall
+  // through), then flips back
+  const FLIP = "\u01e9", FLIPPED = "\u01ea", FLIP_WOBBLE = 0.35, FLIP_OPEN = 1.6;
+  // Decorations: a big tree drawn TREE_W wide and TREE_H tall from one square,
+  // hanging vines and tall grass
+  const TREE = "\u01eb", TREE_W = 3, TREE_H = 4, VINES = "\u01ec", TALL_GRASS = "\u01ed";
   // The giant vacuum is a boss (the son's design), fought right in the level.
   // Three stages, round and round: 1, it rolls after you and sucks (catch you
   // and you're INSIDE it: press jump VAC_ESCAPE times to pop out of its
@@ -346,7 +358,7 @@
       mood: kind === SLEEPY_CAT ? "sleep" : "walk", face: -1, meowT: 0, step: 0, spd: 1.5, hp: VILLAGER_HP, hurtT: 0 };
   };
   const FLOWERS = ["\u01a4", "\u01a5", "\u01a6", "\u01a7"]; // red, yellow, blue, tulip
-  const DECOR = ["\u0193", "\u0194", "\u0195", "\u0196", ...FLOWERS, "\u01ba", "\u01e2", "\u01e3"];
+  const DECOR = ["\u0193", "\u0194", "\u0195", "\u0196", ...FLOWERS, "\u01ba", "\u01e2", "\u01e3", "\u01eb", "\u01ec", "\u01ed"];
   // The background layer: blocks drawn darker behind the level, just for
   // looks. Nothing in it is solid or does anything. These can't go in it.
   const BACK_HIDE = "PKOMhCGE" + CRASH;
@@ -387,7 +399,7 @@
   const MEGA_PICK = "~"; // likewise, the palette button that opens the mega blocks
 
   const PALETTE = ["g", "s", "p", "n", "k", "e", "m", "t", "T", "h", "A", "L", "U", "D", "F", "S", "Z",
-    "W", "Y", "V", "Q", "N", "I", "C", "d", "+", "$", "@", "r", "9", "o", "H", "R", "b", "%", "w", "f", "K", "O", "M", "E", "G", "J", "B", IRON, GLITCH_STONE, GLITCH_IRON, WATER, CRASH, TELEPORT, ELEVATOR, LIFT, ELEV_DOOR, UP_LIFT, UP_LIFT_SHORT, BG_CHANGE, MINIGAME, CAT_BED, SCRATCH_POST, WALL_JUMP, NINE_LIVES, FISH, YARN, CAT_LEAVES, BOX, CATNIP, WALLPAPER, CARDBOARD, ...CAT_BLOCKS, ...SHINY_BLOCKS, CAT_DOOR, ...TREE_PARTS, VOID, HARM_VOID, FAN, CASTLE_WALL, BATTLEMENTS, CONCRETE_PICK, CHEST, PLAT_SIDE, PLAT_UPDOWN, ...CRITTERS, PUSH, SHOVE, ENTER, ...WIRES, BUTTON, LEVER, LAMP, ZOMBIE_TRAP, ...DECOR, ...DOORS, KEY, MEGA_PICK, MINE, "P", ERASER];
+    "W", "Y", "V", "Q", "N", "I", "C", "d", "+", "$", "@", "r", "9", "o", "H", "R", "b", "%", "w", "f", "K", "O", "M", "E", "G", "J", "B", IRON, GLITCH_STONE, GLITCH_IRON, WATER, CRASH, TELEPORT, ELEVATOR, LIFT, ELEV_DOOR, UP_LIFT, UP_LIFT_SHORT, BG_CHANGE, MINIGAME, CAT_BED, SCRATCH_POST, WALL_JUMP, NINE_LIVES, FISH, YARN, CAT_LEAVES, BOX, CATNIP, WALLPAPER, CARDBOARD, ...CAT_BLOCKS, ...SHINY_BLOCKS, CAT_DOOR, ...TREE_PARTS, VOID, HARM_VOID, FAN, CASTLE_WALL, BATTLEMENTS, CONCRETE_PICK, CHEST, PLAT_SIDE, PLAT_UPDOWN, FLIP, ...CRITTERS, PUSH, SHOVE, ENTER, ...WIRES, BUTTON, LEVER, LAMP, ZOMBIE_TRAP, ...DECOR, ...DOORS, KEY, "P", ERASER];
 
   // The boss arena is drawn in the same editor as the level, with a slightly
   // different set of blocks: no portals, save points or note-carrying blocks
@@ -715,12 +727,16 @@
   const layerRows = (g) => (g.some((r) => r.some((ch) => ch !== AIR)) ? gridToRows(g) : undefined);
   // Draws the background layer's blocks in columns x0..x1 and rows y0..y1,
   // darkened so they sit behind. ox shifts it (the play screen's scroll).
+  // a Tree square draws a big tree growing up from it, centred on it
+  const drawTree = (ctx, ch, px, py, ts) =>
+    Art.drawSprite(ctx, ch, px - ts * (TREE_W - 1) / 2, py - ts * (TREE_H - 1), ts * TREE_W, ts * TREE_H);
   const drawBackLayer = (ctx, g, x0, x1, y0, y1, ts, ox, t) => {
     for (let y = Math.max(0, y0); y <= Math.min(g.length - 1, y1); y++) {
       for (let x = Math.max(0, x0); x <= Math.min(g[0].length - 1, x1); x++) {
         const ch = g[y][x];
         if (ch === AIR) continue;
         const tall = isDoor(ch) || baseOf(ch) === ELEV_DOOR;
+        if (baseOf(ch) === TREE) { drawTree(ctx, ch, x * ts + ox, y * ts, ts); continue; }
         if (tall) Art.drawSprite(ctx, ch, x * ts + ox, (y - 1) * ts, ts, ts * 2);
         else drawTile(ctx, overOf(ch) || ch, x * ts + ox, y * ts, ts, t, false);
         ctx.fillStyle = "rgba(0, 0, 0, 0.38)";
@@ -2759,6 +2775,10 @@
       [CHEST, "Treasure chest — touch it for a random prize: coins, a power… or a TNT surprise!"],
       [PLAT_SIDE, "Side-to-side platform — moves left and right (up to 4 squares); you ride along"],
       [PLAT_UPDOWN, "Up-and-down platform — moves up and down (up to 4 squares); you ride along"],
+      [FLIP, "Flip floor — a castle trap: it looks like floor, but stand on it and it wobbles, flips over and drops you! Then it flips back"],
+      ["\u01eb", "Tree — decoration: one square makes a big tree (3 wide, 4 tall) growing up from here"],
+      ["\u01ec", "Vines — decoration: hang them under a block; stack them for long vines"],
+      ["\u01ed", "Tall grass — decoration: put it on the ground"],
       [VILLAGER, "Grey villager — acts like a zombie: walks after you and hurts you. Stomp it 3 times!"],
       [VOID, "Void block — a solid block that looks like empty space"],
       [FAN, "Fan — only inside the vacuum (🌀 Inside the vacuum tab): a big spinning fan goes here. Use as many as you like"],
@@ -3881,6 +3901,7 @@
       showArtStudio(k, () => (s >= 0 ? showEditor(loadLevels()[s], s) : showEditor(null, -1)));
     };
     const drawMine = () => {
+      if (!palItems[MINE]) return; // (the More blocks button is now the 🎨 More tab)
       const cx = palItems[MINE].firstChild.getContext("2d");
       cx.clearRect(0, 0, 32, 32);
       if (myLast) drawTile(cx, myLast, 0, 0, 32, 0, false);
@@ -3988,9 +4009,54 @@
       palItems[ch] = item;
       pal.appendChild(item);
     });
+    // Mega blocks and your own blocks sit in the list too (under the ✨ Mega
+    // and 🎨 More tabs), instead of behind buttons that open a tray
+    const pickItem = (k, item) => {
+      sel = k;
+      Object.values(palItems).forEach((n) => n.classList.remove("sel"));
+      item.classList.add("sel");
+      showTray();
+      showOpts();
+    };
+    const megaOwned = loadBag().unlocked;
+    for (const k of MEGA_LIST) {
+      const locked = !megaOwned.includes(k);
+      const item = el("div", "pal-item" + (k === sel ? " sel" : ""));
+      const c = el("canvas");
+      c.width = c.height = 32;
+      drawTile(c.getContext("2d"), k, 0, 0, 32, 0, false);
+      if (locked) c.style.opacity = "0.35";
+      item.append(c, el("div", "lbl", (locked ? "🔒 " : "") + TILES[k].name));
+      item.onclick = () => {
+        if (locked) { toast(`Buy ${TILES[k].name} in the Shop: ${MEGA_COST} megacoins`); return; }
+        pickItem(k, item);
+      };
+      palItems[k] = item;
+      pal.appendChild(item);
+    }
+    for (const { key: k, label, base } of myBlocks) {
+      const item = el("div", "pal-item" + (k === sel ? " sel" : ""));
+      // the small print says what it acts like, so a bouncy block and a solid one can't be mixed up
+      const kind = el("div", "lbl", typeName(base));
+      kind.style.opacity = "0.6";
+      item.append(spriteThumb(k, 32, 32), el("div", "lbl", label), kind);
+      item.onclick = () => { myLast = k; pickItem(k, item); };
+      palItems[k] = item;
+      pal.appendChild(item);
+    }
+    const NEW_BLOCK = "new-block"; // not a block: the button to make one in the Art Studio
+    {
+      const add = el("div", "pal-item");
+      const plus = el("div", null, "🎨");
+      plus.style.cssText = "height:32px;line-height:32px;font-size:22px;margin-bottom:3px";
+      add.append(plus, el("div", "lbl", "New / paint"));
+      add.title = "Make your own block in the Art Studio, or repaint the one picked here";
+      add.onclick = () => toStudio(isMine(sel) ? sel : undefined);
+      palItems[NEW_BLOCK] = add;
+      pal.appendChild(add);
+    }
     drawMine();
     // 🔍 search: type part of a block's name and only matching blocks show
-    // (your own blocks too: a match opens More blocks)
     const search = el("input");
     search.type = "search";
     search.placeholder = "🔍 Search blocks";
@@ -3998,19 +4064,54 @@
     const doSearch = () => {
       const q = search.value.trim().toLowerCase();
       const hit = (name) => !q || String(name).toLowerCase().includes(q);
-      const mineHit = !!q && myBlocks.some((b) => hit(b.label));
       for (const [ch, item] of Object.entries(palItems)) {
-        const name = ch === ERASER ? "erase eraser" : ch === MINE ? "more blocks my blocks" : ch === MEGA_PICK ? "mega blocks" : ch === CONCRETE_PICK ? "concrete colours " + CONCRETES.map((k) => TILES[k].name).join(" ") : (TILES[ch] || {}).name || "";
-        item.classList.toggle("search-hide", !(hit(name) || (ch === MINE && mineHit)));
-      }
-      if (mineHit && trayOpen !== MINE) { trayOpen = MINE; showTray(); }
-      for (const it of tray.children) {
-        const lbl = it.querySelector(".lbl");
-        if (trayOpen === MINE && lbl) it.classList.toggle("search-hide", !!q && !hit(lbl.textContent) && !/new|make/i.test(lbl.textContent));
+        const lbl = item.querySelector(".lbl");
+        const name = ch === ERASER ? "erase eraser" : ch === CONCRETE_PICK ? "concrete colours " + CONCRETES.map((k) => TILES[k].name).join(" ")
+          : (lbl ? lbl.textContent : "") + " " + ((TILES[ch] || {}).name || "");
+        item.classList.toggle("search-hide", !hit(name));
       }
     };
     search.oninput = doSearch;
     palPanel.appendChild(search);
+    // Category tabs: All to start with; a category shows only its blocks.
+    // They filter together with the search box.
+    const DANGER = ["t", "T", "h", "A", "L", "U", "D", "F", "S", "Z", "8", HARM_VOID, FLIP];
+    const MOBS = ["W", "Y", "V", "Q", "N", ...CRITTERS];
+    const ITEMS = ["d", "b", "w", "f", "r", "o", "9", "$", "+", "@", "%", KEY, FISH, YARN, CATNIP, WALL_JUMP, NINE_LIVES, CHEST];
+    const MACHINES = [ELEVATOR, LIFT, ELEV_DOOR, UP_LIFT, UP_LIFT_SHORT, PUSH, SHOVE, ...WIRES, BUTTON, LEVER, LAMP,
+      PLAT_SIDE, PLAT_UPDOWN, TELEPORT, ...DOORS, "I", "m", "0", CAT_BED, SCRATCH_POST, CAT_LEAVES, "\u01c6", "\u01ca", "\u01cb"];
+    const SPECIAL = ["P", "E", "C", "K", "O", "M", "G", "R", "H", "J", BG_CHANGE, MINIGAME, BOX, CAT_DOOR, ZOMBIE_TRAP, ENTER, FAN, CRASH];
+    const CAT_FLAP = "\ue5ca"; // a built-in extra block that acts like a teleport
+    const CATS = [CAT_BED, SCRATCH_POST, CAT_LEAVES, SLEEPY_CAT, CAT_MOB, WALL_JUMP, NINE_LIVES, FISH, YARN, CATNIP, BOX,
+      CAT_DOOR, VACUUM, WALLPAPER, CARDBOARD, ...CAT_BLOCKS, "\u01ba", ...TREE_PARTS, CAT_FLAP];
+    // Extra blocks (built-in ones like Stone bricks, and his own) go in the
+    // category of what they act like; his own are also under My blocks.
+    const shipped = new Set(Art.customBlocks().filter((b) => b.shipped).map((b) => b.key));
+    const kindOf = (ch) => (MEGA_LIST.includes(ch) ? "mega" : ch === NEW_BLOCK ? "mine"
+      : ch.length === 1 && isMine(ch) ? kindOf(baseOf(ch))
+      : DANGER.includes(ch) ? "danger" : MOBS.includes(ch) ? "mobs" : ITEMS.includes(ch) ? "items"
+      : MACHINES.includes(ch) ? "machines" : SPECIAL.includes(ch) ? "special" : DECOR.includes(ch) ? "decor" : "building");
+    const inCat = (ch, k) => k === "all" || ch === ERASER || kindOf(ch) === k || (k === "cats" && CATS.includes(ch))
+      || (k === "mine" && ch.length === 1 && isMine(ch) && !shipped.has(ch));
+    const catTabs = el("div", "cat-tabs");
+    const catBtns = {};
+    let catNow = "all";
+    const showCat = (k) => {
+      catNow = k;
+      for (const [kk, b] of Object.entries(catBtns)) b.classList.toggle("green", kk === k);
+      // the eraser stays in every category
+      for (const [ch, item] of Object.entries(palItems)) item.classList.toggle("cat-hide", !inCat(ch, k));
+    };
+    for (const [k, label] of [["all", "All"], ["building", "🧱 Building"], ["danger", "⚠️ Danger"], ["mobs", "👾 Mobs"],
+      ["items", "💎 Items"], ["machines", "⚙️ Moving"], ["special", "🚩 Special"], ["decor", "🌸 Decoration"],
+      ["cats", "🐱 Cats"], ["mega", "✨ Mega"], ["mine", "🎨 My blocks"]]) {
+      const b = el("button", "small", label);
+      b.onclick = () => showCat(k);
+      catBtns[k] = b;
+      catTabs.appendChild(b);
+    }
+    showCat("all");
+    palPanel.appendChild(catTabs);
     palPanel.appendChild(pal);
     palPanel.appendChild(tray);
     showTray();
@@ -4085,7 +4186,7 @@
     // show only the blocks that make sense for what's being edited
     const refreshPalette = () => {
       const hide = hiddenNow();
-      for (const [ch, item] of Object.entries(palItems)) item.style.display = hide.includes(ch) ? "none" : "";
+      for (const [ch, item] of Object.entries(palItems)) item.style.display = hide.includes(ch) || (ch.length === 1 && hide.includes(baseOf(ch))) ? "none" : "";
       if (hide.includes(baseOf(sel))) palItems.g.onclick();
       else showTray();
       editHint.textContent = editing === "arena"
@@ -4445,6 +4546,8 @@
               Art.drawSprite(ctx, ch, x * TS + TS * 0.05, (y - 1) * TS, TS * 0.9, TS * 2);
             } else if (isDoor(ch) || baseOf(ch) === ELEV_DOOR) {
               Art.drawSprite(ctx, ch, x * TS, (y - 1) * TS, TS, TS * 2);
+            } else if (baseOf(ch) === TREE) {
+              drawTree(ctx, ch, x * TS, y * TS, TS);
             } else if (baseOf(ch) === MINIGAME) {
               drawMiniQuarter(ctx, grid, x, y, x * TS, y * TS, TS);
             } else {
@@ -4604,29 +4707,30 @@
     CAT_SPEED, CATNIP, CHASE_SPEED, CHEST, CHEST_OPEN, clamp, CLIMB_V, CLIMBABLE, COIN_VALUE,
     CONCRETES, COYOTE, CRASH, crashArenaGrid, crashBgOf, CRITTERS, CUT_END, dailyLevelDone,
     dailyNote, dayKey, DOOR_REACH, DOOR_SWING, drawBackLayer, drawCone, drawExplosion,
-    drawMiniQuarter, drawPlayer, drawTile, EFFECT_TIME, el, ELEV_DOOR, ELEV_DOOR_OPEN,
-    ELEVATOR, ELEVATOR_BOOST, ENDER_AHEAD, ENDER_BULLET_SPEED, ENDER_NOTICE, ENTER,
-    ENTER_DONE, FALL_ACCEL, FALL_MAX, FALL_PUSH, FAN, findSpawn, FIREBALL_SPEED, FLOWED,
-    FLY_THRUST, FLY_UP_V, FLYING_PETS, GALAXY_H, GALAXY_KEY, GALAXY_LOOK, GALAXY_SHOOT,
-    GALAXY_W, galaxyWon, getBest, GHOST_BONUS, GHOST_EVERY, GLIDE_FALL, GLITCH_BLOCKS,
-    GLITCH_COLORS, GLITCH_EVERY, GLITCH_FIX_TIME, GLITCH_HOP, GLITCH_HP, GLITCH_IRON,
-    GLITCH_SIZE, GLITCH_SOLID, GLITCH_SPOTS, GLITCH_STONE, glitchLookOn, GRAVITY, H,
-    HARM_VOID, HEALTH_MAX, HURT_SAFE, inCone, isDoor, isHidden, isHiddenTnt, isLava,
-    isLogged, isOpenDoor, isSolid, isWire, JUMP_BUFFER, JUMP_V, KEY, LAMP, lapSpeed,
-    LAVA_FALL, LAVA_RISE, LEVER, LEVER_ON, LIFT, loadBag, loadPets, LOGGABLE, makeCritter,
-    MEGA_BASE, MEGA_BLAST, MEGA_BOUNCE_V, MEGATITE_PAYS, MINI_DEFAULT, miniArenaGrid,
-    MINIGAME, miniGroup, MOB_H, MOB_W, musicOf, nextToWater, NINE_LIVES, NINE_SAFE, NIP_JUMP,
-    NIP_TIME, noteKey, overOf, PET_SOUND, PLAINS_PORTAL, plainsGrid, PLAT_RANGE, PLAT_SIDE,
-    PLAT_STEP, PLAT_UPDOWN, PLAYER_H, PLAYER_W, POOF_AFTER, PUSH, RAIN_SPEED, saveBag,
-    savePets, SCRATCH_POST, setBest, SHIELD_TIME, SHOOT_EVERY, SHOVE, SHOVE_DIST, SINK_MAX,
-    SKELETON, SKELETON_SHOOT, SKELETON_SPEED, SLEEPY_CAT, SLIME_MOB, SLIME_SIZES,
-    SOLDIER_BLAST, SOLDIER_FUSE, SOLDIER_SPEED, SPAWN_EVERY, SPEED_BASE, SPEED_FAST,
-    SPEED_SLOW, STILL_PETS, STOP_DEFAULT, SWIM_V, SWORDS, TELEPORT, TILES, TNT_SOLDIER,
-    toast, trailOn, unlockKitten, unlockPet, UP_DEFAULT, UP_LIFT, UP_LIFT_SHORT, UP_SPEED,
-    VAC_DIRT, VAC_ESCAPE, VAC_FAN, VAC_HP, VAC_LOW, VAC_PULL, VAC_REACH, VAC_SIZE, VAC_SUCK,
-    vacInsideGrid, VACUUM, VILLAGER, VILLAGER_HP, VILLAGER_SPEED, VOID, WALL_JUMP, WARP_TIME,
-    WATCH_CYCLE, WATCH_OPEN, WATER, WATER_GRAVITY, WATER_SLOW, WIRE, WIRES, YARN, ZOMBIE_HP,
-    ZOMBIE_LIVES, ZOMBIE_SPEED, ZOMBIE_TRAP, ZOMBIE_TRAP_USED
+    drawMiniQuarter, drawPlayer, drawTile, drawTree, EFFECT_TIME, el, ELEV_DOOR,
+    ELEV_DOOR_OPEN, ELEVATOR, ELEVATOR_BOOST, ENDER_AHEAD, ENDER_BULLET_SPEED, ENDER_NOTICE,
+    ENTER, ENTER_DONE, FALL_ACCEL, FALL_MAX, FALL_PUSH, FAN, findSpawn, FIREBALL_SPEED, FLIP,
+    FLIP_OPEN, FLIP_WOBBLE, FLIPPED, FLOWED, FLY_THRUST, FLY_UP_V, FLYING_PETS, GALAXY_H,
+    GALAXY_KEY, GALAXY_LOOK, GALAXY_SHOOT, GALAXY_W, galaxyWon, getBest, GHOST_BONUS,
+    GHOST_EVERY, GLIDE_FALL, GLITCH_BLOCKS, GLITCH_COLORS, GLITCH_EVERY, GLITCH_FIX_TIME,
+    GLITCH_HOP, GLITCH_HP, GLITCH_IRON, GLITCH_SIZE, GLITCH_SOLID, GLITCH_SPOTS,
+    GLITCH_STONE, glitchLookOn, GRAVITY, H, HARM_VOID, HEALTH_MAX, HURT_SAFE, inCone, isDoor,
+    isHidden, isHiddenTnt, isLava, isLogged, isOpenDoor, isSolid, isWire, JUMP_BUFFER,
+    JUMP_V, KEY, LAMP, lapSpeed, LAVA_FALL, LAVA_RISE, LEVER, LEVER_ON, LIFT, loadBag,
+    loadPets, LOGGABLE, makeCritter, MEGA_BASE, MEGA_BLAST, MEGA_BOUNCE_V, MEGATITE_PAYS,
+    MINI_DEFAULT, miniArenaGrid, MINIGAME, miniGroup, MOB_H, MOB_W, musicOf, nextToWater,
+    NINE_LIVES, NINE_SAFE, NIP_JUMP, NIP_TIME, noteKey, overOf, PET_SOUND, PLAINS_PORTAL,
+    plainsGrid, PLAT_RANGE, PLAT_SIDE, PLAT_STEP, PLAT_UPDOWN, PLAYER_H, PLAYER_W,
+    POOF_AFTER, PUSH, RAIN_SPEED, saveBag, savePets, SCRATCH_POST, setBest, SHIELD_TIME,
+    SHOOT_EVERY, SHOVE, SHOVE_DIST, SINK_MAX, SKELETON, SKELETON_SHOOT, SKELETON_SPEED,
+    SLEEPY_CAT, SLIME_MOB, SLIME_SIZES, SOLDIER_BLAST, SOLDIER_FUSE, SOLDIER_SPEED,
+    SPAWN_EVERY, SPEED_BASE, SPEED_FAST, SPEED_SLOW, STILL_PETS, STOP_DEFAULT, SWIM_V,
+    SWORDS, TELEPORT, TILES, TNT_SOLDIER, toast, trailOn, TREE, unlockKitten, unlockPet,
+    UP_DEFAULT, UP_LIFT, UP_LIFT_SHORT, UP_SPEED, VAC_DIRT, VAC_ESCAPE, VAC_FAN, VAC_HP,
+    VAC_LOW, VAC_PULL, VAC_REACH, VAC_SIZE, VAC_SUCK, vacInsideGrid, VACUUM, VILLAGER,
+    VILLAGER_HP, VILLAGER_SPEED, VOID, WALL_JUMP, WARP_TIME, WATCH_CYCLE, WATCH_OPEN, WATER,
+    WATER_GRAVITY, WATER_SLOW, WIRE, WIRES, YARN, ZOMBIE_HP, ZOMBIE_LIVES, ZOMBIE_SPEED,
+    ZOMBIE_TRAP, ZOMBIE_TRAP_USED
   };
 
   // `chain` links a level to the ones after it: { i, count, carried, playNext }.
@@ -4776,7 +4880,7 @@
       watchers: [], mobs: [], runT: 0, warp: null, free: false, moveL: false, moveR: false,
       stopT: 0, talk: null, talkAt: 0, poofed: false, inBoss: false, boss: null,
       introSeen: false, cutT: 0, downT: 0, knock: 0, plats: [], flipT: 0, fallers: [], camY: 0,
-      crash: false, armor: galaxyWon() ? 1 : 0, slides: [], blockT: 0, tpSkip: null, entersLeft: 0, doorsLanded: [], critters: [], arrows: [], hp: 4, hurtT: 0, risers: [], bgNow: null, mini: null, box: null, inside: null, movPlats: [], platT: 0, nipT: 0, climb: null, wallT: 0, wallSide: 1, runDir: 1, lastWall: 0, wallJump: false, nineLives: 0, nineT: 0, safe: null, yarnGot: 0, yarnTotal: 0, powered: new Set(),
+      crash: false, armor: galaxyWon() ? 1 : 0, slides: [], blockT: 0, tpSkip: null, entersLeft: 0, doorsLanded: [], critters: [], arrows: [], hp: 4, hurtT: 0, risers: [], bgNow: null, mini: null, box: null, inside: null, movPlats: [], platT: 0, flipTraps: [], nipT: 0, climb: null, wallT: 0, wallSide: 1, runDir: 1, lastWall: 0, wallJump: false, nineLives: 0, nineT: 0, safe: null, yarnGot: 0, yarnTotal: 0, powered: new Set(),
     });
 
     const showItems = () => {
@@ -4948,6 +5052,7 @@
       S.movers = [];
       S.movPlats = [];
       S.platT = 0;
+      S.flipTraps = [];
       S.shooters = [];
       S.bullets = [];
       S.spawners = [];

@@ -10,14 +10,15 @@ window.BDPlayHazards = (S, P, BD) => {
     BOSS_SHOT_SPEED, BULLET_LIFE, BULLET_SPEED, BULLET_TURN, BUTTON_ON, CAT_MOBS, CAT_SPEED,
     CHASE_SPEED, clamp, ELEV_DOOR, ELEV_DOOR_OPEN, ELEVATOR_BOOST, ENDER_AHEAD,
     ENDER_BULLET_SPEED, ENDER_NOTICE, ENTER, ENTER_DONE, FALL_ACCEL, FALL_MAX, FALL_PUSH,
-    FIREBALL_SPEED, FLOWED, GLITCH_EVERY, GLITCH_HOP, GLITCH_IRON, GRAVITY, H, HURT_SAFE,
-    inCone, isDoor, isSolid, isWire, JUMP_V, LAMP, LAVA_FALL, LAVA_RISE, LEVER_ON, LIFT,
-    LOGGABLE, MOB_H, MOB_W, nextToWater, noteKey, PLAT_RANGE, PLAT_SIDE, PLAT_STEP,
-    PLAT_UPDOWN, PLAYER_H, PLAYER_W, PUSH, SHOOT_EVERY, SHOVE, SKELETON, SKELETON_SHOOT,
-    SKELETON_SPEED, SLIME_MOB, SLIME_SIZES, SOLDIER_BLAST, SOLDIER_FUSE, SOLDIER_SPEED,
-    SPAWN_EVERY, TELEPORT, TNT_SOLDIER, toast, UP_DEFAULT, UP_LIFT, UP_LIFT_SHORT, UP_SPEED,
-    VAC_DIRT, VAC_ESCAPE, VAC_FAN, VAC_HP, VAC_LOW, VAC_PULL, VAC_REACH, VAC_SUCK, VACUUM,
-    VILLAGER, VILLAGER_SPEED, WATCH_CYCLE, WATCH_OPEN, WIRE, ZOMBIE_TRAP, ZOMBIE_TRAP_USED
+    FIREBALL_SPEED, FLIP, FLIP_OPEN, FLIP_WOBBLE, FLIPPED, FLOWED, GLITCH_EVERY, GLITCH_HOP,
+    GLITCH_IRON, GRAVITY, H, HURT_SAFE, inCone, isDoor, isSolid, isWire, JUMP_V, LAMP,
+    LAVA_FALL, LAVA_RISE, LEVER_ON, LIFT, LOGGABLE, MOB_H, MOB_W, nextToWater, noteKey,
+    PLAT_RANGE, PLAT_SIDE, PLAT_STEP, PLAT_UPDOWN, PLAYER_H, PLAYER_W, PUSH, SHOOT_EVERY,
+    SHOVE, SKELETON, SKELETON_SHOOT, SKELETON_SPEED, SLIME_MOB, SLIME_SIZES, SOLDIER_BLAST,
+    SOLDIER_FUSE, SOLDIER_SPEED, SPAWN_EVERY, TELEPORT, TNT_SOLDIER, toast, UP_DEFAULT,
+    UP_LIFT, UP_LIFT_SHORT, UP_SPEED, VAC_DIRT, VAC_ESCAPE, VAC_FAN, VAC_HP, VAC_LOW,
+    VAC_PULL, VAC_REACH, VAC_SUCK, VACUUM, VILLAGER, VILLAGER_SPEED, WATCH_CYCLE, WATCH_OPEN,
+    WIRE, ZOMBIE_TRAP, ZOMBIE_TRAP_USED
   } = BD;
   const {
     die, explode, gotRod, sparkle, VIEW_COLS
@@ -243,6 +244,7 @@ window.BDPlayHazards = (S, P, BD) => {
     updateRisers(dt);
     updateBlocks(dt);
     updatePlats(dt);
+    updateFlips(dt);
     return false;
   };
 
@@ -697,6 +699,22 @@ window.BDPlayHazards = (S, P, BD) => {
     }
     S.grid[ny][nx] = ch;
     return true;
+  };
+
+  // Flip floors: a wobble, then open (not solid: you drop), then shut again
+  const updateFlips = (dt) => {
+    for (const f of S.flipTraps) {
+      f.t += dt;
+      if (!f.open && f.t >= FLIP_WOBBLE) {
+        if (S.grid[f.y][f.x] === FLIP) S.grid[f.y][f.x] = FLIPPED;
+        f.open = true;
+        f.t = 0;
+      } else if (f.open && f.t >= FLIP_OPEN) {
+        if (S.grid[f.y][f.x] === FLIPPED) S.grid[f.y][f.x] = FLIP;
+        f.done = true;
+      }
+    }
+    S.flipTraps = S.flipTraps.filter((f) => !f.done);
   };
 
   // Moving platforms go one square every PLAT_STEP, PLAT_RANGE squares and
