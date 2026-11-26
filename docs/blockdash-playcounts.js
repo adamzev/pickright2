@@ -42,7 +42,8 @@
 
   // fetched once per page load, shared by every card
   let all = null;
-  const counts = () => (all = all || (API ? fetch(`${API}/stats/play-counts`).then((r) => r.json()).catch(() => ({})) : Promise.resolve({})));
+  // (no fetch: the replay test's pretend browser, which shouldn't reach the real API)
+  const counts = () => (all = all || (API && typeof window.fetch === "function" ? fetch(`${API}/stats/play-counts`).then((r) => r.json()).catch(() => ({})) : Promise.resolve({})));
 
   // adds "· ▶ 123 plays" to a level card once the counts arrive
   const show = (metaEl, level) => {
