@@ -1555,7 +1555,7 @@
         `${lvl.name}<span class="meta">${g[0].length} blocks long · ` +
         `${countBlocks(g)} blocks placed${best ? ` · best ${best}` : ""}</span>`),
     );
-    window.BDPlayCounts?.show(card.querySelector(".meta"), lvl);
+    window.BDPlayCounts?.show(card.querySelector(".meta"), bestKey(lvl));
     actions.forEach((b) => card.appendChild(b));
     return card;
   };
